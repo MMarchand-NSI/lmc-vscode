@@ -1,6 +1,7 @@
 name = "lmc_vscode"
 version = "1.0.0"
-runtime = "javascript"
+target = "javascript"
+runtime = "node"
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.
 #
