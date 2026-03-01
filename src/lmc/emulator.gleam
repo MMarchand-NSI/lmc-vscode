@@ -25,12 +25,17 @@ pub type State {
 pub type StepResult {
   Running(State)
   Halted(State)
+  /// La machine est en pause sur INP et attend une valeur de l'utilisateur.
+  /// Appeler `provide_input(state, value)` puis `step` pour reprendre.
+  NeedsInput(State)
 }
 
 pub type EmulatorError {
   UndefinedLabel(String)
   ProgramTooLong
   InvalidAddress(Int)
+  /// Uniquement en mode batch : `run` a rencontré un INP sans input disponible.
+  /// En mode interactif, `step` retourne `NeedsInput` à la place.
   NoInput
 }
 
@@ -59,12 +64,32 @@ pub fn step(state: State) -> Result(StepResult, EmulatorError) {
 }
 
 /// Run until the machine halts or an error occurs.
+/// En mode batch : l'input doit être fourni entièrement à l'avance via `load`.
+/// Pour le mode interactif (webview), utiliser `step` directement et gérer
+/// `NeedsInput` en appelant `provide_input` puis `step` à nouveau.
 pub fn run(state: State) -> Result(State, EmulatorError) {
   case step(state) {
     Error(e) -> Error(e)
     Ok(Halted(s)) -> Ok(s)
     Ok(Running(s)) -> run(s)
+    Ok(NeedsInput(_)) -> Error(NoInput)
   }
+}
+
+/// Run jusqu'au prochain INP (NeedsInput) ou jusqu'au HLT.
+/// Utile en mode interactif pour avancer sans bloquer sur les entrées.
+pub fn run_until_input(state: State) -> Result(StepResult, EmulatorError) {
+  case step(state) {
+    Error(e) -> Error(e)
+    Ok(Halted(s)) -> Ok(Halted(s))
+    Ok(NeedsInput(s)) -> Ok(NeedsInput(s))
+    Ok(Running(s)) -> run_until_input(s)
+  }
+}
+
+/// Fournit une valeur d'entrée à une machine en pause sur INP.
+pub fn provide_input(state: State, value: Int) -> State {
+  State(..state, input: list.append(state.input, [value]))
 }
 
 // ---- Assembler --------------------------------------------------------------
@@ -225,7 +250,7 @@ fn execute(
 
     DInp ->
       case state.input {
-        [] -> Error(NoInput)
+        [] -> Ok(NeedsInput(state))
         [val, ..rest] ->
           Ok(Running(State(
             ..state,

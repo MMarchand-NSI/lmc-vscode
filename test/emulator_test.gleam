@@ -226,6 +226,40 @@ divisor  DAT"
   |> should.equal([3])
 }
 
+// ---- Mode interactif (NeedsInput) -------------------------------------------
+
+pub fn interactive_input_test() {
+  let assert Ok(program) = "INP\nOUT\nHLT" |> lexer.tokenize |> parser.parse
+  let assert Ok(s0) = emulator.load(program, [])
+
+  // INP sans input → pause, PC inchangé
+  let assert Ok(emulator.NeedsInput(paused)) = emulator.step(s0)
+
+  // on fournit la valeur et on reprend
+  let s1 = emulator.provide_input(paused, 42)
+  let assert Ok(final) = emulator.run(s1)
+  final.output |> should.equal([42])
+}
+
+pub fn interactive_multiple_inputs_test() {
+  let assert Ok(program) =
+    "INP\nSTA a\nINP\nADD a\nOUT\nHLT\na DAT"
+    |> lexer.tokenize
+    |> parser.parse
+  let assert Ok(s0) = emulator.load(program, [])
+
+  // premier INP
+  let assert Ok(emulator.NeedsInput(p0)) = emulator.step(s0)
+  let s1 = emulator.provide_input(p0, 10)
+
+  // deuxième INP — on laisse run gérer le reste jusqu'au prochain NeedsInput
+  let assert Ok(emulator.NeedsInput(p1)) = emulator.run_until_input(s1)
+  let s2 = emulator.provide_input(p1, 5)
+
+  let assert Ok(final) = emulator.run(s2)
+  final.output |> should.equal([15])
+}
+
 // ---- Erreurs ----------------------------------------------------------------
 
 pub fn no_input_error_test() {
