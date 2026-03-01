@@ -1,6 +1,9 @@
 import gleam/int
 import gleam/list
+import gleam/regexp
+import gleam/set
 import gleam/string
+import nibble/lexer
 
 // ---- Types ------------------------------------------------------------------
 
@@ -8,7 +11,9 @@ pub type Token {
   Ident(String)
   // identifiant brut : label, mnémonique, référence
   Number(Int)
-  // entier littéral (toute valeur, validation laissée au parser)
+  // entier positif, validation laissée au parser
+  Minus
+  // '-' isolé, pour DAT -5
   Comment(String)
   // texte après ; ou //
   Newline
@@ -16,182 +21,89 @@ pub type Token {
   // caractère non reconnu
 }
 
-pub type Span {
-  Span(line: Int, col_start: Int, col_end: Int)
-}
-
-pub type SpannedToken {
-  SpannedToken(token: Token, span: Span)
-}
-
 // ---- Point d'entrée ---------------------------------------------------------
 
-pub fn tokenize(source: String) -> List(SpannedToken) {
+pub fn tokenize(source: String) -> List(lexer.Token(Token)) {
   source
   |> string.split("\n")
   |> list.index_map(fn(line, idx) { tokenize_line(line, idx + 1) })
   |> list.flatten
 }
 
-pub fn tokenize_line(line: String, line_no: Int) -> List(SpannedToken) {
-  line
-  |> string.to_graphemes
-  |> scan(line_no, 1, [])
-  |> list.reverse
-  |> fn(tokens) {
-    list.append(tokens, [SpannedToken(Newline, Span(line_no, -1, -1))])
+pub fn tokenize_line(line: String, line_no: Int) -> List(lexer.Token(Token)) {
+  let tokens = case lexer.run(line, line_lexer()) {
+    Ok(tokens) -> tokens
+    Error(_) -> []
   }
-}
-
-// ---- Automate de scan -------------------------------------------------------
-
-fn scan(
-  chars: List(String),
-  line: Int,
-  col: Int,
-  acc: List(SpannedToken),
-) -> List(SpannedToken) {
-  case chars {
-    [] -> acc
-
-    [c, ..rest] if c == " " || c == "\t" -> scan(rest, line, col + 1, acc)
-
-    [";", ..rest] -> emit_comment(rest, line, col, acc)
-
-    ["/", "/", ..rest] -> emit_comment(rest, line, col, acc)
-
-    ["/", ..rest] ->
-      scan(rest, line, col + 1, [
-        SpannedToken(Unknown("/"), Span(line, col, col)),
-        ..acc
-      ])
-
-    ["-", ..rest] ->
-      case rest {
-        [c, ..] ->
-          case is_digit(c) {
-            // nombre négatif, seul cas où le - est valide
-            True -> emit_number(chars, line, col, acc)
-            False ->
-              scan(rest, line, col + 1, [
-                SpannedToken(Unknown("-"), Span(line, col, col)),
-                ..acc
-              ])
-          }
-        _ ->
-          scan(rest, line, col + 1, [
-            SpannedToken(Unknown("-"), Span(line, col, col)),
-            ..acc
-          ])
-      }
-
-    [c, ..rest] ->
-      case is_digit(c) {
-        True -> emit_number(chars, line, col, acc)
-        False ->
-          case is_ident_start(c) {
-            True -> emit_ident(chars, line, col, acc)
-            False ->
-              scan(rest, line, col + 1, [
-                SpannedToken(Unknown(c), Span(line, col, col)),
-                ..acc
-              ])
-          }
-      }
-  }
-}
-
-// ---- Émission des tokens composés -------------------------------------------
-
-fn emit_comment(
-  chars: List(String),
-  line: Int,
-  col: Int,
-  acc: List(SpannedToken),
-) -> List(SpannedToken) {
-  let text = string.join(chars, "")
-  let end_col = col + string.length(text)
-  [SpannedToken(Comment(string.trim(text)), Span(line, col, end_col)), ..acc]
-}
-
-fn emit_number(
-  chars: List(String),
-  line: Int,
-  col: Int,
-  acc: List(SpannedToken),
-) -> List(SpannedToken) {
-  let #(raw_chars, rest) = case chars {
-    ["-", ..rest] -> {
-      let #(digits, remaining) = take_while(rest, is_digit)
-      #(["-", ..digits], remaining)
-    }
-    _ -> take_while(chars, is_digit)
-  }
-  let raw = string.join(raw_chars, "")
-  let end_col = col + string.length(raw) - 1
-  let token = case int.parse(raw) {
-    Ok(n) -> Number(n)
-    Error(_) -> Unknown(raw)
-  }
-  scan(rest, line, end_col + 1, [
-    SpannedToken(token, Span(line, col, end_col)),
-    ..acc
+  list.append(tokens, [
+    lexer.Token(lexer.Span(line_no, -1, line_no, -1), "", Newline),
   ])
 }
 
-fn emit_ident(
-  chars: List(String),
-  line: Int,
-  col: Int,
-  acc: List(SpannedToken),
-) -> List(SpannedToken) {
-  let #(word_chars, rest) = take_while(chars, is_ident_char)
-  let raw = string.join(word_chars, "")
-  let end_col = col + string.length(raw) - 1
-  scan(rest, line, end_col + 1, [
-    SpannedToken(Ident(string.uppercase(raw)), Span(line, col, end_col)),
-    ..acc
+// ---- Règles de tokenisation -------------------------------------------------
+
+fn line_lexer() -> lexer.Lexer(Token, Nil) {
+  lexer.simple([
+    comment_matcher("//"),
+    comment_matcher(";"),
+    lexer.identifier("[a-zA-Z_]", "[a-zA-Z0-9_]", set.new(), fn(name) {
+      Ident(string.uppercase(name))
+    }),
+    positive_int(),
+    lexer.token("-", Minus),
+    lexer.whitespace(Nil) |> lexer.ignore,
+    lexer.keep(fn(lexeme, lookahead) {
+      let assert Ok(any) = regexp.from_string("^.$")
+      let assert Ok(alnum) = regexp.from_string("[a-zA-Z0-9_\\-]")
+      case
+        regexp.check(any, lexeme)
+        && !regexp.check(alnum, lookahead)
+        || lookahead == ""
+      {
+        True -> Ok(Unknown(lexeme))
+        False -> Error(Nil)
+      }
+    }),
   ])
 }
 
-// ---- Utilitaires ------------------------------------------------------------
+// ---- Matcher pour les entiers positifs --------------------------------------
 
-fn take_while(
-  chars: List(String),
-  pred: fn(String) -> Bool,
-) -> #(List(String), List(String)) {
-  case chars {
-    [c, ..rest] ->
-      case pred(c) {
-        True -> {
-          let #(taken, remaining) = take_while(rest, pred)
-          #([c, ..taken], remaining)
+fn positive_int() -> lexer.Matcher(Token, Nil) {
+  let assert Ok(digits) = regexp.from_string("^[0-9]+$")
+  let assert Ok(digit) = regexp.from_string("^[0-9]$")
+  lexer.keep(fn(lexeme, lookahead) {
+    case regexp.check(digits, lexeme) && !regexp.check(digit, lookahead) {
+      True ->
+        case int.parse(lexeme) {
+          Ok(n) -> Ok(Number(n))
+          Error(_) -> Error(Nil)
         }
-        False -> #([], chars)
-      }
-    _ -> #([], chars)
-  }
+      False -> Error(Nil)
+    }
+  })
 }
 
-fn is_digit(c: String) -> Bool {
-  case c {
-    "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> True
-    _ -> False
-  }
-}
+// ---- Matcher pour les commentaires ------------------------------------------
 
-fn is_ident_start(c: String) -> Bool {
-  is_alpha(c) || c == "_"
-}
-
-fn is_ident_char(c: String) -> Bool {
-  is_alpha(c) || is_digit(c) || c == "_"
-}
-
-fn is_alpha(c: String) -> Bool {
-  let code = case string.to_utf_codepoints(c) {
-    [cp] -> string.utf_codepoint_to_int(cp)
-    _ -> 0
-  }
-  { code >= 65 && code <= 90 } || { code >= 97 && code <= 122 }
+fn comment_matcher(prefix: String) -> lexer.Matcher(Token, Nil) {
+  let prefix_len = string.length(prefix)
+  lexer.custom(fn(_, lexeme, next) {
+    case string.starts_with(prefix, lexeme) && lexeme != prefix {
+      True -> lexer.Skip
+      False ->
+        case string.starts_with(lexeme, prefix) {
+          False -> lexer.NoMatch
+          True ->
+            case next {
+              "" ->
+                lexer.Keep(
+                  Comment(string.trim(string.drop_start(lexeme, prefix_len))),
+                  Nil,
+                )
+              _ -> lexer.Skip
+            }
+        }
+    }
+  })
 }
