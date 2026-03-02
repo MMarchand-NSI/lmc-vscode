@@ -1,4 +1,26 @@
 {
+  "name": "lmc-vscode",
+  "displayName": "LMC Language Support",
+  "description": "Little Man Computer (LMC) assembly language support for VS Code",
+  "version": "0.1.0",
+  "publisher": "lmc-vscode",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Programming Languages"],
+  "main": "./out/client.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "lmc",
+        "aliases": ["LMC", "Little Man Computer"],
+        "extensions": [".lmc"],
+        "configuration": "./language-configuration.json"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
   },
@@ -6,6 +28,5 @@
     "@types/vscode": "^1.109.0",
     "typescript": "^5.9.3",
     "@vscode/vsce": "^3.7.1"
-  },
-  "engines": { "vscode": "^1.80.0" }
+  }
 }
