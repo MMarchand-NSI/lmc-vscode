@@ -151,3 +151,46 @@ pub fn labels_dont_shift_the_address_line_map_test() {
   assert model.line_for_address(m, 1) == Some(1)
   assert model.line_for_address(m, 2) == Some(2)
 }
+
+// ── Légende d'instruction / longueur du programme ─────────────────
+
+pub fn current_instruction_text_mnemonic_with_operand_test() {
+  let m = model.init("STA total\nHLT\ntotal DAT 0\n")
+  assert model.current_instruction_text(m) == Some("STA total — stocker ACC")
+}
+
+pub fn current_instruction_text_nullary_test() {
+  let m = model.init("INP\nHLT\n")
+  assert model.current_instruction_text(m) == Some("INP — lire une entrée")
+}
+
+pub fn current_instruction_text_advances_with_pc_test() {
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(1)
+    |> model.step
+  assert model.current_instruction_text(m) == Some("OUT — écrire la sortie")
+}
+
+pub fn current_instruction_text_none_when_not_loaded_test() {
+  let m = model.init("XXX\n")
+  assert model.current_instruction_text(m) == None
+}
+
+pub fn program_length_counts_instructions_test() {
+  // Lignes vides comprises dans le source, pas dans le compte — même
+  // logique que load.address_offsets côté lmc_lsp.
+  let m = model.init("INP\n\nOUT\nHLT\n")
+  assert model.program_length(m) == 3
+}
+
+pub fn program_length_counts_the_invalid_line_even_when_it_wont_load_test() {
+  // "XXX" alone doesn't parse as a real instruction, but the parser's error
+  // recovery still gives it an Invalid placeholder that occupies an
+  // address (matches lmc_lsp's own addressing — see load.gleam) — even
+  // though this program never actually loads (m.machine == None).
+  let m = model.init("XXX\n")
+  assert m.machine == None
+  assert model.program_length(m) == 1
+}

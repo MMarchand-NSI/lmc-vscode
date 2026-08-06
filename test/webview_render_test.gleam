@@ -46,3 +46,9 @@ pub fn cursor_address_reflected_test() {
     |> render.to_json
   assert string.contains(json, "\"cursorAddress\":1")
 }
+
+pub fn instruction_text_and_program_length_reflected_test() {
+  let json = model.init("INP\nOUT\nHLT\n") |> render.to_json
+  assert string.contains(json, "\"instructionText\":\"INP — lire une entrée\"")
+  assert string.contains(json, "\"programLength\":3")
+}

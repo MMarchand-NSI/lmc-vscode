@@ -75,6 +75,15 @@ h2 {
 .status-error { background: var(--vscode-testing-iconFailed, #f14c4c); color: #fff; }
 .status-waiting_input { background: var(--vscode-testing-iconQueued, #cca700); color: #000; }
 
+.instruction-caption {
+  font-size: 0.85em;
+  opacity: 0.75;
+  font-family: var(--vscode-editor-font-family, monospace);
+  min-height: 1.2em;
+  /* Text, not a competing visual anchor — same reasoning as putting it
+     next to the registers instead of its own boxed/bordered section. */
+}
+
 .controls {
   display: flex;
   gap: 6px;
@@ -168,4 +177,15 @@ button:disabled {
 .mailbox.cursor:not(.current) {
   outline: 2px solid var(--vscode-focusBorder);
   outline-offset: -1px;
+}
+
+/* Cells past the end of the assembled program — always 0, never touched.
+   Dimmed rather than hidden (still legible if someone wants to check),
+   so attention naturally goes to the handful of cells that actually
+   matter instead of all 100 carrying equal visual weight. */
+.mailbox.unused {
+  opacity: 0.35;
+}
+.mailbox.unused:hover {
+  opacity: 0.7;
 }

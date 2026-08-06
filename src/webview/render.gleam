@@ -21,6 +21,11 @@ pub fn to_json(mdl: Model) -> String {
     #("currentLine", json_option_int(model.current_line(mdl))),
     #("currentAddress", json_option_int(model.current_address(mdl))),
     #("cursorAddress", json_option_int(model.cursor_address(mdl))),
+    #(
+      "instructionText",
+      json_option_string(model.current_instruction_text(mdl)),
+    ),
+    #("programLength", json.int(model.program_length(mdl))),
     #("loadError", json_option_string(mdl.load_error)),
   ])
   |> json.to_string

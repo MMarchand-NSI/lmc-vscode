@@ -71,6 +71,7 @@ export function render(json) {
   const state = JSON.parse(json);
   renderMemory(state);
   renderRegisters(state);
+  renderInstruction(state);
   renderOutput(state);
   renderStatus(state);
   renderInput(state);
@@ -93,6 +94,7 @@ function renderMemory(state) {
   }
 
   const memory = state.memory ?? new Array(100).fill(0);
+  const programLength = state.programLength ?? 0;
   const cells = grid.children;
   for (let addr = 0; addr < cells.length; addr++) {
     const cell = cells[addr];
@@ -102,6 +104,9 @@ function renderMemory(state) {
     // execution — a separate, lighter highlight (see style.css).
     cell.classList.toggle("current", addr === state.currentAddress);
     cell.classList.toggle("cursor", addr === state.cursorAddress);
+    // Dim cells the assembled program never touches, so attention goes to
+    // the handful that matter instead of all 100 looking equally relevant.
+    cell.classList.toggle("unused", addr >= programLength);
   }
 }
 
@@ -110,6 +115,10 @@ function renderRegisters(state) {
     state.acc === null || state.acc === undefined ? "—" : String(state.acc);
   document.getElementById("pc").textContent =
     state.pc === null || state.pc === undefined ? "—" : String(state.pc);
+}
+
+function renderInstruction(state) {
+  document.getElementById("instruction").textContent = state.instructionText ?? "—";
 }
 
 function renderOutput(state) {

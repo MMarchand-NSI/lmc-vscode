@@ -6,6 +6,7 @@ import lmc/parse/span
 import lmc/runner/load
 import lmc/runner/run
 import lmc/runner/state.{type MachineState}
+import lmc/semantic/ast
 import lmc/semantic/pipeline
 
 // Pure application state for the emulator webview — no FFI, no DOM, fully
@@ -24,6 +25,11 @@ pub type Model {
     // lmc_lsp v0.1.5/v0.1.6). Powers the editor <-> webview sync both ways.
     address_to_line: Dict(Int, Int),
     line_to_address: Dict(Int, Int),
+    // Same addressing as address_to_line (derived from the same
+    // load.address_offsets call — see build_address_maps), just mapped to
+    // the instruction itself instead of the line number. Powers the
+    // current-instruction caption; not needed for the editor sync.
+    address_to_instruction: Dict(Int, ast.Instruction),
     // Line the host's cursor is currently on — independent of execution
     // state, doesn't get reset by step/run/reset.
     cursor_line: Option(Int),
@@ -38,6 +44,7 @@ pub fn init(source: String) -> Model {
     machine: None,
     address_to_line: dict.new(),
     line_to_address: dict.new(),
+    address_to_instruction: dict.new(),
     cursor_line: None,
     load_error: None,
   )
@@ -68,6 +75,7 @@ pub fn load_source(model: Model, source: String) -> Model {
   let result = pipeline.parse(source)
   let address_to_line = build_address_to_line(result)
   let line_to_address = invert(address_to_line)
+  let address_to_instruction = build_address_to_instruction(result)
 
   case result.diagnostics {
     [] ->
@@ -80,6 +88,7 @@ pub fn load_source(model: Model, source: String) -> Model {
             machine: Some(machine),
             address_to_line: address_to_line,
             line_to_address: line_to_address,
+            address_to_instruction: address_to_instruction,
             load_error: None,
           )
         Error(err) ->
@@ -90,6 +99,7 @@ pub fn load_source(model: Model, source: String) -> Model {
             machine: None,
             address_to_line: address_to_line,
             line_to_address: line_to_address,
+            address_to_instruction: address_to_instruction,
             load_error: Some(load_error_message(err)),
           )
       }
@@ -104,6 +114,7 @@ pub fn load_source(model: Model, source: String) -> Model {
         machine: None,
         address_to_line: address_to_line,
         line_to_address: line_to_address,
+        address_to_instruction: address_to_instruction,
         load_error: Some(
           "le programme contient des erreurs — voir les diagnostics dans l'éditeur",
         ),
@@ -198,6 +209,33 @@ pub fn line_for_address(model: Model, address: Int) -> Option(Int) {
   dict.get(model.address_to_line, address) |> option.from_result
 }
 
+/// Human-readable caption for the instruction at current_address, e.g.
+/// "STA dividend — stocker ACC". Deliberately just the instruction as
+/// written (mnemonic + operand text) plus a static one-line description of
+/// what that mnemonic does — not the *resolved* effect (e.g. not "mem[7] =
+/// ACC"), which would need pulling in the symbol table just for a caption.
+/// Static and always correct beats dynamic and one more thing to get wrong.
+pub fn current_instruction_text(model: Model) -> Option(String) {
+  case current_address(model) {
+    None -> None
+    Some(addr) ->
+      dict.get(model.address_to_instruction, addr)
+      |> option.from_result
+      |> option.map(describe_instruction)
+  }
+}
+
+/// How many addresses the assembled program actually occupies — i.e. the
+/// number of instruction-bearing lines, per load.address_offsets. Always a
+/// contiguous range [0, count) since collect_addresses_loop in lmc_lsp
+/// assigns addresses sequentially in source order; any address >= this is
+/// outside the program (padding memory, always 0 until written). Lets the
+/// webview de-emphasize those cells instead of giving all 100 equal visual
+/// weight regardless of how short the program is.
+pub fn program_length(model: Model) -> Int {
+  dict.size(model.address_to_line)
+}
+
 // ── Internals ──────────────────────────────────────────────────────
 
 fn build_address_to_line(result: pipeline.ParseResult) -> Dict(Int, Int) {
@@ -215,6 +253,54 @@ fn invert(d: Dict(Int, Int)) -> Dict(Int, Int) {
   |> dict.to_list
   |> list.map(fn(pair) { #(pair.1, pair.0) })
   |> dict.from_list
+}
+
+/// Same addressing as build_address_to_line (same load.address_offsets
+/// call), matched back to the actual ast.Line by character offset — cheap
+/// and precise, no need for span.to_position/line_index here since offsets
+/// are already exact.
+fn build_address_to_instruction(
+  result: pipeline.ParseResult,
+) -> Dict(Int, ast.Instruction) {
+  load.address_offsets(result.ast)
+  |> list.filter_map(fn(pair) {
+    let #(addr, offset) = pair
+    case list.find(result.ast.lines, fn(line) { line.span.start == offset }) {
+      Error(_) -> Error(Nil)
+      Ok(line) ->
+        case line.instruction {
+          Some(instr) -> Ok(#(addr, instr))
+          None -> Error(Nil)
+        }
+    }
+  })
+  |> dict.from_list
+}
+
+fn describe_instruction(instr: ast.Instruction) -> String {
+  case instr {
+    ast.Inp(_) -> "INP — lire une entrée"
+    ast.Out(_) -> "OUT — écrire la sortie"
+    ast.Hlt(_) -> "HLT — arrêter le programme"
+    ast.Add(op, _) -> "ADD " <> operand_text(op) <> " — additionner"
+    ast.Sub(op, _) -> "SUB " <> operand_text(op) <> " — soustraire"
+    ast.Sta(op, _) -> "STA " <> operand_text(op) <> " — stocker ACC"
+    ast.Lda(op, _) -> "LDA " <> operand_text(op) <> " — charger dans ACC"
+    ast.Bra(op, _) -> "BRA " <> operand_text(op) <> " — sauter"
+    ast.Brz(op, _) -> "BRZ " <> operand_text(op) <> " — sauter si ACC = 0"
+    ast.Brp(op, _) -> "BRP " <> operand_text(op) <> " — sauter si ACC ≥ 0"
+    ast.Dat(Some(v), _) -> "DAT " <> int.to_string(v)
+    ast.Dat(None, _) -> "DAT"
+    ast.Invalid(_) -> "?"
+  }
+}
+
+fn operand_text(op: ast.Operand) -> String {
+  case op {
+    ast.LabelRef(name, _) -> name
+    ast.Immediate(v, _) -> int.to_string(v)
+    ast.MissingOperand(_) -> ""
+  }
 }
 
 fn load_error_message(err: load.LoadError) -> String {
