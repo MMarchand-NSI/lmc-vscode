@@ -53,22 +53,24 @@ pub fn instruction_text_and_program_length_reflected_test() {
   assert string.contains(json, "\"programLength\":3")
 }
 
-pub fn events_reflected_after_step_test() {
+pub fn cycle_reflected_after_step_test() {
   // Resuming from INP: the events accumulated across the pause (see
   // model.accumulate_events) so the panel shows this instruction's whole
-  // Fetch->Decode->Execute cycle in one place, not just the tail end of
-  // Execute as if Fetch/Decode never happened.
+  // Fetch->Decode->Execute cycle in one place — and as exactly one
+  // "Execute" phase (not three), its sub-events grouped into that phase's
+  // "details" array rather than three separate top-level phase entries.
   let json =
     model.init("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(1)
     |> model.step
     |> render.to_json
-  assert string.contains(json, "\"events\":[\"Fetch")
-  assert string.contains(json, "\"Execute : ACC ← entrée (1)\"")
+  assert string.contains(json, "\"cycle\":[{\"phase\":\"Fetch\"")
+  assert string.contains(json, "\"phase\":\"Execute\",\"details\":[")
+  assert string.contains(json, "\"ACC ← entrée (1)\"")
 }
 
-pub fn events_empty_before_any_step_test() {
+pub fn cycle_empty_before_any_step_test() {
   let json = model.init("INP\nOUT\nHLT\n") |> render.to_json
-  assert string.contains(json, "\"events\":[]")
+  assert string.contains(json, "\"cycle\":[]")
 }

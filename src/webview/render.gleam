@@ -26,10 +26,19 @@ pub fn to_json(mdl: Model) -> String {
       json_option_string(model.current_instruction_text(mdl)),
     ),
     #("programLength", json.int(model.program_length(mdl))),
-    #("events", json.array(model.last_event_descriptions(mdl), json.string)),
+    #("cycle", json_cycle(mdl)),
     #("loadError", json_option_string(mdl.load_error)),
   ])
   |> json.to_string
+}
+
+fn json_cycle(mdl: Model) -> Json {
+  json.array(model.last_cycle(mdl), fn(phase) {
+    json.object([
+      #("phase", json.string(phase.name)),
+      #("details", json.array(phase.details, json.string)),
+    ])
+  })
 }
 
 fn json_memory(mdl: Model) -> Json {

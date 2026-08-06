@@ -1,5 +1,4 @@
 import gleam/option.{None, Some}
-import gleam/string
 import lmc/runner/state
 import webview/model
 
@@ -200,10 +199,10 @@ pub fn program_length_counts_the_invalid_line_even_when_it_wont_load_test() {
 
 pub fn no_events_before_any_step_test() {
   let m = model.init("INP\nOUT\nHLT\n")
-  assert model.last_event_descriptions(m) == []
+  assert model.last_cycle(m) == []
 }
 
-pub fn step_produces_fetch_decode_execute_events_test() {
+pub fn step_produces_one_entry_per_phase_test() {
   // OUT (nullaire) : le cas le plus simple pour vérifier les 3 phases sans
   // le cas particulier de INP qui bloque avant l'Execute.
   let m =
@@ -212,11 +211,12 @@ pub fn step_produces_fetch_decode_execute_events_test() {
     |> model.provide_input(9)
     |> model.step
     |> model.step
-  let descriptions = model.last_event_descriptions(m)
-  let assert [fetch, decode, execute] = descriptions
-  assert string.starts_with(fetch, "Fetch : lire mem[1]")
-  assert string.starts_with(decode, "Decode : → OUT")
-  assert execute == "Execute : sortie ← ACC (9)"
+  let cycle = model.last_cycle(m)
+  let assert [fetch, decode, execute] = cycle
+  assert fetch.name == "Fetch"
+  assert decode.name == "Decode"
+  assert execute.name == "Execute"
+  assert execute.details == ["sortie ← ACC (9)"]
 }
 
 pub fn events_accumulate_across_an_input_pause_test() {
@@ -230,13 +230,16 @@ pub fn events_accumulate_across_an_input_pause_test() {
     |> model.run_to_halt
     |> model.provide_input(9)
     |> model.step
-  let descriptions = model.last_event_descriptions(m)
-  let assert [fetch, decode, waiting, consumed, changed] = descriptions
-  assert string.starts_with(fetch, "Fetch")
-  assert string.starts_with(decode, "Decode")
-  assert waiting == "Execute : en attente d'une entrée…"
-  assert consumed == "Execute : ACC ← entrée (9)"
-  assert changed == "Execute : ACC 0 → 9"
+  let cycle = model.last_cycle(m)
+  let assert [fetch, decode, execute] = cycle
+  assert fetch.name == "Fetch"
+  assert decode.name == "Decode"
+  // Une seule entrée "Execute", pas trois — c'est tout l'enjeu : ses trois
+  // sous-actions restent groupées dans .details, pas éclatées en trois
+  // phases qui donneraient l'impression que Fetch→Decode→Execute se répète.
+  assert execute.name == "Execute"
+  assert execute.details
+    == ["en attente d'une entrée…", "ACC ← entrée (9)", "ACC 0 → 9"]
 }
 
 pub fn events_clear_on_reset_test() {
@@ -246,5 +249,5 @@ pub fn events_clear_on_reset_test() {
     |> model.provide_input(9)
     |> model.step
     |> model.reset
-  assert model.last_event_descriptions(m) == []
+  assert model.last_cycle(m) == []
 }

@@ -122,12 +122,31 @@ function renderInstruction(state) {
   document.getElementById("instruction").textContent = state.instructionText ?? "—";
 }
 
+// One <li> per *phase* (Fetch, Decode, Execute — never more than three),
+// not one per event. A single Execute can produce several events (e.g.
+// INP resuming: "waiting", then "ACC <- input", then "ACC changed") — if
+// each got its own top-level <li> labeled "Execute", it would read as
+// three separate Execute phases and undermine the point of this panel.
+// Those go in a nested list under the one "Execute" entry instead.
 function renderCycleEvents(state) {
   const list = document.getElementById("cycle-events");
   list.innerHTML = "";
-  for (const line of state.events ?? []) {
+  for (const phase of state.cycle ?? []) {
     const li = document.createElement("li");
-    li.textContent = line;
+    const label = document.createElement("strong");
+    label.textContent = phase.phase;
+    li.appendChild(label);
+    if (phase.details.length <= 1) {
+      li.appendChild(document.createTextNode(" — " + (phase.details[0] ?? "")));
+    } else {
+      const sub = document.createElement("ul");
+      for (const detail of phase.details) {
+        const subLi = document.createElement("li");
+        subLi.textContent = detail;
+        sub.appendChild(subLi);
+      }
+      li.appendChild(sub);
+    }
     list.appendChild(li);
   }
 }

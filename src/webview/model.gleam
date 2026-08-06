@@ -275,13 +275,22 @@ pub fn program_length(model: Model) -> Int {
   dict.size(model.address_to_line)
 }
 
-/// The last step/run_to_halt's Fetch/Decode/Execute events, one line of
-/// French per event — for the collapsible "what actually just happened"
-/// panel. The point is pedagogical: every instruction, whatever the
-/// mnemonic, goes through the same phases; this is where that becomes
-/// visible instead of staying implicit in "the highlight moved".
-pub fn last_event_descriptions(model: Model) -> List(String) {
-  list.map(model.last_events, describe_event)
+/// One entry per *phase* (Fetch, Decode, Execute — never more than three),
+/// each carrying the individual events that happened during it. Grouped
+/// rather than one flat line per event: Execute alone can produce several
+/// events (e.g. INP resuming: "waiting" then "ACC <- input" then "ACC
+/// changed") — a flat list would show three lines all prefixed "Execute",
+/// which reads as three separate Execute phases and undermines the exact
+/// point of this panel (every instruction is Fetch, Decode, Execute — not
+/// Fetch, Decode, Execute, Execute, Execute).
+pub fn last_cycle(model: Model) -> List(CyclePhase) {
+  model.last_events
+  |> list.map(event_phase_and_detail)
+  |> group_consecutive_by_phase
+}
+
+pub type CyclePhase {
+  CyclePhase(name: String, details: List(String))
 }
 
 // ── Internals ──────────────────────────────────────────────────────
@@ -351,30 +360,59 @@ fn operand_text(op: ast.Operand) -> String {
   }
 }
 
-fn describe_event(evt: Event) -> String {
+/// #(phase, detail) — kept separate rather than pre-joined into one
+/// "Phase : detail" string so group_consecutive_by_phase can merge same-
+/// phase entries without string-parsing its own output back apart.
+fn event_phase_and_detail(evt: Event) -> #(String, String) {
   case evt {
-    event.Fetched(address, raw) ->
-      "Fetch : lire mem["
-      <> int.to_string(address)
-      <> "] → "
-      <> int.to_string(raw)
-    event.Decoded(instr) -> "Decode : → " <> describe_runtime_instruction(instr)
-    event.InputConsumed(v) ->
-      "Execute : ACC ← entrée (" <> int.to_string(v) <> ")"
-    event.OutputProduced(v) ->
-      "Execute : sortie ← ACC (" <> int.to_string(v) <> ")"
-    event.MemoryWritten(address, v) ->
-      "Execute : mem["
-      <> int.to_string(address)
-      <> "] ← ACC ("
-      <> int.to_string(v)
-      <> ")"
-    event.AccumulatorChanged(old, new) ->
-      "Execute : ACC " <> int.to_string(old) <> " → " <> int.to_string(new)
-    event.Halted -> "Execute : HLT"
-    event.InputRequested -> "Execute : en attente d'une entrée…"
-    event.ErrorOccurred(message) -> "Erreur : " <> message
+    event.Fetched(address, raw) -> #(
+      "Fetch",
+      "lire mem[" <> int.to_string(address) <> "] → " <> int.to_string(raw),
+    )
+    event.Decoded(instr) -> #("Decode", describe_runtime_instruction(instr))
+    event.InputConsumed(v) -> #(
+      "Execute",
+      "ACC ← entrée (" <> int.to_string(v) <> ")",
+    )
+    event.OutputProduced(v) -> #(
+      "Execute",
+      "sortie ← ACC (" <> int.to_string(v) <> ")",
+    )
+    event.MemoryWritten(address, v) -> #(
+      "Execute",
+      "mem[" <> int.to_string(address) <> "] ← ACC (" <> int.to_string(v) <> ")",
+    )
+    event.AccumulatorChanged(old, new) -> #(
+      "Execute",
+      "ACC " <> int.to_string(old) <> " → " <> int.to_string(new),
+    )
+    event.Halted -> #("Execute", "HLT")
+    event.InputRequested -> #("Execute", "en attente d'une entrée…")
+    event.ErrorOccurred(message) -> #("Erreur", message)
   }
+}
+
+/// Merges consecutive same-phase pairs into one CyclePhase each — "merges
+/// consecutive" rather than "groups all", since phases can legitimately
+/// repeat across accumulated events from *different* instructions (a
+/// future improvement might show more than one instruction's cycle at
+/// once); today last_events only ever holds one instruction's worth, so in
+/// practice this always yields at most one Fetch, one Decode, one Execute.
+fn group_consecutive_by_phase(
+  pairs: List(#(String, String)),
+) -> List(CyclePhase) {
+  pairs
+  |> list.fold([], fn(acc, pair) {
+    let #(phase, detail) = pair
+    case acc {
+      [CyclePhase(name, details), ..rest] if name == phase -> [
+        CyclePhase(name, list.append(details, [detail])),
+        ..rest
+      ]
+      _ -> [CyclePhase(phase, [detail]), ..acc]
+    }
+  })
+  |> list.reverse
 }
 
 fn describe_runtime_instruction(instr: instruction.Instruction) -> String {

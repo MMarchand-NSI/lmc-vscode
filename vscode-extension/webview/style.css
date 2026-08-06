@@ -227,5 +227,17 @@ button:disabled {
   font-size: 0.85em;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+}
+/* One top-level <li> per phase (Fetch/Decode/Execute), never more than
+   three — a phase with several events (Execute resuming from INP) nests
+   them here instead of repeating the phase label, so it doesn't read as
+   several separate phases. */
+#cycle-events li strong {
+  color: var(--vscode-textLink-foreground, inherit);
+}
+#cycle-events ul {
+  margin: 2px 0 0;
+  padding-left: 1.2em;
+  opacity: 0.85;
 }
