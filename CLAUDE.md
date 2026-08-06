@@ -167,6 +167,44 @@ future work on the webview; it's the reason to have one.
 
 Not covered by any GUI-free test — verified so far by (a) `gleam test` on `model.gleam`/`render.gleam`,
 and (b) manually driving the built bundle inside a minimal `node:vm`-stubbed DOM (see chat history /
-git history for the throwaway script; not committed). Actually opening the panel in a real Extension
-Development Host has not been done by an agent in this repo — do it before trusting the UI wiring
-itself, `webviewPanel.ts` and `index.html`'s placeholder substitution in particular.
+git history for the throwaway scripts; not committed). Actually opening the panel in a real Extension
+Development Host has not been done by an agent in this repo — see "Status" below, it's the top item.
+
+## Status: where things stand, what's left
+
+Done and working, each verified by actually running it (`gleam test`, or driving the built bundle —
+never just code review):
+
+- LSP integration (`lsp-server.mjs` → `vendor/lmc-lsp.bundle.mjs`), no fallback.
+- Emulator API as an `lmc_lsp` git dependency; CI pulls it over the `LMC_LSP_DEPLOY_KEY` deploy key.
+- `lmc_lsp`'s own release pipeline, publishing tagged bundles — this repo currently pinned to `v0.1.6`.
+- Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
+  Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
+  session-style current-line decoration).
+- A long list of real bugs caught by actually exercising the extension/webview, not by guessing:
+  hover-on-operand, missing HLT/length diagnostics, a confusing mnemonic error message, blank lines
+  silently becoming an implicit HLT (`lmc_lsp`, the most serious one), a stale `TextEditor` reference
+  breaking sync across tab switches, mailbox clicks opening a new tab instead of reusing an existing
+  one, Step behaving like Run, Run collapsing into Step after providing input, PC/ACC resetting on
+  refocus, Fetch/Decode/Execute events splitting across an input pause, a redundant post-INP
+  accumulator-changed event, and the Decode line reading like reconstructed source code.
+
+Still open, roughly in the order it's worth tackling them:
+
+1. **The webview has never been opened in a real Extension Development Host by an agent here.**
+   Every fix above was validated with `gleam test` plus a throwaway `node:vm`-stubbed-DOM script
+   driving the *built bundle*, never VS Code itself — so `webviewPanel.ts`'s placeholder
+   substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
+   `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
+   independent of how solid the model/render logic underneath now is.
+2. **No committed smoke-test script.** The `node:vm` scripts that caught the Step/Run/reset/decode-
+   text bugs above only ever lived in a session's scratchpad — worth promoting one into a committed
+   `scripts/` tool so the next round of webview work doesn't start from zero.
+3. **`lmc_lsp` is still private**, so `fetch-lsp-bundle.mjs` and `gleam deps download` both need `gh
+   auth`/the deploy key — fine for solo development, but blocks any real distribution. No public-
+   release work (Marketplace listing, making `lmc_lsp` public) has started.
+4. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+   the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
+   VS Code client using it.
+5. **The VS Code extension itself isn't packaged/published anywhere** — `npx vsce package` works
+   locally, but there's no CI job building a `.vsix`, let alone a Marketplace listing.
