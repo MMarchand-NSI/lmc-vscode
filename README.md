@@ -13,7 +13,7 @@ A Visual Studio Code extension for the **Little Man Computer (LMC)** assembly la
 - **Go to Definition** — jump to the line where a label is defined
 - **Find References** — list every line that references a label
 - **Completion** — auto-complete LMC mnemonics (with descriptions) and labels defined in the current file
-- **Formatting** — canonical reformatting of the whole document (only available when running against the standalone `lmc_lsp` server — see [Architecture](#architecture))
+- **Formatting** — canonical reformatting of the whole document
 
 ## LMC Instruction Set
 
@@ -36,19 +36,14 @@ Labels are case-insensitive. Comments start with `//` or `;`.
 ## Project Structure
 
 ```
-lsp-server.mjs         # LSP entry point: prefers vendor/lmc-lsp.bundle.mjs, falls back to
-                       # the in-tree server below
+lsp-server.mjs         # LSP entry point: loads vendor/lmc-lsp.bundle.mjs
 scripts/
   fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vendor/ (gitignored)
 src/
   lmc/
-    lexer.gleam        # Tokeniser
-    parser.gleam       # Parser (nibble combinators) → AST
-    analyser.gleam     # Semantic analysis → diagnostics & symbol table
-    emulator.gleam     # Assembler + virtual machine
-  lsp/
-    server.gleam       # Legacy in-tree LSP server (JSON-RPC over stdio) — fallback only
-    lsp_ffi.mjs       # Node.js FFI — stdin/stdout transport
+    lexer.gleam        # Tokeniser  ┐
+    parser.gleam       # Parser (nibble combinators) → AST  ├─ standalone Emulator API,
+    emulator.gleam     # Assembler + virtual machine  ┘        see below — not used by the LSP
   webview/
     app.gleam          # Interactive emulator UI (planned)
 vscode-extension/
@@ -64,47 +59,46 @@ test/
 
 The extension runs two processes:
 
-1. **VS Code extension host** (`vscode-extension/`) — TypeScript client that starts the language server and relays LSP messages between VS Code and the server.
-2. **Language server** — `lsp-server.mjs` picks between two, in order:
-   - **Preferred**: [`lmc_lsp`](https://github.com/MMarchand-NSI/lmc_lsp), a standalone, editor-agnostic
-     rewrite of the server (adds formatting, byte-correct LSP framing, and is meant to also work with
-     other LSP clients such as Zed). It lives in its own repo, not here — fetch a tagged release into
-     `vendor/lmc-lsp.bundle.mjs` with `node scripts/fetch-lsp-bundle.mjs` (requires the `gh` CLI,
-     authenticated with access to that repo, which is currently private).
-   - **Fallback**: this repo's own `src/lsp/server.gleam` + `src/lmc/*` (`lexer → parser → analyser`),
-     compiled locally with `gleam build`. Used automatically whenever the vendored bundle hasn't been
-     fetched, so the extension still works without the extra step above.
+1. **VS Code extension host** (`vscode-extension/`) — TypeScript client that starts the language
+   server and relays LSP messages between VS Code and the server.
+2. **Language server** — [`lmc_lsp`](https://github.com/MMarchand-NSI/lmc_lsp), a standalone,
+   editor-agnostic Gleam/Node.js LSP server that also targets other LSP clients (e.g. Zed). It lives
+   in its own repo, not here: `lsp-server.mjs` loads a tagged release fetched into
+   `vendor/lmc-lsp.bundle.mjs` by `node scripts/fetch-lsp-bundle.mjs` (requires the `gh` CLI,
+   authenticated with access to that repo, which is currently private — run the script before first
+   use, there is no in-tree fallback).
 
 ```
-                                              ┌─ vendor/lmc-lsp.bundle.mjs             (preferred,
-                                              │    fetched from lmc_lsp releases)
-VS Code ←—LSP (stdio)—→ lsp-server.mjs ──────┤
-                                              └─ build/.../lmc_vscode/lsp/server.mjs   (fallback,
-                                                   lexer → parser → analyser)
+VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fetched from lmc_lsp releases)
 ```
+
+`src/lmc/{lexer,parser,emulator}.gleam` are unrelated to the above — they exist only for the
+standalone [Emulator API](#emulator-api), independent of the LSP.
 
 ## Development
 
 ### Prerequisites
 
-- [Gleam](https://gleam.run) ≥ 1.0 (CI pins 1.14.0)
+- [Gleam](https://gleam.run) ≥ 1.0 (CI pins 1.14.0) — only needed for the standalone Emulator API,
+  not for running the extension
 - Node.js ≥ 18
-- [`gh`](https://cli.github.com) CLI, authenticated with access to `MMarchand-NSI/lmc_lsp` — only
-  needed to fetch the preferred language server (see [Architecture](#architecture)); everything else
-  works without it, using the fallback server
+- [`gh`](https://cli.github.com) CLI, authenticated with access to `MMarchand-NSI/lmc_lsp` — needed
+  to fetch the language server (see [Architecture](#architecture))
 
-### Build & test
-
-```sh
-gleam test        # Run all tests (lexer, parser, emulator)
-gleam build       # Compile the fallback server to build/dev/javascript/
-```
-
-### Use the standalone `lmc_lsp` server (recommended)
+### Fetch the language server
 
 ```sh
 node scripts/fetch-lsp-bundle.mjs        # fetches the latest tagged release into vendor/
 node scripts/fetch-lsp-bundle.mjs v0.1.0 # or a specific version
+```
+
+Required before the extension will start — there is no in-tree fallback.
+
+### Build & test the Emulator API
+
+```sh
+gleam test        # Run all tests (lexer, parser, emulator)
+gleam build       # Compile to build/dev/javascript/
 ```
 
 ### Build the VS Code extension

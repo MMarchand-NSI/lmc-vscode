@@ -4,58 +4,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A VS Code extension for the **Little Man Computer (LMC)** assembly language: a Gleam-implemented
-language server (lexer → parser → analyser) plus a separate emulator, exposed to VS Code through a
-thin TypeScript client. See [README.md](README.md) for the LMC instruction set and user-facing features.
+A VS Code extension for the **Little Man Computer (LMC)** assembly language: a thin TypeScript
+extension host that runs a standalone Gleam/Node.js language server, plus an independent Gleam
+Emulator API for programmatic use. See [README.md](README.md) for the LMC instruction set and
+user-facing features.
 
 ## Relationship to the sibling `lmc_lsp` repo
 
-There is a second, separate repo, `lmc_lsp` (typically cloned alongside this one, e.g. `../lmc_lsp`),
-that matters for anyone touching the LSP core here. Sequence of events:
+There is a second, separate repo, `lmc_lsp` (typically cloned alongside this one, e.g.
+`../lmc_lsp`, currently **private**), which owns the actual language server implementation. This
+repo used to carry its own hand-rolled LSP server (`src/lsp/`, `src/lmc/analyser.gleam`) — that code
+has been **deleted**, not just deprecated, in favor of `lmc_lsp`. Sequence of events, for context:
 
 - This repo (`lmc-vscode`, commits from **2026-03-01/02**) was written first, as one monorepo:
   extension host + hand-rolled Gleam LSP + emulator, all under `src/`.
 - `lmc_lsp` (commits from **2026-04-26**, ~2 months later) is a **from-scratch, standalone rewrite of
-  just the LSP server part** — not a fork, a new repo. It supersedes the design of this repo's
-  `src/lmc/` + `src/lsp/`: a proper 4-layer architecture (`parse/` → `semantic/` → `features/` →
-  `lsp/`), a CST-preserving parser (enables a `textDocument/formatting` feature this repo doesn't
-  have), byte-correct `Content-Length` framing (this repo's `lsp_ffi.mjs` framing is char/line based
-  and likely mishandles non-ASCII content the same way `lmc_lsp`'s `ARCHI.md` documents as a bug it
-  had to fix), and a richer event-sourced runner (the counterpart to `emulator.gleam` here).
-  `lmc_lsp` builds to a self-contained esbuild bundle (`dist/lmc-lsp.bundle.mjs`) explicitly meant to
-  be dropped into a VS Code extension without needing a Gleam toolchain at install time.
-- **`lmc_lsp` has no extension host code of its own** (no `client.ts`, no `package.json` for a VS Code
-  extension) — that shell only exists here, in `vscode-extension/`.
-- **The integration has not happened yet.** `lsp-server.mjs` (repo root) still imports the old
-  in-tree compiled server (`build/dev/javascript/lmc_vscode/lsp/server.mjs`), not `lmc_lsp`'s bundle.
+  just the LSP server** — a proper 4-layer architecture (`parse/` → `semantic/` → `features/` →
+  `lsp/`), a CST-preserving parser (enables `textDocument/formatting`), byte-correct
+  `Content-Length` framing, and a richer event-sourced runner. It builds to a self-contained esbuild
+  bundle and publishes it as a downloadable asset on tagged GitHub releases
+  (`.github/workflows/release.yml` there).
+- The integration is done: `lsp-server.mjs` here loads that bundle from `vendor/lmc-lsp.bundle.mjs`,
+  fetched by `scripts/fetch-lsp-bundle.mjs` via the `gh` CLI (needed because `lmc_lsp` is private).
+  There is **no fallback** — this repo no longer contains an LSP implementation of its own. A
+  fallback existed briefly during the migration (kept "until manually validated"); once validated —
+  and after it turned out to be broken anyway (see the git history around "Fix broken Result import
+  in the legacy LSP's FFI layer" for the bug that had gone undetected) — it was removed as pure
+  complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
+  worse than failing loudly and telling you to run the fetch script.
 
-Practical implication: treat `src/lmc/` and `src/lsp/` in *this* repo as the legacy implementation,
-likely to be replaced by pointing `lsp-server.mjs` at `lmc_lsp`'s bundle once that integration is
-done. Don't invest in fixing framing/architecture issues here that `lmc_lsp` has already solved
-differently — check there first. New LSP features (definition/references logic, diagnostics, etc.)
-should probably land in `lmc_lsp`, not here, unless the user says otherwise.
+**Keep the two repos separate — do not merge them, and do not resurrect an in-tree LSP server here.**
+The reason `lmc_lsp` exists as its own repo is editor independence (VS Code today, Zed planned) —
+folding it back in would recreate the coupling it was written to remove. New LSP/language-core
+features (diagnostics, definition/references logic, etc.) belong in `lmc_lsp`, not here.
 
-**Keep the two repos separate — do not merge them.** The reason to have a standalone LSP server at
-all is editor independence: the goal is to also use it from other LSP clients (e.g. Zed), not just
-VS Code, so `lmc_lsp` needs to stay usable without any VS Code-specific code around it. Folding it
-back into this repo would just recreate the coupling it was written to remove.
-
-What *should* change is how this repo depends on it: right now the only path from `lmc_lsp` to here
-is a manual copy of `dist/lmc-lsp.bundle.mjs` between two local clones, which silently goes stale.
-`lmc_lsp` now has `.github/workflows/release.yml`, which attaches its built bundle to a GitHub
-release whenever a `v*.*.*` tag is pushed there — `lsp-server.mjs` here should be updated to fetch a
-specific tagged release's `lmc-lsp.bundle.mjs` (e.g. at extension build/package time) instead of
-reading a path into a sibling working directory. A future Zed extension would be a third, similarly
-small repo consuming the same tagged releases — the pattern here (`vscode-extension/` as thin
-client-specific glue around an externally-built server) is the template for it.
+`lmc_lsp` being private means anyone building this extension needs `gh` authenticated with access to
+it (see README prerequisites) — revisit if/when a public release (VS Code Marketplace, a Zed
+extension) makes that impractical.
 
 ## Commands
 
 ```sh
-gleam deps download                # fetch dependencies (also done by CI)
-gleam test                         # compile + run all Gleam tests (gleeunit, target=javascript/node)
-gleam build                        # compile to build/dev/javascript/ — required before running the LSP,
-                                    # since lsp-server.mjs imports the compiled output
+node scripts/fetch-lsp-bundle.mjs        # required before the extension will run at all —
+                                          # fetches vendor/lmc-lsp.bundle.mjs (gitignored)
+```
+
+```sh
+gleam test                         # run the Emulator API's tests (lexer, parser, emulator) —
+                                    # unrelated to the LSP, see Architecture below
+gleam build                        # compile the Emulator API to build/dev/javascript/
 gleam format src test              # auto-format
 gleam format --check src test      # what CI runs; do this before committing
 ```
@@ -73,71 +70,65 @@ npx tsc              # or `npm run compile` — compiles client.ts to out/client
 npx vsce package      # package as .vsix
 ```
 
-To manually try the extension in VS Code: run `gleam build` first, then launch the
-"Run LMC Extension" debug config (`.vscode/launch.json`, `F5`) — it starts an Extension
+To manually try the extension in VS Code: run `node scripts/fetch-lsp-bundle.mjs` first, then launch
+the "Run LMC Extension" debug config (`.vscode/launch.json`, `F5`) — it starts an Extension
 Development Host with `vscode-extension` as the dev path.
 
-CI (`.github/workflows/test.yml`) runs on OTP 28 / gleam 1.13.0: `gleam deps download`,
-`gleam test`, `gleam format --check src test`.
+CI (`.github/workflows/test.yml`) runs on OTP 28 / gleam 1.14.0: `gleam deps download`, `gleam test`,
+`gleam format --check src test`. It only exercises the Emulator API — it doesn't fetch or touch the
+LSP bundle at all.
 
 ## Architecture
 
-The extension is two separate processes talking LSP over stdio:
-
 ```
-VS Code ⇄ (LSP over stdio) ⇄ node lsp-server.mjs ⇄ compiled Gleam (lexer → parser → analyser)
+VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fetched from lmc_lsp releases)
 ```
 
 - **`vscode-extension/client.ts`** — the extension host. On activate, it spawns
   `node <repo-root>/lsp-server.mjs` (one directory above the extension itself) via
   `vscode-languageclient`, scoped to files with language id `lmc`.
-- **`lsp-server.mjs`** (repo root) — trivial entry point: imports `main` from
-  `build/dev/javascript/lmc_vscode/lsp/server.mjs` (the compiled Gleam output) and calls it.
-  This is why `gleam build` must run before the server can start.
-- **`src/lsp/server.gleam`** — the actual language server. It is a hand-rolled JSON-RPC
-  server (no LSP library): a minimal `Json` union + encoder, a `handle(msg, store, ...)`
-  dispatcher that pattern-matches on the LSP `method` string, and an in-memory
-  `Dict(uri, Document)` store. `Document` holds the raw text plus the last `analyser.Analysis`.
-  Sync is `Full` (`textDocumentSync = 1`) — the *entire* document is re-lexed/parsed/analysed
-  on every `didOpen`/`didChange`, there is no incremental analysis.
-- **`src/lsp/lsp_ffi.mjs`** — the Node.js I/O layer, wired in via `@external(javascript, ...)`.
-  Handles LSP `Content-Length` framing over stdin/stdout (synchronous byte-level reads), plus
-  dynamic field accessors (`getStr`/`getInt`/`getNested`/`isDefined`) because Gleam's `Dynamic`
-  can't destructure parsed JSON directly.
+- **`lsp-server.mjs`** (repo root) — imports `main` from `./vendor/lmc-lsp.bundle.mjs` and calls it.
+  Exits with a clear error (not a silent fallback) if that file is missing — run
+  `scripts/fetch-lsp-bundle.mjs` first.
+- **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
+  download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
+  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.1.0`; pass a version to pin a different tag.
 
-### Compilation pipeline (`src/lmc/`)
+None of the LSP protocol logic (diagnostics, hover, completion, formatting, etc.) lives in this repo
+any more — see `lmc_lsp`'s own `CLAUDE.md`/`ARCHI.md` for that.
 
-Each document is analysed independently through this pipeline (also usable standalone, see the
-"Emulator API" section of the README):
+### The Emulator API (`src/lmc/`) — unrelated to the LSP
 
-1. **`lexer.gleam`** — tokenizes **line by line** (`nibble/lexer` per line, then a `Newline`
-   token appended), which is what lets the parser and diagnostics stay line-oriented. Identifiers
-   are uppercased at this stage (labels/mnemonics are case-insensitive). Comments start with `//`
-   or `;` (not `#` — note the code, not just the README's prose table, is the source of truth here).
+`src/lmc/{lexer,parser,emulator}.gleam` is a **separate, standalone concern**: a small Gleam library
+for assembling and running LMC programs programmatically (see the README's "Emulator API" section),
+not used by the extension or the language server at all. It exists here — rather than depending on
+`lmc_lsp`'s own, more capable `parse/`/`runner/` layers — because reusing those would mean either a
+Gleam git dependency on a private repo (works locally via the `gh` git-credential helper, but needs
+a deploy key or PAT wired into this repo's CI as a secret) or waiting for `lmc_lsp` to publish to
+Hex; neither has been done. If that changes, this local copy plus its tests
+(`test/lexer_test.gleam`, `test/parser_test.gleam`, `test/emulator_test.gleam`) and the
+`nibble`/`gleam_regexp` dependencies they pull in should be replaced by depending on `lmc_lsp`
+directly rather than maintaining two parallel Gleam implementations of the same lexer/parser.
+
+1. **`lexer.gleam`** — tokenizes **line by line** (`nibble/lexer` per line, then a `Newline` token
+   appended). Identifiers are uppercased (labels/mnemonics are case-insensitive). Comments start
+   with `//` or `;` (not `#` — the code, not just the README's prose table, is the source of truth
+   here).
 2. **`parser.gleam`** — `nibble` combinator parser producing the AST (`Program` → `Line` →
    `Instruction`). A leading identifier is treated as a label unless it matches a known mnemonic.
-3. **`analyser.gleam`** — two-pass semantic analysis over the AST:
-   - Pass 1 collects label definitions, flagging duplicates.
-   - Pass 2 checks that every operand label resolves and builds the `Symbol` table
-     (`name`, `defined_at`, `referenced_at`) that powers hover / go-to-definition / find-references.
-   - Plus standalone checks: missing `HLT` (warning) and >100 instructions (error).
-   - `find_definition`, `all_symbols`, `diagnostics_by_severity` are the query surface the LSP
-     handlers in `server.gleam` call into.
-4. **`emulator.gleam`** — a separate assembler + VM, **not currently wired into the LSP** (no
-   server handler runs a program). Assembles the AST into 100 three-digit LMC words
+3. **`emulator.gleam`** — assembler + VM. Assembles the AST into 100 three-digit LMC words
    (`opcode * 100 + addr`; addresses assigned by walking lines in source order, with a label on a
-   blank line carried forward to the next instruction). Supports both batch execution (`run`,
-   input supplied upfront) and interactive stepping (`step` / `NeedsInput` / `provide_input`, for
-   a future UI that needs to pause on `INP`).
+   blank line carried forward to the next instruction). Supports both batch execution (`run`, input
+   supplied upfront) and interactive stepping (`step` / `NeedsInput` / `provide_input`, for a future
+   UI that needs to pause on `INP` — see `src/webview/app.gleam` below).
 
-### Planned / stub areas (empty files, not implemented yet)
+### Planned / stub areas
 
-- **`src/dap/server.gleam`** — Debug Adapter Protocol server (empty stub).
-- **`src/webview/app.gleam`** — interactive emulator webview UI (empty stub).
-- **`ffi/transport.mjs`** (repo root) — empty stub, presumably the future DAP counterpart to
-  `src/lsp/lsp_ffi.mjs`.
-- **`src/lmc_vscode.gleam`** — the default `gleam new` entry point stub (`"Hello from
-  lmc_vscode!"`); unrelated to the LSP/extension, not invoked by anything real.
+- **`src/webview/app.gleam`** — interactive emulator webview UI (empty stub, not implemented). A
+  webview is inherently VS Code-specific (unlike DAP, which moved to `lmc_lsp` — see its
+  `CLAUDE.md`), so this stays here. When work on it starts, decide then whether it should drive
+  `src/lmc/emulator.gleam` (current local copy) or `lmc_lsp`'s runner (see the Emulator API note
+  above) — don't assume the former just because it's already in this repo.
 
-When implementing any of the above, follow the existing pattern: Gleam core logic + a small
+When implementing it, follow the existing pattern used by `lmc_lsp`: Gleam core logic + a small
 `@external(javascript, ...)` FFI file colocated with the `.gleam` module for the Node-specific I/O.

@@ -1,16 +1,17 @@
 // Entry point for the LMC language server.
 //
-// Prefers the standalone lmc_lsp server (github.com/MMarchand-NSI/lmc_lsp),
+// Runs the standalone lmc_lsp server (github.com/MMarchand-NSI/lmc_lsp),
 // vendored locally by `node scripts/fetch-lsp-bundle.mjs` into
-// vendor/lmc-lsp.bundle.mjs (gitignored — run the script to fetch it).
-// Falls back to the legacy in-tree Gleam server (src/lsp/, src/lmc/,
-// compiled by `gleam build`) when the vendored bundle hasn't been fetched
-// yet, so the extension keeps working during the migration. See CLAUDE.md,
-// "Relationship to the sibling lmc_lsp repo".
+// vendor/lmc-lsp.bundle.mjs (gitignored — run that script to fetch it).
 let main;
 try {
   ({ main } = await import("./vendor/lmc-lsp.bundle.mjs"));
-} catch {
-  ({ main } = await import("./build/dev/javascript/lmc_vscode/lsp/server.mjs"));
+} catch (err) {
+  console.error(
+    "Could not load vendor/lmc-lsp.bundle.mjs — run " +
+      "`node scripts/fetch-lsp-bundle.mjs` first to fetch it.\n" +
+      String(err),
+  );
+  process.exit(1);
 }
 main();
