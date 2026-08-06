@@ -285,8 +285,31 @@ pub fn program_length(model: Model) -> Int {
 /// Fetch, Decode, Execute, Execute, Execute).
 pub fn last_cycle(model: Model) -> List(CyclePhase) {
   model.last_events
+  |> dedupe_input_accumulator_change
   |> list.map(event_phase_and_detail)
   |> group_consecutive_by_phase
+}
+
+/// INP with input available is the only case where the runner emits two
+/// events for what reads as one fact: InputConsumed(v) immediately
+/// followed by AccumulatorChanged(_, v) with that same value — "ACC <-
+/// entrée (123)" then "ACC 0 -> 123" right after, both just saying ACC is
+/// now 123. Every other ACC-changing instruction (ADD/SUB/LDA) emits only
+/// AccumulatorChanged, so this is INP-specific, not a general pattern to
+/// generalize away — drop the redundant AccumulatorChanged, keep
+/// InputConsumed (it says *why* ACC changed, not just that it did).
+fn dedupe_input_accumulator_change(events: List(Event)) -> List(Event) {
+  case events {
+    [
+      event.InputConsumed(v) as consumed,
+      event.AccumulatorChanged(_, new),
+      ..rest
+    ]
+      if new == v
+    -> [consumed, ..dedupe_input_accumulator_change(rest)]
+    [first, ..rest] -> [first, ..dedupe_input_accumulator_change(rest)]
+    [] -> []
+  }
 }
 
 pub type CyclePhase {

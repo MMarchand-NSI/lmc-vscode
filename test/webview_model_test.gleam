@@ -234,12 +234,25 @@ pub fn events_accumulate_across_an_input_pause_test() {
   let assert [fetch, decode, execute] = cycle
   assert fetch.name == "Fetch"
   assert decode.name == "Decode"
-  // Une seule entrée "Execute", pas trois — c'est tout l'enjeu : ses trois
-  // sous-actions restent groupées dans .details, pas éclatées en trois
+  // Une seule entrée "Execute", pas trois — c'est tout l'enjeu : ses
+  // sous-actions restent groupées dans .details, pas éclatées en plusieurs
   // phases qui donneraient l'impression que Fetch→Decode→Execute se répète.
+  // Seulement 2 sous-actions, pas 3 : "ACC 0 → 9" est déduplié, il ne dit
+  // rien de plus que "ACC ← entrée (9)" (voir dedupe_input_accumulator_change).
   assert execute.name == "Execute"
-  assert execute.details
-    == ["en attente d'une entrée…", "ACC ← entrée (9)", "ACC 0 → 9"]
+  assert execute.details == ["en attente d'une entrée…", "ACC ← entrée (9)"]
+}
+
+pub fn add_accumulator_change_is_not_deduped_test() {
+  // Le dédoublonnage est spécifique à INP (seul cas où deux événements
+  // décrivent le même fait) — ADD n'émet qu'un seul AccumulatorChanged, il
+  // ne doit surtout pas être filtré par erreur.
+  let m =
+    model.init("LDA n\nADD n\nHLT\nn DAT 5\n")
+    |> model.step
+    |> model.step
+  let assert [_fetch, _decode, execute] = model.last_cycle(m)
+  assert execute.details == ["ACC 5 → 10"]
 }
 
 pub fn events_clear_on_reset_test() {
