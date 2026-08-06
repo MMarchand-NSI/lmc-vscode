@@ -449,24 +449,73 @@ fn group_consecutive_by_phase(
 /// instruction.decode uses (raw / 100 for the opcode, raw % 100 for the
 /// address). instruction.encode(instr) reconstructs the raw number here —
 /// the exact inverse of decode, so it's always the same value Fetch showed.
+///
+/// Also names what decode is *for*: it doesn't do the operation (no
+/// memory write, no ACC change happens here — that's Execute's job), it
+/// only figures out which of the processor's fixed circuits — the ALU,
+/// the memory bus, the program counter — need to be engaged and how, so
+/// Execute has something to act on. Spelling that out here is the direct
+/// follow-up to the fetch/decode/execute discussion: "decode" can
+/// otherwise read as just another arithmetic step alongside Fetch.
 fn describe_decoded(instr: instruction.Instruction) -> String {
   let raw = int.to_string(instruction.encode(instr))
   case instr {
-    instruction.Inp -> raw <> " → INP"
-    instruction.Out -> raw <> " → OUT"
-    instruction.Hlt -> raw <> " → HLT"
-    instruction.Add(a) -> decoded_with_address(raw, "ADD", a)
-    instruction.Sub(a) -> decoded_with_address(raw, "SUB", a)
-    instruction.Sta(a) -> decoded_with_address(raw, "STA", a)
-    instruction.Lda(a) -> decoded_with_address(raw, "LDA", a)
-    instruction.Bra(a) -> decoded_with_address(raw, "BRA", a)
-    instruction.Brz(a) -> decoded_with_address(raw, "BRZ", a)
-    instruction.Brp(a) -> decoded_with_address(raw, "BRP", a)
+    instruction.Inp ->
+      raw <> " → INP (" <> circuit_note("lecture d'une entrée") <> ")"
+    instruction.Out ->
+      raw <> " → OUT (" <> circuit_note("écriture de la sortie") <> ")"
+    instruction.Hlt ->
+      raw <> " → HLT (" <> circuit_note("arrêt du processeur") <> ")"
+    instruction.Add(a) ->
+      decoded_with_address(raw, "ADD", a, circuit_note("une addition"))
+    instruction.Sub(a) ->
+      decoded_with_address(raw, "SUB", a, circuit_note("une soustraction"))
+    instruction.Sta(a) ->
+      decoded_with_address(raw, "STA", a, circuit_note("stockage en mémoire"))
+    instruction.Lda(a) ->
+      decoded_with_address(
+        raw,
+        "LDA",
+        a,
+        circuit_note("chargement depuis la mémoire"),
+      )
+    instruction.Bra(a) ->
+      decoded_with_address(raw, "BRA", a, circuit_note("un saut"))
+    instruction.Brz(a) ->
+      decoded_with_address(
+        raw,
+        "BRZ",
+        a,
+        circuit_note("un saut conditionnel (si ACC = 0)"),
+      )
+    instruction.Brp(a) ->
+      decoded_with_address(
+        raw,
+        "BRP",
+        a,
+        circuit_note("un saut conditionnel (si ACC ≥ 0)"),
+      )
   }
 }
 
-fn decoded_with_address(raw: String, mnemonic: String, address: Int) -> String {
-  raw <> " → " <> mnemonic <> ", adresse " <> int.to_string(address)
+fn circuit_note(purpose: String) -> String {
+  "configuration des circuits du processeur pour " <> purpose
+}
+
+fn decoded_with_address(
+  raw: String,
+  mnemonic: String,
+  address: Int,
+  note: String,
+) -> String {
+  raw
+  <> " → "
+  <> mnemonic
+  <> ", adresse "
+  <> int.to_string(address)
+  <> " ("
+  <> note
+  <> ")"
 }
 
 fn load_error_message(err: load.LoadError) -> String {

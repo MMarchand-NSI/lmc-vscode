@@ -233,7 +233,10 @@ pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
     |> model.step
     |> model.step
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
-  assert decode.details == ["902 → OUT"]
+  assert decode.details
+    == [
+      "902 → OUT (configuration des circuits du processeur pour écriture de la sortie)",
+    ]
 }
 
 pub fn decode_shows_the_raw_number_with_an_address_test() {
@@ -242,7 +245,10 @@ pub fn decode_shows_the_raw_number_with_an_address_test() {
   // mémoire assemblé (302 = 3·100 + 2).
   let m = model.init("STA total\nHLT\ntotal DAT 0\n") |> model.step
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
-  assert decode.details == ["302 → STA, adresse 2"]
+  assert decode.details
+    == [
+      "302 → STA, adresse 2 (configuration des circuits du processeur pour stockage en mémoire)",
+    ]
 }
 
 pub fn events_accumulate_across_an_input_pause_test() {
