@@ -90,7 +90,7 @@ Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for pro
 
 ```sh
 node scripts/fetch-lsp-bundle.mjs        # fetches the latest tagged release into vendor/
-node scripts/fetch-lsp-bundle.mjs v0.1.1 # or a specific version
+node scripts/fetch-lsp-bundle.mjs v0.1.2 # or a specific version
 ```
 
 Required before the extension will start — there is no in-tree fallback.
