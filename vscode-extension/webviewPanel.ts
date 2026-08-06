@@ -14,9 +14,17 @@ import * as vscode from "vscode";
 //   webview -> host  {"type":"revealLine","line":N}
 //   host -> webview  {"type":"setSource","source":"..."}
 //   host -> webview  {"type":"cursorLine","line":N|null}
+//
+// Tracked by document URI, not by a cached TextEditor object. VS Code can
+// (and does) hand out a *new* TextEditor instance for the same file when
+// you switch tabs away and back — a cached reference from when the panel
+// was opened goes stale, silently breaking both sync directions (identity
+// checks against it stop matching, and calling .revealRange on a disposed
+// editor is a no-op). Resolving the live editor by URI at the moment it's
+// actually needed sidesteps that entirely.
 
 let currentPanel: vscode.WebviewPanel | undefined;
-let currentEditor: vscode.TextEditor | undefined;
+let sourceUri: vscode.Uri | undefined;
 let disposables: vscode.Disposable[] = [];
 
 export function openEmulatorPanel(context: vscode.ExtensionContext): void {
@@ -29,13 +37,13 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
   }
 
   if (currentPanel) {
-    currentEditor = editor;
+    sourceUri = editor.document.uri;
     currentPanel.reveal(vscode.ViewColumn.Beside);
     sendSource(currentPanel, editor.document);
     return;
   }
 
-  currentEditor = editor;
+  sourceUri = editor.document.uri;
   const webviewDir = path.join(context.extensionPath, "webview");
 
   currentPanel = vscode.window.createWebviewPanel(
@@ -63,7 +71,7 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
 
   disposables.push(
     vscode.window.onDidChangeTextEditorSelection((event) => {
-      if (!currentPanel || event.textEditor !== currentEditor) return;
+      if (!currentPanel || !isSourceDocument(event.textEditor.document)) return;
       const line = event.selections[0]?.active.line ?? null;
       currentPanel.webview.postMessage({ type: "cursorLine", line });
     }),
@@ -71,24 +79,54 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
 
   disposables.push(
     vscode.workspace.onDidChangeTextDocument((event) => {
-      if (!currentPanel || !currentEditor) return;
-      if (event.document !== currentEditor.document) return;
+      if (!currentPanel || !isSourceDocument(event.document)) return;
       sendSource(currentPanel, event.document);
+    }),
+  );
+
+  // Selection-change events only fire on an actual selection change, not
+  // merely on refocusing a tab whose cursor hadn't moved — without this,
+  // switching back to the source file after the cursor already sat
+  // somewhere would leave the webview showing a stale cursor highlight
+  // until the next actual move. Re-sync (source + cursor) on every switch
+  // back to the tracked file instead of waiting for that.
+  disposables.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (!currentPanel || !editor || !isSourceDocument(editor.document)) return;
+      sendSource(currentPanel, editor.document);
+      const line = editor.selection.active.line;
+      currentPanel.webview.postMessage({ type: "cursorLine", line });
     }),
   );
 
   currentPanel.onDidDispose(() => {
     currentPanel = undefined;
-    currentEditor = undefined;
+    sourceUri = undefined;
     disposables.forEach((d) => d.dispose());
     disposables = [];
   });
 }
 
+function isSourceDocument(document: vscode.TextDocument): boolean {
+  return sourceUri !== undefined && document.uri.toString() === sourceUri.toString();
+}
+
+/// The live TextEditor for sourceUri, if that file is currently visible in
+/// some pane — never a cached reference from an earlier point in time.
+function findLiveEditor(): vscode.TextEditor | undefined {
+  return vscode.window.visibleTextEditors.find(
+    (e) => sourceUri !== undefined && e.document.uri.toString() === sourceUri.toString(),
+  );
+}
+
 function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {
   switch (message?.type) {
     case "ready":
-      if (currentEditor) sendSource(panel, currentEditor.document);
+      if (sourceUri) {
+        const editor = findLiveEditor();
+        if (editor) sendSource(panel, editor.document);
+        else vscode.workspace.openTextDocument(sourceUri).then((doc) => sendSource(panel, doc));
+      }
       break;
     case "revealLine":
       revealLine(message.line);
@@ -100,12 +138,20 @@ function sendSource(panel: vscode.WebviewPanel, document: vscode.TextDocument): 
   panel.webview.postMessage({ type: "setSource", source: document.getText() });
 }
 
-function revealLine(line: number): void {
-  if (typeof line !== "number" || !currentEditor) return;
+async function revealLine(line: number): Promise<void> {
+  if (typeof line !== "number" || !sourceUri) return;
   const position = new vscode.Position(line, 0);
   const range = new vscode.Range(position, position);
-  currentEditor.selection = new vscode.Selection(position, position);
-  currentEditor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+
+  // Prefer an already-visible editor for the file (don't steal focus into
+  // a new pane if the user can already see it); fall back to opening it
+  // if the tab was closed entirely, not just backgrounded.
+  const editor =
+    findLiveEditor() ??
+    (await vscode.window.showTextDocument(sourceUri, { preserveFocus: true }));
+
+  editor.selection = new vscode.Selection(position, position);
+  editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
 function renderHtml(webview: vscode.Webview, webviewDir: string): string {
