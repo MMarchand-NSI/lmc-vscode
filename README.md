@@ -40,20 +40,17 @@ lsp-server.mjs         # LSP entry point: loads vendor/lmc-lsp.bundle.mjs
 scripts/
   fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vendor/ (gitignored)
 src/
-  lmc/
-    lexer.gleam        # Tokeniser  ┐
-    parser.gleam       # Parser (nibble combinators) → AST  ├─ standalone Emulator API,
-    emulator.gleam     # Assembler + virtual machine  ┘        see below — not used by the LSP
   webview/
     app.gleam          # Interactive emulator UI (planned)
 vscode-extension/
   client.ts            # VS Code extension host
   package.json
 test/
-  lexer_test.gleam
-  parser_test.gleam
-  emulator_test.gleam
+  emulator_test.gleam  # Smoke test for the Emulator API, see below
 ```
+
+There is no local lexer/parser/emulator anymore — the Emulator API is the `lmc_lsp` Gleam package
+itself, pulled in as a git dependency (see `gleam.toml`), not copied files.
 
 ## Architecture
 
@@ -72,8 +69,8 @@ The extension runs two processes:
 VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fetched from lmc_lsp releases)
 ```
 
-`src/lmc/{lexer,parser,emulator}.gleam` are unrelated to the above — they exist only for the
-standalone [Emulator API](#emulator-api), independent of the LSP.
+The [Emulator API](#emulator-api) is unrelated to the above and to the extension at runtime — it's a
+Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for programmatic use.
 
 ## Development
 
@@ -82,8 +79,9 @@ standalone [Emulator API](#emulator-api), independent of the LSP.
 - [Gleam](https://gleam.run) ≥ 1.0 (CI pins 1.14.0) — only needed for the standalone Emulator API,
   not for running the extension
 - Node.js ≥ 18
-- [`gh`](https://cli.github.com) CLI, authenticated with access to `MMarchand-NSI/lmc_lsp` — needed
-  to fetch the language server (see [Architecture](#architecture))
+- [`gh`](https://cli.github.com) CLI, authenticated with access to `MMarchand-NSI/lmc_lsp` (currently
+  private) — needed both to fetch the language server below, and locally by `gleam deps download`
+  (via its git-credential helper) to pull `lmc_lsp` as a Gleam dependency for the Emulator API
 
 ### Fetch the language server
 
@@ -97,8 +95,10 @@ Required before the extension will start — there is no in-tree fallback.
 ### Build & test the Emulator API
 
 ```sh
-gleam test        # Run all tests (lexer, parser, emulator)
-gleam build       # Compile to build/dev/javascript/
+gleam deps download # pulls lmc_lsp itself as a git dependency (see gleam.toml) — needs gh auth,
+                     # same as above
+gleam test           # Run all tests
+gleam build          # Compile to build/dev/javascript/
 ```
 
 ### Build the VS Code extension
@@ -112,21 +112,31 @@ npx vsce package  # Package as .vsix
 
 ## Emulator API
 
-The emulator can be used independently of the LSP, in batch or interactive mode:
+`gleam.toml` depends on [`lmc_lsp`](https://github.com/MMarchand-NSI/lmc_lsp) as a git dependency —
+not a copy of its code — for programmatic assembling/running of LMC programs, independently of the
+extension:
 
 ```gleam
-import lmc/lexer
-import lmc/parser
-import lmc/emulator
+import lmc/semantic/pipeline
+import lmc/runner/load
+import lmc/runner/run
+import lmc/runner/state
 
 // Batch mode — provide all input upfront
-let assert Ok(program) = source |> lexer.tokenize |> parser.parse
-let assert Ok(state)   = emulator.load(program, [input1, input2])
-let assert Ok(final)   = emulator.run(state)
+let result = pipeline.parse(source)     // -> ParseResult { ast, diagnostics, symbols, ... }
+let assert Ok(initial) = load.load(result, [input1, input2])
+let #(final, _events) = run.run_to_halt(initial)
 // final.output → list of output values
+// final.status → state.Halted (or state.ExecutionError(_) on a runtime error)
 
 // Interactive mode — supply input on demand
-let assert Ok(emulator.NeedsInput(paused)) = emulator.step(state)
-let resumed = emulator.provide_input(paused, 42)
-let assert Ok(final) = emulator.run(resumed)
+let #(paused, _events) = run.run_to_halt(initial)
+// paused.status == state.WaitingForInput
+let resumed = run.resume(paused, 42)
+let #(final, _events) = run.run_to_halt(resumed)
 ```
+
+`run_to_halt` actually runs until the machine *stops progressing* — halted, errored, or waiting on
+`INP` — not necessarily until `Halted`; check `.status` to tell which. `_events` is the list of
+`Fetched`/`Decoded`/`InputConsumed`/`OutputProduced`/... events the interpreter produced along the
+way, useful for tracing/debugging. See `lmc_lsp`'s own `CLAUDE.md`/`ARCHI.md` for the full API.

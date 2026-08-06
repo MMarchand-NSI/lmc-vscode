@@ -18,6 +18,20 @@ jobs:
           gleam-version: "1.14.0"
           rebar3-version: "3"
           # elixir-version: "1"
+
+      # gleam.toml depends on the private MMarchand-NSI/lmc_lsp repo over
+      # git (Emulator API — see CLAUDE.md). `gleam deps download` shells out
+      # to `git clone` on the https:// URL in gleam.toml; rewrite it to SSH
+      # so it authenticates with the read-only deploy key below instead.
+      - name: Set up SSH access to the private lmc_lsp dependency
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LMC_LSP_DEPLOY_KEY }}" > ~/.ssh/lmc_lsp_deploy_key
+          chmod 600 ~/.ssh/lmc_lsp_deploy_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+          git config --global core.sshCommand "ssh -i ~/.ssh/lmc_lsp_deploy_key"
+          git config --global url."git@github.com:".insteadOf "https://github.com/"
+
       - run: gleam deps download
       - run: gleam test
       - run: gleam format --check src test
