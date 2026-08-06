@@ -42,6 +42,14 @@ pub type Model {
     // happened" panel — the point being to show that every instruction,
     // no matter the mnemonic, goes through the same three phases.
     last_events: List(Event),
+    // Which button led to the current WaitingForInput, if any — True for
+    // Run, False for Step. `resume_after_input` reads this to decide what
+    // to do once the value arrives: Run should keep running past this INP
+    // (to the next halt or the next INP), Step should complete only this
+    // one instruction. Without tracking it, providing input always looked
+    // like Step regardless of which button was actually clicked (see
+    // resume_after_input's doc comment for the bug this fixes).
+    run_after_input: Bool,
   )
 }
 
@@ -56,6 +64,7 @@ pub fn init(source: String) -> Model {
     cursor_line: None,
     load_error: None,
     last_events: [],
+    run_after_input: False,
   )
   |> load_source(source)
 }
@@ -100,6 +109,7 @@ pub fn load_source(model: Model, source: String) -> Model {
             address_to_instruction: address_to_instruction,
             load_error: None,
             last_events: [],
+            run_after_input: False,
           )
         Error(err) ->
           Model(
@@ -112,6 +122,7 @@ pub fn load_source(model: Model, source: String) -> Model {
             address_to_instruction: address_to_instruction,
             load_error: Some(load_error_message(err)),
             last_events: [],
+            run_after_input: False,
           )
       }
     _ ->
@@ -130,6 +141,7 @@ pub fn load_source(model: Model, source: String) -> Model {
           "le programme contient des erreurs — voir les diagnostics dans l'éditeur",
         ),
         last_events: [],
+        run_after_input: False,
       )
   }
 }
@@ -139,7 +151,8 @@ pub fn reset(model: Model) -> Model {
 }
 
 /// Advance exactly one instruction (fetch/decode/execute), unless the
-/// machine is halted, errored, or waiting on input.
+/// machine is halted, errored, or waiting on input. Marks any resulting
+/// WaitingForInput as Step-originated — see `run_after_input`.
 pub fn step(model: Model) -> Model {
   case model.machine {
     None -> model
@@ -149,6 +162,7 @@ pub fn step(model: Model) -> Model {
         ..model,
         machine: Some(next),
         last_events: accumulate_events(m, model, events),
+        run_after_input: False,
       )
     }
   }
@@ -156,7 +170,8 @@ pub fn step(model: Model) -> Model {
 
 /// Run until the machine stops progressing on its own — halted, errored, or
 /// waiting on INP (not necessarily Halted, see lmc_lsp's own docs on
-/// run_to_halt).
+/// run_to_halt). Marks any resulting WaitingForInput as Run-originated —
+/// see `run_after_input`.
 pub fn run_to_halt(model: Model) -> Model {
   case model.machine {
     None -> model
@@ -166,6 +181,7 @@ pub fn run_to_halt(model: Model) -> Model {
         ..model,
         machine: Some(next),
         last_events: accumulate_events(m, model, events),
+        run_after_input: True,
       )
     }
   }
@@ -194,6 +210,24 @@ pub fn provide_input(model: Model, value: Int) -> Model {
   case model.machine {
     None -> model
     Some(m) -> Model(..model, machine: Some(run.resume(m, value)))
+  }
+}
+
+/// What the input form's submit handler should actually call — `provide_input`
+/// only hands the value to the paused machine, it doesn't advance anything
+/// on its own; something still has to run the INP's completion afterwards.
+/// Which something depends on how the wait was entered: a Run that hit an
+/// INP should keep running past it (to the next halt or the next INP), a
+/// Step that hit one should complete only that instruction and stop, same
+/// as any other step. `run_after_input` is exactly that memory — without
+/// it, every input submission looked like Step regardless of which button
+/// was clicked, since app.gleam had no way to tell the two apart itself
+/// (see run_after_input's doc comment, and the "Step behaves like Run" bug
+/// this replaced — this is that fix's mirror image for Run).
+pub fn resume_after_input(model: Model, value: Int) -> Model {
+  case model.run_after_input {
+    True -> model |> provide_input(value) |> run_to_halt
+    False -> model |> provide_input(value) |> step
   }
 }
 

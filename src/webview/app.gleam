@@ -20,15 +20,13 @@ pub fn main() -> Nil {
   ffi.on_run_click(fn() { update(cell, model.run_to_halt) })
   ffi.on_reset_click(fn() { update(cell, model.reset) })
   ffi.on_input_submit(fn(value) {
-    // Only complete the one INP that was waiting — not run_to_halt. The
-    // model can't tell whether the user got here via Step or Run, and
-    // resuming straight into run_to_halt made *every* input submission run
-    // the rest of the program to completion (or the next INP) regardless,
-    // which is exactly "Step behaves like Run" from the user's side.
-    // Landing back on Running after exactly this instruction is the
-    // uniformly correct choice for both: a Run user just clicks Run again
-    // to keep going, at the cost of one extra click.
-    update(cell, fn(m) { m |> model.provide_input(value) |> model.step })
+    // model.resume_after_input picks Step-like or Run-like completion based
+    // on which button led to this WaitingForInput in the first place (see
+    // Model.run_after_input) — Run should keep running past the INP it
+    // paused on, Step should complete only that one instruction. A single
+    // fixed choice here (this used to always do the Step-like thing) got
+    // one of the two wrong depending on how you got here.
+    update(cell, fn(m) { model.resume_after_input(m, value) })
   })
   ffi.on_mailbox_click(fn(address) {
     case model.line_for_address(ffi.deref(cell), address) {

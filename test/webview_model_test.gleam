@@ -88,6 +88,38 @@ pub fn provide_input_then_run_halts_test() {
   assert machine.output == [42]
 }
 
+pub fn resume_after_input_keeps_running_when_run_triggered_the_wait_test() {
+  // Regression: the input form's submit handler used to always complete
+  // just the one paused instruction (Step-like), regardless of whether Run
+  // or Step led to the wait — so clicking Run and then answering the INP
+  // prompt looked like Step, stopping right after instead of continuing to
+  // the next halt. run_to_halt marks the wait as Run-originated
+  // (run_after_input); resume_after_input must honour that and keep going
+  // past the INP it paused on, all the way to HLT here.
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.resume_after_input(9)
+  let assert Some(machine) = m.machine
+  assert machine.status == state.Halted
+  assert machine.output == [9]
+}
+
+pub fn resume_after_input_completes_only_the_instruction_when_step_triggered_the_wait_test() {
+  // Mirror image: a Step that pauses on INP must still behave like Step
+  // once input arrives — complete only that instruction, not run to
+  // completion.
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.step
+    |> model.resume_after_input(9)
+  let assert Some(machine) = m.machine
+  assert machine.status == state.Running
+  assert machine.program_counter == 1
+  assert machine.accumulator == 9
+  assert machine.output == []
+}
+
 pub fn reset_reruns_from_scratch_test() {
   // reset() reloads to the freshly-assembled state — it does not
   // auto-run up to the first INP the way a fresh model.init would look
