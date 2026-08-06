@@ -24,6 +24,13 @@
         ],
         "configuration": "./language-configuration.json"
       }
+    ],
+    "grammars": [
+      {
+        "language": "lmc",
+        "scopeName": "source.lmc",
+        "path": "./syntaxes/lmc.tmLanguage.json"
+      }
     ]
   },
   "scripts": {
