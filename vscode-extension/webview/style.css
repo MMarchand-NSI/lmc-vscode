@@ -189,3 +189,43 @@ button:disabled {
 .mailbox.unused:hover {
   opacity: 0.7;
 }
+
+/* ── Fetch/Decode/Execute panel ───────────────────────────────────
+   Collapsed by default (native <details>, no JS needed for the fold) —
+   the point is that it's available for the lesson on "what a CPU cycle
+   actually is", not that it competes with the step-by-step highlight for
+   attention on every click. */
+
+.cycle-details {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--vscode-widget-border, #444);
+}
+
+.cycle-details summary {
+  cursor: pointer;
+  font-size: 0.85em;
+  opacity: 0.8;
+  user-select: none;
+}
+.cycle-details[open] summary {
+  opacity: 1;
+  margin-bottom: 8px;
+}
+
+.cycle-hint {
+  font-size: 0.8em;
+  opacity: 0.7;
+  margin: 0 0 8px;
+  max-width: 60em;
+}
+
+#cycle-events {
+  margin: 0;
+  padding-left: 1.4em;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.85em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

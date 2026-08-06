@@ -3,6 +3,8 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import lmc/parse/span
+import lmc/runner/event.{type Event}
+import lmc/runner/instruction
 import lmc/runner/load
 import lmc/runner/run
 import lmc/runner/state.{type MachineState}
@@ -34,6 +36,12 @@ pub type Model {
     // state, doesn't get reset by step/run/reset.
     cursor_line: Option(Int),
     load_error: Option(String),
+    // Fetch/Decode/Execute events from the *last* step/run_to_halt call —
+    // lmc_lsp's runner already produces these per sub-phase, previously
+    // just discarded. Powers the collapsible "what actually just
+    // happened" panel — the point being to show that every instruction,
+    // no matter the mnemonic, goes through the same three phases.
+    last_events: List(Event),
   )
 }
 
@@ -47,6 +55,7 @@ pub fn init(source: String) -> Model {
     address_to_instruction: dict.new(),
     cursor_line: None,
     load_error: None,
+    last_events: [],
   )
   |> load_source(source)
 }
@@ -90,6 +99,7 @@ pub fn load_source(model: Model, source: String) -> Model {
             line_to_address: line_to_address,
             address_to_instruction: address_to_instruction,
             load_error: None,
+            last_events: [],
           )
         Error(err) ->
           Model(
@@ -101,6 +111,7 @@ pub fn load_source(model: Model, source: String) -> Model {
             line_to_address: line_to_address,
             address_to_instruction: address_to_instruction,
             load_error: Some(load_error_message(err)),
+            last_events: [],
           )
       }
     _ ->
@@ -118,6 +129,7 @@ pub fn load_source(model: Model, source: String) -> Model {
         load_error: Some(
           "le programme contient des erreurs — voir les diagnostics dans l'éditeur",
         ),
+        last_events: [],
       )
   }
 }
@@ -132,8 +144,8 @@ pub fn step(model: Model) -> Model {
   case model.machine {
     None -> model
     Some(m) -> {
-      let #(next, _events) = run.run_n(m, 1)
-      Model(..model, machine: Some(next))
+      let #(next, events) = run.run_n(m, 1)
+      Model(..model, machine: Some(next), last_events: events)
     }
   }
 }
@@ -145,8 +157,8 @@ pub fn run_to_halt(model: Model) -> Model {
   case model.machine {
     None -> model
     Some(m) -> {
-      let #(next, _events) = run.run_to_halt(m)
-      Model(..model, machine: Some(next))
+      let #(next, events) = run.run_to_halt(m)
+      Model(..model, machine: Some(next), last_events: events)
     }
   }
 }
@@ -236,6 +248,15 @@ pub fn program_length(model: Model) -> Int {
   dict.size(model.address_to_line)
 }
 
+/// The last step/run_to_halt's Fetch/Decode/Execute events, one line of
+/// French per event — for the collapsible "what actually just happened"
+/// panel. The point is pedagogical: every instruction, whatever the
+/// mnemonic, goes through the same phases; this is where that becomes
+/// visible instead of staying implicit in "the highlight moved".
+pub fn last_event_descriptions(model: Model) -> List(String) {
+  list.map(model.last_events, describe_event)
+}
+
 // ── Internals ──────────────────────────────────────────────────────
 
 fn build_address_to_line(result: pipeline.ParseResult) -> Dict(Int, Int) {
@@ -300,6 +321,47 @@ fn operand_text(op: ast.Operand) -> String {
     ast.LabelRef(name, _) -> name
     ast.Immediate(v, _) -> int.to_string(v)
     ast.MissingOperand(_) -> ""
+  }
+}
+
+fn describe_event(evt: Event) -> String {
+  case evt {
+    event.Fetched(address, raw) ->
+      "Fetch : lire mem["
+      <> int.to_string(address)
+      <> "] → "
+      <> int.to_string(raw)
+    event.Decoded(instr) -> "Decode : → " <> describe_runtime_instruction(instr)
+    event.InputConsumed(v) ->
+      "Execute : ACC ← entrée (" <> int.to_string(v) <> ")"
+    event.OutputProduced(v) ->
+      "Execute : sortie ← ACC (" <> int.to_string(v) <> ")"
+    event.MemoryWritten(address, v) ->
+      "Execute : mem["
+      <> int.to_string(address)
+      <> "] ← ACC ("
+      <> int.to_string(v)
+      <> ")"
+    event.AccumulatorChanged(old, new) ->
+      "Execute : ACC " <> int.to_string(old) <> " → " <> int.to_string(new)
+    event.Halted -> "Execute : HLT"
+    event.InputRequested -> "Execute : en attente d'une entrée…"
+    event.ErrorOccurred(message) -> "Erreur : " <> message
+  }
+}
+
+fn describe_runtime_instruction(instr: instruction.Instruction) -> String {
+  case instr {
+    instruction.Inp -> "INP"
+    instruction.Out -> "OUT"
+    instruction.Hlt -> "HLT"
+    instruction.Add(a) -> "ADD " <> int.to_string(a)
+    instruction.Sub(a) -> "SUB " <> int.to_string(a)
+    instruction.Sta(a) -> "STA " <> int.to_string(a)
+    instruction.Lda(a) -> "LDA " <> int.to_string(a)
+    instruction.Bra(a) -> "BRA " <> int.to_string(a)
+    instruction.Brz(a) -> "BRZ " <> int.to_string(a)
+    instruction.Brp(a) -> "BRP " <> int.to_string(a)
   }
 }
 

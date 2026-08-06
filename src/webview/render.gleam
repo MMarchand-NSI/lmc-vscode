@@ -26,6 +26,7 @@ pub fn to_json(mdl: Model) -> String {
       json_option_string(model.current_instruction_text(mdl)),
     ),
     #("programLength", json.int(model.program_length(mdl))),
+    #("events", json.array(model.last_event_descriptions(mdl), json.string)),
     #("loadError", json_option_string(mdl.load_error)),
   ])
   |> json.to_string

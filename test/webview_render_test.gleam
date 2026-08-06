@@ -52,3 +52,24 @@ pub fn instruction_text_and_program_length_reflected_test() {
   assert string.contains(json, "\"instructionText\":\"INP — lire une entrée\"")
   assert string.contains(json, "\"programLength\":3")
 }
+
+pub fn events_reflected_after_step_test() {
+  // Resuming from INP completes mid-cycle (Execute only — the Fetch for
+  // this instruction already happened in the step that discovered
+  // WaitingForInput), so this checks the events array is populated, not
+  // that it starts with "Fetch" — see
+  // webview_model_test.step_produces_fetch_decode_execute_events_test for
+  // that (a full Fetch->Decode->Execute cycle on a fresh instruction).
+  let json =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(1)
+    |> model.step
+    |> render.to_json
+  assert string.contains(json, "\"events\":[\"Execute")
+}
+
+pub fn events_empty_before_any_step_test() {
+  let json = model.init("INP\nOUT\nHLT\n") |> render.to_json
+  assert string.contains(json, "\"events\":[]")
+}

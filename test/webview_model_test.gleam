@@ -1,4 +1,5 @@
 import gleam/option.{None, Some}
+import gleam/string
 import lmc/runner/state
 import webview/model
 
@@ -193,4 +194,37 @@ pub fn program_length_counts_the_invalid_line_even_when_it_wont_load_test() {
   let m = model.init("XXX\n")
   assert m.machine == None
   assert model.program_length(m) == 1
+}
+
+// ── Cycle Fetch → Decode → Execute ────────────────────────────────
+
+pub fn no_events_before_any_step_test() {
+  let m = model.init("INP\nOUT\nHLT\n")
+  assert model.last_event_descriptions(m) == []
+}
+
+pub fn step_produces_fetch_decode_execute_events_test() {
+  // OUT (nullaire) : le cas le plus simple pour vérifier les 3 phases sans
+  // le cas particulier de INP qui bloque avant l'Execute.
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(9)
+    |> model.step
+    |> model.step
+  let descriptions = model.last_event_descriptions(m)
+  let assert [fetch, decode, execute] = descriptions
+  assert string.starts_with(fetch, "Fetch : lire mem[1]")
+  assert string.starts_with(decode, "Decode : → OUT")
+  assert execute == "Execute : sortie ← ACC (9)"
+}
+
+pub fn events_clear_on_reset_test() {
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(9)
+    |> model.step
+    |> model.reset
+  assert model.last_event_descriptions(m) == []
 }

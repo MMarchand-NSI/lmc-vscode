@@ -72,6 +72,7 @@ export function render(json) {
   renderMemory(state);
   renderRegisters(state);
   renderInstruction(state);
+  renderCycleEvents(state);
   renderOutput(state);
   renderStatus(state);
   renderInput(state);
@@ -119,6 +120,16 @@ function renderRegisters(state) {
 
 function renderInstruction(state) {
   document.getElementById("instruction").textContent = state.instructionText ?? "—";
+}
+
+function renderCycleEvents(state) {
+  const list = document.getElementById("cycle-events");
+  list.innerHTML = "";
+  for (const line of state.events ?? []) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    list.appendChild(li);
+  }
 }
 
 function renderOutput(state) {

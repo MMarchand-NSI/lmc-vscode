@@ -51,6 +51,15 @@
       </section>
     </div>
 
+    <details class="cycle-details">
+      <summary>Fetch → Decode → Execute</summary>
+      <p class="cycle-hint">
+        Chaque instruction, quel que soit son mnémonique, passe par les mêmes trois phases.
+        Voici ce qui s'est passé au dernier step :
+      </p>
+      <ol id="cycle-events"></ol>
+    </details>
+
     <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
     <script nonce="{{nonce}}">LmcApp.main();</script>
   </body>
