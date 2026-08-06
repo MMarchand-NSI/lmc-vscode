@@ -3,8 +3,8 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import lmc/parser.{
-  type Instruction, type Line, type Program, Add, Bra, Brp, Brz, Dat, Hlt,
-  Inp, Lda, Line, Out, Sta, Sub,
+  type Instruction, type Line, type Program, Add, Bra, Brp, Brz, Dat, Hlt, Inp,
+  Lda, Line, Out, Sta, Sub,
 }
 
 pub const memory_size: Int = 100
@@ -42,19 +42,18 @@ pub type EmulatorError {
 // ---- Public API -------------------------------------------------------------
 
 /// Assemble a parsed program and initialise the machine with the given input.
-pub fn load(
-  program: Program,
-  input: List(Int),
-) -> Result(State, EmulatorError) {
+pub fn load(program: Program, input: List(Int)) -> Result(State, EmulatorError) {
   use memory <- result.try(assemble(program))
-  Ok(State(
-    memory: memory,
-    acc: 0,
-    pc: 0,
-    negative: False,
-    input: input,
-    output: [],
-  ))
+  Ok(
+    State(
+      memory: memory,
+      acc: 0,
+      pc: 0,
+      negative: False,
+      input: input,
+      output: [],
+    ),
+  )
 }
 
 /// Execute one instruction cycle.
@@ -100,7 +99,10 @@ fn assemble(program: Program) -> Result(List(Int), EmulatorError) {
   case list.length(encoded) > memory_size {
     True -> Error(ProgramTooLong)
     False ->
-      Ok(list.append(encoded, list.repeat(0, memory_size - list.length(encoded))))
+      Ok(list.append(
+        encoded,
+        list.repeat(0, memory_size - list.length(encoded)),
+      ))
   }
 }
 
@@ -252,21 +254,15 @@ fn execute(
       case state.input {
         [] -> Ok(NeedsInput(state))
         [val, ..rest] ->
-          Ok(Running(State(
-            ..state,
-            acc: val,
-            negative: val < 0,
-            input: rest,
-            pc: pc,
-          )))
+          Ok(Running(
+            State(..state, acc: val, negative: val < 0, input: rest, pc: pc),
+          ))
       }
 
     DOut ->
-      Ok(Running(State(
-        ..state,
-        output: list.append(state.output, [state.acc]),
-        pc: pc,
-      )))
+      Ok(Running(
+        State(..state, output: list.append(state.output, [state.acc]), pc: pc),
+      ))
   }
 }
 

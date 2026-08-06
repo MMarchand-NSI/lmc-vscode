@@ -58,9 +58,10 @@ fn to_json(j: Json) -> String {
     JBool(False) -> "false"
     JInt(n) -> int.to_string(n)
     JString(s) ->
-      "\"" <> string.replace(s, "\"", "\\\"") |> string.replace("\n", "\\n") <> "\""
-    JArray(items) ->
-      "[" <> string.join(list.map(items, to_json), ",") <> "]"
+      "\""
+      <> string.replace(s, "\"", "\\\"") |> string.replace("\n", "\\n")
+      <> "\""
+    JArray(items) -> "[" <> string.join(list.map(items, to_json), ",") <> "]"
     JObject(pairs) ->
       "{"
       <> string.join(
@@ -111,11 +112,7 @@ fn serve(store: Store, shutdown_requested: Bool) -> Nil {
 
 // ---- Message dispatcher -----------------------------------------------------
 
-fn handle(
-  msg: Dynamic,
-  store: Store,
-  _shutdown: Bool,
-) -> #(Store, Bool) {
+fn handle(msg: Dynamic, store: Store, _shutdown: Bool) -> #(Store, Bool) {
   let method = get_str(msg, "method") |> result.unwrap("")
   let id = get_int(msg, "id")
   let params = get_nested(msg, "params") |> result.unwrap(msg)
@@ -183,7 +180,10 @@ fn handle(
     }
 
     "textDocument/definition" -> {
-      let loc = case get_nested(params, "textDocument"), get_nested(params, "position") {
+      let loc = case
+        get_nested(params, "textDocument"),
+        get_nested(params, "position")
+      {
         Ok(td), Ok(pos) -> {
           let uri = get_str(td, "uri") |> result.unwrap("")
           let line = get_int(pos, "line") |> result.unwrap(0)
@@ -197,7 +197,10 @@ fn handle(
     }
 
     "textDocument/hover" -> {
-      let hov = case get_nested(params, "textDocument"), get_nested(params, "position") {
+      let hov = case
+        get_nested(params, "textDocument"),
+        get_nested(params, "position")
+      {
         Ok(td), Ok(pos) -> {
           let uri = get_str(td, "uri") |> result.unwrap("")
           let line = get_int(pos, "line") |> result.unwrap(0)
@@ -211,7 +214,10 @@ fn handle(
     }
 
     "textDocument/references" -> {
-      let locs = case get_nested(params, "textDocument"), get_nested(params, "position") {
+      let locs = case
+        get_nested(params, "textDocument"),
+        get_nested(params, "position")
+      {
         Ok(td), Ok(pos) -> {
           let uri = get_str(td, "uri") |> result.unwrap("")
           let line = get_int(pos, "line") |> result.unwrap(0)
@@ -240,7 +246,11 @@ fn handle(
       // Unknown method — send error only if it had an id (request, not notif)
       case is_defined(msg) {
         True -> {
-          send_response(error_response(id, -32_601, "Method not found: " <> method))
+          send_response(error_response(
+            id,
+            -32_601,
+            "Method not found: " <> method,
+          ))
           #(store, False)
         }
         False -> #(store, False)
@@ -289,10 +299,13 @@ fn handle_hover(store: Store, uri: String, pos: Position) -> Json {
                 <> int.to_string(ref_count)
                 <> " time(s)"
               JObject([
-                #("contents", JObject([
-                  #("kind", JString("markdown")),
-                  #("value", JString(md)),
-                ])),
+                #(
+                  "contents",
+                  JObject([
+                    #("kind", JString("markdown")),
+                    #("value", JString(md)),
+                  ]),
+                ),
               ])
             }
           }
@@ -311,9 +324,11 @@ fn handle_references(store: Store, uri: String, pos: Position) -> Json {
           case analyser.find_definition(analysis, lbl) {
             None -> JArray([])
             Some(sym) ->
-              JArray(list.map(sym.referenced_at, fn(line) {
-                encode_location(uri, full_line_range(line - 1))
-              }))
+              JArray(
+                list.map(sym.referenced_at, fn(line) {
+                  encode_location(uri, full_line_range(line - 1))
+                }),
+              )
           }
       }
   }
@@ -339,7 +354,10 @@ fn handle_completion(store: Store, uri: String) -> Json {
           #("label", JString(sym.name)),
           #("kind", JInt(6)),
           // Variable
-          #("detail", JString("label at line " <> int.to_string(sym.defined_at))),
+          #(
+            "detail",
+            JString("label at line " <> int.to_string(sym.defined_at)),
+          ),
         ])
       })
   }
@@ -352,17 +370,19 @@ fn handle_completion(store: Store, uri: String) -> Json {
 fn publish_diagnostics(uri: String, doc: Document) -> Nil {
   let diags = case doc.analysis {
     None -> JArray([])
-    Some(analysis) ->
-      JArray(list.map(analysis.diagnostics, encode_diagnostic))
+    Some(analysis) -> JArray(list.map(analysis.diagnostics, encode_diagnostic))
   }
   let notif =
     JObject([
       #("jsonrpc", JString("2.0")),
       #("method", JString("textDocument/publishDiagnostics")),
-      #("params", JObject([
-        #("uri", JString(uri)),
-        #("diagnostics", diags),
-      ])),
+      #(
+        "params",
+        JObject([
+          #("uri", JString(uri)),
+          #("diagnostics", diags),
+        ]),
+      ),
     ])
   send_notification(to_json(notif))
 }
@@ -431,46 +451,62 @@ fn find_label_at(store: Store, uri: String, pos: Position) -> Option(String) {
 // ---- JSON helpers -----------------------------------------------------------
 
 fn response(id: Result(Int, Nil), result: Json) -> String {
-  to_json(JObject([
-    #("jsonrpc", JString("2.0")),
-    #("id", case id {
-      Ok(n) -> JInt(n)
-      Error(_) -> JNull
-    }),
-    #("result", result),
-  ]))
+  to_json(
+    JObject([
+      #("jsonrpc", JString("2.0")),
+      #("id", case id {
+        Ok(n) -> JInt(n)
+        Error(_) -> JNull
+      }),
+      #("result", result),
+    ]),
+  )
 }
 
 fn error_response(id: Result(Int, Nil), code: Int, message: String) -> String {
-  to_json(JObject([
-    #("jsonrpc", JString("2.0")),
-    #("id", case id {
-      Ok(n) -> JInt(n)
-      Error(_) -> JNull
-    }),
-    #("error", JObject([
-      #("code", JInt(code)),
-      #("message", JString(message)),
-    ])),
-  ]))
+  to_json(
+    JObject([
+      #("jsonrpc", JString("2.0")),
+      #("id", case id {
+        Ok(n) -> JInt(n)
+        Error(_) -> JNull
+      }),
+      #(
+        "error",
+        JObject([
+          #("code", JInt(code)),
+          #("message", JString(message)),
+        ]),
+      ),
+    ]),
+  )
 }
 
 fn capabilities() -> Json {
   JObject([
-    #("capabilities", JObject([
-      #("textDocumentSync", JInt(1)),
-      // Full sync
-      #("hoverProvider", JBool(True)),
-      #("definitionProvider", JBool(True)),
-      #("referencesProvider", JBool(True)),
-      #("completionProvider", JObject([
-        #("triggerCharacters", JArray([])),
-      ])),
-    ])),
-    #("serverInfo", JObject([
-      #("name", JString("lmc-language-server")),
-      #("version", JString("1.0.0")),
-    ])),
+    #(
+      "capabilities",
+      JObject([
+        #("textDocumentSync", JInt(1)),
+        // Full sync
+        #("hoverProvider", JBool(True)),
+        #("definitionProvider", JBool(True)),
+        #("referencesProvider", JBool(True)),
+        #(
+          "completionProvider",
+          JObject([
+            #("triggerCharacters", JArray([])),
+          ]),
+        ),
+      ]),
+    ),
+    #(
+      "serverInfo",
+      JObject([
+        #("name", JString("lmc-language-server")),
+        #("version", JString("1.0.0")),
+      ]),
+    ),
   ])
 }
 

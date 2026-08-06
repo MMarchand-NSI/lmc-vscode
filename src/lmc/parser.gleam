@@ -78,16 +78,18 @@ fn comment_parser() -> nibble.Parser(String, Token, Nil) {
 }
 
 fn instruction_parser() -> nibble.Parser(Instruction, Token, Nil) {
-  use mnemonic <- nibble.do(nibble.take_map("mnemonic", fn(tok) {
-    case tok {
-      Ident(s) ->
-        case is_mnemonic(s) {
-          True -> Some(s)
-          False -> None
-        }
-      _ -> None
-    }
-  }))
+  use mnemonic <- nibble.do(
+    nibble.take_map("mnemonic", fn(tok) {
+      case tok {
+        Ident(s) ->
+          case is_mnemonic(s) {
+            True -> Some(s)
+            False -> None
+          }
+        _ -> None
+      }
+    }),
+  )
   case mnemonic {
     "ADD" -> addr_operand() |> nibble.map(Add)
     "SUB" -> addr_operand() |> nibble.map(Sub)
@@ -117,12 +119,14 @@ fn dat_operand() -> nibble.Parser(Instruction, Token, Nil) {
   nibble.one_of([
     {
       use _ <- nibble.do(nibble.token(Minus))
-      use n <- nibble.do(nibble.take_map("number", fn(tok) {
-        case tok {
-          Number(n) -> Some(n)
-          _ -> None
-        }
-      }))
+      use n <- nibble.do(
+        nibble.take_map("number", fn(tok) {
+          case tok {
+            Number(n) -> Some(n)
+            _ -> None
+          }
+        }),
+      )
       nibble.return(Dat(-n))
     },
     nibble.take_map("number", fn(tok) {
@@ -137,8 +141,17 @@ fn dat_operand() -> nibble.Parser(Instruction, Token, Nil) {
 
 fn is_mnemonic(s: String) -> Bool {
   case s {
-    "ADD" | "SUB" | "STA" | "LDA" | "BRA" | "BRZ" | "BRP" | "INP" | "OUT"
-    | "HLT" | "DAT" -> True
+    "ADD"
+    | "SUB"
+    | "STA"
+    | "LDA"
+    | "BRA"
+    | "BRZ"
+    | "BRP"
+    | "INP"
+    | "OUT"
+    | "HLT"
+    | "DAT" -> True
     _ -> False
   }
 }

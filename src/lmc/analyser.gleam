@@ -57,18 +57,17 @@ fn collect_definitions(
       None -> acc
       Some(name) ->
         case dict.get(defs, name) {
-          Ok(prev) ->
-            #(defs, [
-              Diagnostic(
-                line: line_no,
-                severity: SevError,
-                message: "Label \""
-                  <> name
-                  <> "\" already defined at line "
-                  <> int.to_string(prev),
-              ),
-              ..diags
-            ])
+          Ok(prev) -> #(defs, [
+            Diagnostic(
+              line: line_no,
+              severity: SevError,
+              message: "Label \""
+                <> name
+                <> "\" already defined at line "
+                <> int.to_string(prev),
+            ),
+            ..diags
+          ])
           Error(_) -> #(dict.insert(defs, name, line_no), diags)
         }
     }
@@ -97,18 +96,17 @@ fn check_references(
           None -> acc
           Some(lbl) ->
             case dict.get(defs, lbl) {
-              Error(_) ->
-                #(
-                  [
-                    Diagnostic(
-                      line: line_no,
-                      severity: SevError,
-                      message: "Label \"" <> lbl <> "\" is not defined",
-                    ),
-                    ..diags
-                  ],
-                  symbols,
-                )
+              Error(_) -> #(
+                [
+                  Diagnostic(
+                    line: line_no,
+                    severity: SevError,
+                    message: "Label \"" <> lbl <> "\" is not defined",
+                  ),
+                  ..diags
+                ],
+                symbols,
+              )
               Ok(_) -> {
                 let sym = case dict.get(symbols, lbl) {
                   Ok(s) ->
@@ -127,8 +125,8 @@ fn check_references(
 /// Extrait le label opérande d'une instruction qui en a un.
 fn operand_label(instr: Instruction) -> Option(String) {
   case instr {
-    Add(lbl) | Sub(lbl) | Sta(lbl) | Lda(lbl) | Bra(lbl) | Brz(lbl)
-    | Brp(lbl) -> Some(lbl)
+    Add(lbl) | Sub(lbl) | Sta(lbl) | Lda(lbl) | Bra(lbl) | Brz(lbl) | Brp(lbl) ->
+      Some(lbl)
     _ -> None
   }
 }
@@ -179,10 +177,7 @@ fn check_length(indexed: List(#(Int, parser.Line))) -> List(Diagnostic) {
 // ---- Requêtes utilitaires (pour le LSP) -------------------------------------
 
 /// Retourne le symbole défini sous ce label, s'il existe.
-pub fn find_definition(
-  analysis: Analysis,
-  label: String,
-) -> Option(Symbol) {
+pub fn find_definition(analysis: Analysis, label: String) -> Option(Symbol) {
   dict.get(analysis.symbols, label) |> option.from_result
 }
 
