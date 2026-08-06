@@ -113,10 +113,35 @@ function isSourceDocument(document: vscode.TextDocument): boolean {
 
 /// The live TextEditor for sourceUri, if that file is currently visible in
 /// some pane — never a cached reference from an earlier point in time.
+/// `visibleTextEditors` only covers panes actually painted on screen: a tab
+/// that's open but sitting in the background of its group (not the active
+/// tab there) doesn't count as "visible" and won't show up here — see
+/// findOpenTabGroupColumn for that case.
 function findLiveEditor(): vscode.TextEditor | undefined {
   return vscode.window.visibleTextEditors.find(
     (e) => sourceUri !== undefined && e.document.uri.toString() === sourceUri.toString(),
   );
+}
+
+/// The view column of an existing (but currently backgrounded/inactive)
+/// tab for sourceUri, if one is open anywhere. Without this,
+/// showTextDocument(uri) with no explicit viewColumn defaults to the
+/// *active* column — which, when the click driving this came from the
+/// webview, is the webview's own column — and opens a redundant second tab
+/// there instead of reactivating the existing one.
+function findOpenTabGroupColumn(): vscode.ViewColumn | undefined {
+  if (!sourceUri) return undefined;
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      if (
+        tab.input instanceof vscode.TabInputText &&
+        tab.input.uri.toString() === sourceUri.toString()
+      ) {
+        return group.viewColumn;
+      }
+    }
+  }
+  return undefined;
 }
 
 function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {
@@ -143,12 +168,18 @@ async function revealLine(line: number): Promise<void> {
   const position = new vscode.Position(line, 0);
   const range = new vscode.Range(position, position);
 
-  // Prefer an already-visible editor for the file (don't steal focus into
-  // a new pane if the user can already see it); fall back to opening it
-  // if the tab was closed entirely, not just backgrounded.
+  // Prefer an already-visible editor for the file; failing that, reactivate
+  // its existing (but backgrounded) tab in whichever column it's already
+  // open in — passing that column explicitly is what stops
+  // showTextDocument from defaulting to the active column (the webview's
+  // own) and opening a redundant second tab there. Only if neither exists
+  // (the tab was actually closed) does it fall through to opening a new one.
   const editor =
     findLiveEditor() ??
-    (await vscode.window.showTextDocument(sourceUri, { preserveFocus: true }));
+    (await vscode.window.showTextDocument(sourceUri, {
+      preserveFocus: true,
+      viewColumn: findOpenTabGroupColumn(),
+    }));
 
   editor.selection = new vscode.Selection(position, position);
   editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
