@@ -1,0 +1,31 @@
+start   INP
+        STA n
+        LDA zero
+        STA a
+        LDA one
+        STA b
+        LDA n
+        BRZ done
+
+loop    LDA b
+        OUT
+        LDA a
+        ADD b
+        STA temp
+        LDA b
+        STA a
+        LDA temp
+        STA b
+        LDA n
+        SUB one
+        STA n
+        BRP loop
+
+done    HLT
+
+zero    DAT 0
+one     DAT 1
+a       DAT
+b       DAT
+temp    DAT
+n       DAT

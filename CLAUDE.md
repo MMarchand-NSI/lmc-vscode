@@ -170,6 +170,42 @@ and (b) manually driving the built bundle inside a minimal `node:vm`-stubbed DOM
 git history for the throwaway scripts; not committed). Actually opening the panel in a real Extension
 Development Host has not been done by an agent in this repo — see "Status" below, it's the top item.
 
+## Design note: the functional core is why the tests are trustworthy — not why the code is bug-free
+
+Worth being precise about what Gleam's guarantees actually bought this codebase, because it should
+guide where new logic goes, not just serve as a general endorsement of "functional is better."
+
+**What immutability + a pure functional core actually bought:**
+- `webview/model.gleam`'s `Model` is fully immutable; every transition (`step`, `run_to_halt`,
+  `resume_after_input`, `set_source_if_changed`, ...) is a pure function returning a new `Model`. That's
+  what makes the 40 `gleam test`s in `test/webview_model_test.gleam` cheap to write and trustworthy to
+  run — no setup/teardown, no mocking, fully deterministic, sub-second. That fast, reliable feedback
+  loop is the actual reason bugs like "Step behaves like Run" got caught, fixed, *and* pinned down with
+  a regression test in the same session instead of lingering.
+- Gleam's exhaustive `case` on sum types (the 11 `Instruction` variants, the `Event` variants) means the
+  compiler itself flags every unhandled branch whenever a variant is added — a whole category of
+  "forgot to handle this case" bugs never had the chance to exist here.
+- `Option`/`Result` used throughout (`m.machine: Option(MachineState)`, `load_error: Option(String)`)
+  ruled out null-pointer-style bugs entirely — none showed up anywhere in this codebase.
+
+**What it did *not* buy:** every real bug found while actually testing this extension — blank lines
+silently becoming an implicit HLT (`lmc_lsp`'s `load.gleam`), the hover span pointing at the wrong
+token, Step behaving like Run, Run collapsing into Step after providing input — was a **domain-modeling
+gap**: a missing field, a wrong address computation, a wrong span capture. No type system, functional or
+not, invents the test case you haven't thought of yet. Purity made these cheap to *fix* once understood
+(add the field, write the one test that pins it down), not less likely to occur in the first place.
+
+**The tell**: almost every bug that took real effort to track down lived at the *impure* boundary, not
+in the pure core — `webviewPanel.ts` (a stale cached `TextEditor` reference, `visibleTextEditors` vs.
+`tabGroups` API misuse), `app_ffi.mjs` (mutable DOM), or the legacy LSP's FFI layer (`Result$Ok`/
+`Result$Error` — names that don't exist in the compiled prelude, undetected for the fallback's entire
+existence). `model.gleam`/`render.gleam` — the pure core — has never had a mutation bug, a null bug, or
+a missed-case bug; only domain-logic bugs, all of which are now pinned down by a test. Keep that split
+in mind when deciding where new logic belongs: push it into the pure Gleam core (`model.gleam`,
+`lmc_lsp`'s own layers) whenever possible, and treat any code that has to touch the VS Code API or the
+DOM directly (`webviewPanel.ts`, `client.ts`, `app_ffi.mjs`) as inherently higher-risk regardless of how
+solid the core underneath it is.
+
 ## Status: where things stand, what's left
 
 Done and working, each verified by actually running it (`gleam test`, or driving the built bundle —
