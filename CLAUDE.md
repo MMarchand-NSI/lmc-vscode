@@ -32,7 +32,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the fetch script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.1.4" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.1.6" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -113,7 +113,7 @@ VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fe
   `scripts/fetch-lsp-bundle.mjs` first.
 - **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
   download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
-  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.1.4`; pass a version to pin a different tag.
+  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.1.6`; pass a version to pin a different tag.
 
 None of the LSP protocol logic (diagnostics, hover, completion, formatting, etc.) lives in this repo
 any more — see `lmc_lsp`'s own `CLAUDE.md`/`ARCHI.md` for that.
