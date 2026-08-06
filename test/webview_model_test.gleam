@@ -26,6 +26,38 @@ pub fn init_program_with_undefined_label_test() {
   assert m.load_error != None
 }
 
+pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
+  // Regression: webviewPanel.ts resends the source on every editor
+  // refocus (onDidChangeActiveTextEditor), not only on real edits —
+  // clicking back into the source editor while stepping through a
+  // program must not reset PC/ACC/output just because the (unchanged)
+  // source arrived again.
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(9)
+    |> model.step
+  let assert Some(before) = m.machine
+
+  let m2 = model.set_source_if_changed(m, "INP\nOUT\nHLT\n")
+  let assert Some(after) = m2.machine
+  assert after.program_counter == before.program_counter
+  assert after.accumulator == before.accumulator
+}
+
+pub fn set_source_if_changed_reloads_on_real_change_test() {
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(9)
+    |> model.step
+  let m2 = model.set_source_if_changed(m, "INP\nHLT\n")
+  let assert Some(machine) = m2.machine
+  // Rechargé depuis zéro : de retour au début du (nouveau) programme.
+  assert machine.program_counter == 0
+  assert machine.accumulator == 0
+}
+
 // ── Step / run ────────────────────────────────────────────────────
 
 pub fn step_advances_one_instruction_test() {

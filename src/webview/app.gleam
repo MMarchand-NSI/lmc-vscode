@@ -62,7 +62,8 @@ type HostMessage {
 
 fn handle_host_message(cell: Ref(Model), raw: String) -> Nil {
   case decode_host_message(raw) {
-    SetSource(source) -> update(cell, fn(m) { model.load_source(m, source) })
+    SetSource(source) ->
+      update(cell, fn(m) { model.set_source_if_changed(m, source) })
     CursorLine(line) -> update(cell, fn(m) { model.set_cursor_line(m, line) })
     Unrecognized -> Nil
   }

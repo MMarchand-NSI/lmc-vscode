@@ -44,6 +44,22 @@ pub fn init(source: String) -> Model {
   |> load_source(source)
 }
 
+/// Like load_source, but a no-op if `source` is unchanged from what's
+/// already loaded. The webview host resends the source on every editor
+/// refocus, not only on real edits (see webviewPanel.ts,
+/// onDidChangeActiveTextEditor — it also needs to re-sync the cursor) — so
+/// clicking back into the source editor must not blow away step-through
+/// progress (PC/ACC/output) just because a SetSource happened to arrive
+/// with unchanged text. `reset` goes through `load_source` directly and is
+/// unaffected: it must reload even with unchanged text, that's the point
+/// of a reset button.
+pub fn set_source_if_changed(model: Model, source: String) -> Model {
+  case source == model.source {
+    True -> model
+    False -> load_source(model, source)
+  }
+}
+
 /// (Re)parse and (re)assemble `source`, resetting execution state. Input is
 /// always empty at load time — INP is handled interactively via
 /// `provide_input`, never supplied upfront (this is a step-through teaching
