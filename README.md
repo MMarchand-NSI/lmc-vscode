@@ -37,6 +37,9 @@ Labels are case-insensitive. Comments start with `//` or `;`.
 
 ```
 lsp-server.mjs         # LSP entry point: loads vendor/lmc-lsp.bundle.mjs
+examples/              # Opened automatically by the "Run LMC Extension" launch config
+  test-pgm.lmc          # (F5) — a valid program and a deliberately broken one, so
+  broken.lmc            # there's always something to try without editing anything
 scripts/
   fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vendor/ (gitignored)
 src/

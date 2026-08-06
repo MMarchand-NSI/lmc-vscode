@@ -80,7 +80,11 @@ npx vsce package      # package as .vsix
 
 To manually try the extension in VS Code: run `node scripts/fetch-lsp-bundle.mjs` first, then launch
 the "Run LMC Extension" debug config (`.vscode/launch.json`, `F5`) — it starts an Extension
-Development Host with `vscode-extension` as the dev path.
+Development Host with `vscode-extension` as the dev path, with `examples/` (a valid program and a
+deliberately broken one) opened automatically so there's always something to test against without
+manually opening a folder each time. `vscode-extension/.vscode/launch.json` has an equivalent "Run
+Extension" config for when `vscode-extension/` itself is the open workspace instead of the repo root
+(it used to be misnamed `lauch.json` and silently invisible to VS Code — fixed).
 
 CI (`.github/workflows/test.yml`) runs on OTP 28 / gleam 1.14.0: it first configures SSH access to
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites

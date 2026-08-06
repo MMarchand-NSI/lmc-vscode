@@ -1,0 +1,5 @@
+// Volontairement invalide, pour tester les diagnostics de l'extension.
+INP
+LDA ghost   // "ghost" n'est défini nulle part -> diagnostic "label non défini"
+OUT
+// pas de HLT -> diagnostic "programme peut boucler indéfiniment"
