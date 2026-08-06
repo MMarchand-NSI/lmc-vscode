@@ -39,17 +39,25 @@ pub fn main() -> Nil {
 
   // Initial render before the host has sent any source — shows the
   // "nothing loaded yet" state rather than a blank screen while waiting.
-  render_current(cell)
+  render_and_notify(cell)
   ffi.post_to_host(ready_message())
 }
 
 fn update(cell: Ref(Model), f: fn(Model) -> Model) -> Nil {
   ffi.set_ref(cell, f(ffi.deref(cell)))
-  render_current(cell)
+  render_and_notify(cell)
 }
 
-fn render_current(cell: Ref(Model)) -> Nil {
-  ffi.render(render.to_json(ffi.deref(cell)))
+/// Re-renders the webview *and* tells the host which source line is
+/// current, so it can show a debug-session-style highlight in the editor
+/// (see webviewPanel.ts, currentLineDecoration) — not just the memory
+/// grid's own highlight. Every state change goes through `update`, so this
+/// covers step/run/reset/input/source-change uniformly rather than having
+/// to remember to notify at each call site separately.
+fn render_and_notify(cell: Ref(Model)) -> Nil {
+  let mdl = ffi.deref(cell)
+  ffi.render(render.to_json(mdl))
+  ffi.post_to_host(current_line_message(model.current_line(mdl)))
 }
 
 // ── Messages venant de l'extension host ───────────────────────────
@@ -98,5 +106,14 @@ fn ready_message() -> String {
 
 fn reveal_line_message(line: Int) -> String {
   json.object([#("type", json.string("revealLine")), #("line", json.int(line))])
+  |> json.to_string
+}
+
+fn current_line_message(line: Option(Int)) -> String {
+  let line_json = case line {
+    Some(l) -> json.int(l)
+    None -> json.null()
+  }
+  json.object([#("type", json.string("currentLine")), #("line", line_json)])
   |> json.to_string
 }

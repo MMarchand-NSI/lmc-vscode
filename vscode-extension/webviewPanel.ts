@@ -12,6 +12,7 @@ import * as vscode from "vscode";
 //
 //   webview -> host  {"type":"ready"}
 //   webview -> host  {"type":"revealLine","line":N}
+//   webview -> host  {"type":"currentLine","line":N|null}
 //   host -> webview  {"type":"setSource","source":"..."}
 //   host -> webview  {"type":"cursorLine","line":N|null}
 //
@@ -26,6 +27,21 @@ import * as vscode from "vscode";
 let currentPanel: vscode.WebviewPanel | undefined;
 let sourceUri: vscode.Uri | undefined;
 let disposables: vscode.Disposable[] = [];
+
+// The "next instruction about to execute" highlight — same idea as VS
+// Code's own debugger current-line marker, reusing its theme color so it
+// looks native rather than inventing a new color. Applied to whichever
+// TextEditor instance is currently live (see findLiveEditor): the
+// decoration lives on that specific object, and VS Code can hand out a new
+// TextEditor instance for the same file after switching tabs away and back
+// (see the module doc comment) — so lastCurrentLine is kept separately and
+// reapplied to whatever editor object is live, rather than trusting a
+// decoration set once to survive.
+const currentLineDecoration = vscode.window.createTextEditorDecorationType({
+  isWholeLine: true,
+  backgroundColor: new vscode.ThemeColor("editor.stackFrameHighlightBackground"),
+});
+let lastCurrentLine: number | null = null;
 
 export function openEmulatorPanel(context: vscode.ExtensionContext): void {
   const editor = vscode.window.activeTextEditor;
@@ -96,12 +112,18 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
       sendSource(currentPanel, editor.document);
       const line = editor.selection.active.line;
       currentPanel.webview.postMessage({ type: "cursorLine", line });
+      // Refocusing can hand back a *different* TextEditor instance for the
+      // same file — reapply to it explicitly rather than assuming whatever
+      // had the decoration before still does.
+      applyCurrentLineDecoration();
     }),
   );
 
   currentPanel.onDidDispose(() => {
+    findLiveEditor()?.setDecorations(currentLineDecoration, []);
     currentPanel = undefined;
     sourceUri = undefined;
+    lastCurrentLine = null;
     disposables.forEach((d) => d.dispose());
     disposables = [];
   });
@@ -156,7 +178,27 @@ function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {
     case "revealLine":
       revealLine(message.line);
       break;
+    case "currentLine":
+      lastCurrentLine = typeof message.line === "number" ? message.line : null;
+      applyCurrentLineDecoration();
+      break;
   }
+}
+
+/// Applies (or clears) the current-line highlight on the live editor for
+/// sourceUri, if that file happens to be visible right now. Silently does
+/// nothing otherwise — unlike revealLine, this never opens or activates a
+/// tab just to decorate it; there's nothing worth decorating if the user
+/// isn't looking at the file.
+function applyCurrentLineDecoration(): void {
+  const editor = findLiveEditor();
+  if (!editor) return;
+  if (lastCurrentLine === null) {
+    editor.setDecorations(currentLineDecoration, []);
+    return;
+  }
+  const position = new vscode.Position(lastCurrentLine, 0);
+  editor.setDecorations(currentLineDecoration, [new vscode.Range(position, position)]);
 }
 
 function sendSource(panel: vscode.WebviewPanel, document: vscode.TextDocument): void {
