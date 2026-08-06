@@ -1,11 +1,12 @@
 import * as path from "path";
-import { ExtensionContext } from "vscode";
+import { commands, ExtensionContext } from "vscode";
 import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
   TransportKind,
 } from "vscode-languageclient/node";
+import { openEmulatorPanel } from "./webviewPanel";
 
 let client: LanguageClient;
 
@@ -35,6 +36,10 @@ export function activate(context: ExtensionContext): void {
   );
 
   client.start();
+
+  context.subscriptions.push(
+    commands.registerCommand("lmc.openEmulator", () => openEmulatorPanel(context)),
+  );
 }
 
 export function deactivate(): Thenable<void> | undefined {

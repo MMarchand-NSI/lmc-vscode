@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src {{cspSource}}; script-src 'nonce-{{nonce}}';" />
+    <link rel="stylesheet" href="{{styleUri}}" />
+    <title>LMC — Émulateur</title>
+  </head>
+  <body>
+    <div id="error" class="error-banner" style="display: none"></div>
+
+    <div class="layout">
+      <section class="cpu">
+        <div class="register">
+          <span class="label">ACC</span>
+          <span id="acc" class="value">—</span>
+        </div>
+        <div class="register">
+          <span class="label">PC</span>
+          <span id="pc" class="value">—</span>
+        </div>
+        <div class="register">
+          <span class="label">État</span>
+          <span id="status" class="status">—</span>
+        </div>
+
+        <div class="controls">
+          <button id="step" type="button">Step</button>
+          <button id="run" type="button">Run</button>
+          <button id="reset" type="button">Reset</button>
+        </div>
+
+        <form id="input-form" style="display: none">
+          <label for="input-value">Entrée (INP)</label>
+          <input id="input-value" type="number" inputmode="numeric" autofocus />
+          <button type="submit">OK</button>
+        </form>
+
+        <div class="output-tray">
+          <h2>Sortie</h2>
+          <ul id="output"></ul>
+        </div>
+      </section>
+
+      <section class="memory-wrap">
+        <h2>Mémoire</h2>
+        <div id="memory" class="memory-grid"></div>
+      </section>
+    </div>
+
+    <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
+    <script nonce="{{nonce}}">LmcApp.main();</script>
+  </body>
+</html>

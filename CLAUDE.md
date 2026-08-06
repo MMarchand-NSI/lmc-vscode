@@ -54,6 +54,8 @@ else keeps working as-is.
 ```sh
 node scripts/fetch-lsp-bundle.mjs        # required before the extension will run at all —
                                           # fetches vendor/lmc-lsp.bundle.mjs (gitignored)
+gleam build && node scripts/build-webview.mjs  # required before "LMC: Open Emulator" shows
+                                                # anything — bundles src/webview/ for the browser
 ```
 
 ```sh
@@ -126,13 +128,45 @@ programs — see the README's "Emulator API" section for the actual usage (`lmc/
 with `lmc_lsp`'s — `test/emulator_test.gleam` is a smoke test exercising the real dependency, not a
 test of local code.
 
-### Planned / stub areas
+### Emulator webview (`src/webview/`, `vscode-extension/webviewPanel.ts`)
 
-- **`src/webview/app.gleam`** — interactive emulator webview UI (empty stub, not implemented). A
-  webview is inherently VS Code-specific (unlike DAP, which moved to `lmc_lsp` — see its
-  `CLAUDE.md`), so this stays here. When work on it starts, it should drive `lmc_lsp`'s
-  `runner/` (the same dependency the Emulator API already uses) — there is no local emulator to fall
-  back to.
+Runs **in the browser, inside the webview** — not round-tripped through the extension host on every
+step. `src/webview/*.gleam` compiles to JS (same as any other Gleam module here) and gets bundled for
+the browser by `scripts/build-webview.mjs` (esbuild, `--platform=browser`, `--global-name=LmcApp` since
+Gleam's `main()` is just an export — nothing calls it on its own; `index.html` does
+`LmcApp.main()` after loading the bundle).
 
-When implementing it, follow the existing pattern used by `lmc_lsp`: Gleam core logic + a small
-`@external(javascript, ...)` FFI file colocated with the `.gleam` module for the Node-specific I/O.
+- **`webview/model.gleam`** — pure state/transitions, no FFI, `gleam test`-covered. Wraps `lmc_lsp`'s
+  `runner` (`load`/`run`/`state`) directly, same as the Emulator API — no local emulator. Also owns
+  `address_to_line`/`line_to_address` (built from `load.address_offsets`, **not** re-derived by
+  assuming address == line index — that assumption is exactly the v0.1.5 bug in `lmc_lsp`, see its
+  ARCHI.md) for the editor <-> webview sync, and `current_address`/`current_line`, which account for
+  a real runner quirk: PC advances during the *fetch* phase, before `INP`'s execute phase can
+  discover there's no input — so when `WaitingForInput`, PC already points one past the instruction
+  actually paused on.
+- **`webview/render.gleam`** — `Model` -> single JSON payload (`gleam_json`), also `gleam test`-covered.
+  One `ffi.render(json)` call re-renders the whole memory grid each time; 100 cells is cheap enough
+  that a diffing renderer isn't worth the complexity.
+- **`webview/app.gleam`** — entry point, wires `model`+`render` to `ffi.gleam`. Not unit-tested itself
+  (pure FFI wiring), same reasoning as `lmc_lsp`'s `lsp/server.gleam` `serve` loop vs. its testable
+  handlers.
+- **`webview/ffi.gleam` + `app_ffi.mjs`** — DOM + `acquireVsCodeApi().postMessage` bridge, same
+  `ref`/`deref`/`setRef` mutable-cell pattern `lmc_lsp`'s `lsp/ffi.gleam` uses for server state
+  (reimplemented here, not shared — the two repos stay independent). Browser FFI, not Node FFI —
+  don't reach for `node:*` imports in this file.
+- **`vscode-extension/webviewPanel.ts`** — creates the panel (`retainContextWhenHidden: true`, so
+  stepping progress survives switching tabs), fills in `webview/index.html`'s `{{cspSource}}` /
+  `{{styleUri}}` / `{{scriptUri}}` / `{{nonce}}` placeholders, and relays exactly two message
+  directions: host->webview (`setSource`, `cursorLine`) and webview->host (`ready`, `revealLine`).
+  Command `lmc.openEmulator` ("LMC: Open Emulator") is registered in `client.ts`.
+
+**Editor <-> webview sync is the actual point of this being a webview** instead of embedding an
+existing standalone LMC simulator (plenty exist as plain websites) — moving the cursor in the editor
+outlines the corresponding mailbox; clicking a mailbox reveals its source line. Don't regress this in
+future work on the webview; it's the reason to have one.
+
+Not covered by any GUI-free test — verified so far by (a) `gleam test` on `model.gleam`/`render.gleam`,
+and (b) manually driving the built bundle inside a minimal `node:vm`-stubbed DOM (see chat history /
+git history for the throwaway script; not committed). Actually opening the panel in a real Extension
+Development Host has not been done by an agent in this repo — do it before trusting the UI wiring
+itself, `webviewPanel.ts` and `index.html`'s placeholder substitution in particular.

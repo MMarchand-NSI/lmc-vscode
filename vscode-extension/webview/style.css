@@ -1,0 +1,171 @@
+/* Sober MVP styling — VS Code theme variables throughout so it looks native
+   in both light and dark themes, no bespoke color scheme to maintain. */
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  font-family: var(--vscode-font-family, sans-serif);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  margin: 0;
+  padding: 12px;
+}
+
+h2 {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin: 0 0 8px;
+}
+
+.error-banner {
+  background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+  color: var(--vscode-inputValidation-errorForeground, inherit);
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 0.9em;
+}
+
+.layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* ── CPU panel ─────────────────────────────────────────────────── */
+
+.cpu {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.register {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+
+.register .label {
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+
+.register .value {
+  font-size: 1.4em;
+  font-weight: 600;
+}
+
+.status {
+  font-size: 1em !important;
+  font-weight: 500 !important;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+.status-halted { background: var(--vscode-testing-iconPassed, #4caf50); color: #fff; }
+.status-error { background: var(--vscode-testing-iconFailed, #f14c4c); color: #fff; }
+.status-waiting_input { background: var(--vscode-testing-iconQueued, #cca700); color: #000; }
+
+.controls {
+  display: flex;
+  gap: 6px;
+}
+
+button {
+  font-family: inherit;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#input-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+#input-form input {
+  width: 80px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  padding: 3px 6px;
+  border-radius: 2px;
+}
+
+.output-tray ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.output-tray li {
+  background: var(--vscode-textBlockQuote-background);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Memory grid ───────────────────────────────────────────────── */
+
+.memory-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+
+.mailbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px;
+  border-radius: 3px;
+  background: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-widget-border, transparent);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.mailbox:hover {
+  border-color: var(--vscode-focusBorder);
+}
+.mailbox .addr {
+  font-size: 0.65em;
+  opacity: 0.6;
+}
+.mailbox .value {
+  font-size: 0.9em;
+}
+
+.mailbox.current {
+  background: var(--vscode-editor-findMatchHighlightBackground, #515c6a);
+  border-color: var(--vscode-focusBorder);
+}
+.mailbox.cursor:not(.current) {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}

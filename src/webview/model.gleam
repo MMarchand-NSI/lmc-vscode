@@ -137,22 +137,32 @@ pub fn set_cursor_line(model: Model, line: Option(Int)) -> Model {
 
 // ── Requêtes dérivées ─────────────────────────────────────────────
 
-/// The source line (0-indexed) the machine is on, if any — either about to
-/// execute (Running: PC hasn't been fetched from yet) or stuck on
-/// (WaitingForInput: lmc_lsp's runner advances the PC during the *fetch*
-/// phase, before INP's own execute phase can discover there's no input to
-/// consume — by the time we observe WaitingForInput, PC already points one
-/// past the instruction that's actually paused).
-pub fn current_line(model: Model) -> Option(Int) {
+/// The mailbox address the machine is on, if any — either about to execute
+/// (Running: PC hasn't been fetched from yet) or stuck on (WaitingForInput:
+/// lmc_lsp's runner advances the PC during the *fetch* phase, before INP's
+/// own execute phase can discover there's no input to consume — by the
+/// time we observe WaitingForInput, PC already points one past the
+/// instruction that's actually paused). This is what the memory-grid
+/// highlight should key off; current_line is derived from it, for the
+/// editor side of the sync.
+pub fn current_address(model: Model) -> Option(Int) {
   case model.machine {
     None -> None
-    Some(m) -> {
-      let addr = case m.status {
+    Some(m) ->
+      Some(case m.status {
         state.WaitingForInput -> m.program_counter - 1
         _ -> m.program_counter
-      }
-      dict.get(model.address_to_line, addr) |> option.from_result
-    }
+      })
+  }
+}
+
+/// The source line (0-indexed) for current_address, if that address maps
+/// to one (it always should, for any address a real MachineState can be
+/// paused/about-to-fetch on).
+pub fn current_line(model: Model) -> Option(Int) {
+  case current_address(model) {
+    None -> None
+    Some(addr) -> dict.get(model.address_to_line, addr) |> option.from_result
   }
 }
 

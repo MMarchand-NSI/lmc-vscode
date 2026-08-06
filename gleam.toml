@@ -21,6 +21,7 @@ gleam_stdlib = ">= 0.44.0 and < 2.0.0"
 # rewrites this URL to SSH and authenticates with a deploy key — see
 # .github/workflows/test.yml.
 lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.1.6" }
+gleam_json = ">= 3.1.0 and < 4.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

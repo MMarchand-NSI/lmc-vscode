@@ -14,6 +14,9 @@ A Visual Studio Code extension for the **Little Man Computer (LMC)** assembly la
 - **Find References** — list every line that references a label
 - **Completion** — auto-complete LMC mnemonics (with descriptions) and labels defined in the current file
 - **Formatting** — canonical reformatting of the whole document
+- **Emulator webview** — "LMC: Open Emulator" command: a step-through visual emulator (memory grid,
+  ACC/PC, input/output trays) synced bidirectionally with the source editor — see
+  [Emulator webview](#emulator-webview)
 
 ## LMC Instruction Set
 
@@ -42,11 +45,21 @@ examples/              # Opened automatically by the "Run LMC Extension" launch 
   broken.lmc            # there's always something to try without editing anything
 scripts/
   fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vendor/ (gitignored)
+  build-webview.mjs    # Bundles src/webview/ for the browser into vscode-extension/webview/
 src/
-  webview/
-    app.gleam          # Interactive emulator UI (planned)
+  webview/              # Emulator webview — see "Emulator webview" below
+    model.gleam          # Pure state/transitions (gleam test-covered)
+    render.gleam          # Model -> view-model JSON (gleam test-covered)
+    app.gleam              # Entry point: wires model+render to ffi.gleam
+    ffi.gleam                # External declarations, implemented in app_ffi.mjs
+    app_ffi.mjs                # DOM + VS Code webview postMessage bridge
 vscode-extension/
   client.ts            # VS Code extension host
+  webviewPanel.ts       # Creates/manages the emulator panel, editor <-> webview sync
+  webview/
+    index.html            # Static shell (placeholders filled in by webviewPanel.ts)
+    style.css
+    app.bundle.js          # Built by build-webview.mjs (gitignored)
   package.json
 test/
   emulator_test.gleam  # Smoke test for the Emulator API, see below
@@ -113,6 +126,16 @@ npx tsc           # Compile TypeScript
 npx vsce package  # Package as .vsix
 ```
 
+### Build the emulator webview
+
+```sh
+gleam build                    # compiles src/webview/*.gleam
+node scripts/build-webview.mjs # bundles them for the browser into vscode-extension/webview/app.bundle.js
+```
+
+Required before "LMC: Open Emulator" will show anything — `app.bundle.js` is gitignored, same
+reasoning as `vendor/lmc-lsp.bundle.mjs`. Re-run after any change under `src/webview/`.
+
 ## Emulator API
 
 `gleam.toml` depends on [`lmc_lsp`](https://github.com/MMarchand-NSI/lmc_lsp) as a git dependency —
@@ -143,3 +166,21 @@ let #(final, _events) = run.run_to_halt(resumed)
 `INP` — not necessarily until `Halted`; check `.status` to tell which. `_events` is the list of
 `Fetched`/`Decoded`/`InputConsumed`/`OutputProduced`/... events the interpreter produced along the
 way, useful for tracing/debugging. See `lmc_lsp`'s own `CLAUDE.md`/`ARCHI.md` for the full API.
+
+## Emulator webview
+
+"LMC: Open Emulator" (editor title bar icon, or the command palette, on an open `.lmc` file) opens a
+step-through visual emulator beside the editor: a 100-mailbox memory grid, ACC/PC/status, an output
+tray, and an inline prompt when the program hits `INP`.
+
+It runs **inside the webview, in the browser, not through the extension host on every step** —
+`src/webview/*.gleam` compiles to JS and gets bundled for the browser
+(`scripts/build-webview.mjs`), using the same `lmc_lsp` runner as the [Emulator API](#emulator-api)
+above. The extension host (`vscode-extension/webviewPanel.ts`) only creates the panel and relays two
+kinds of messages — the source text, and cursor/click position — so the machine steps instantly
+without a round trip for every click.
+
+**Editor sync, in both directions**: moving the cursor in the editor outlines the corresponding
+mailbox; clicking a mailbox reveals its source line in the editor. This only works because it's a
+real webview next to a real editor — a standalone web-based LMC simulator can't do this, which is
+the reason this exists as a webview instead of just linking out to one.

@@ -5,3 +5,4 @@ erl_crash.dump
 node_modules/
 /vendor
 /vscode-extension/out
+/vscode-extension/webview/app.bundle.js
