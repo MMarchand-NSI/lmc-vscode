@@ -145,7 +145,11 @@ pub fn step(model: Model) -> Model {
     None -> model
     Some(m) -> {
       let #(next, events) = run.run_n(m, 1)
-      Model(..model, machine: Some(next), last_events: events)
+      Model(
+        ..model,
+        machine: Some(next),
+        last_events: accumulate_events(m, model, events),
+      )
     }
   }
 }
@@ -158,8 +162,31 @@ pub fn run_to_halt(model: Model) -> Model {
     None -> model
     Some(m) -> {
       let #(next, events) = run.run_to_halt(m)
-      Model(..model, machine: Some(next), last_events: events)
+      Model(
+        ..model,
+        machine: Some(next),
+        last_events: accumulate_events(m, model, events),
+      )
     }
+  }
+}
+
+/// Fetch and Decode only ever happen once per instruction, right at the
+/// start (phase == Fetch); Execute can then pause (INP with no input) and
+/// resume later without repeating them. If the machine we're stepping
+/// *from* wasn't sitting at a fresh Fetch, this is a resume — append to
+/// last_events instead of replacing it, so the panel shows the whole
+/// instruction's cycle in one place (Fetch, Decode, "waiting", then the
+/// rest of Execute once input arrives) instead of splitting it across two
+/// separate, seemingly out-of-nowhere "Execute only" snapshots.
+fn accumulate_events(
+  before: MachineState,
+  model: Model,
+  new_events: List(Event),
+) -> List(Event) {
+  case before.phase {
+    state.Fetch -> new_events
+    _ -> list.append(model.last_events, new_events)
   }
 }
 

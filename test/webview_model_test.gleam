@@ -219,6 +219,26 @@ pub fn step_produces_fetch_decode_execute_events_test() {
   assert execute == "Execute : sortie ← ACC (9)"
 }
 
+pub fn events_accumulate_across_an_input_pause_test() {
+  // The whole point: Fetch and Decode only happen once, right before the
+  // machine discovers it needs input and pauses mid-Execute — the events
+  // from *before* the pause must not be lost once input is provided and
+  // Execute actually finishes, or the panel would misleadingly look like
+  // this instruction skipped straight to Execute.
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(9)
+    |> model.step
+  let descriptions = model.last_event_descriptions(m)
+  let assert [fetch, decode, waiting, consumed, changed] = descriptions
+  assert string.starts_with(fetch, "Fetch")
+  assert string.starts_with(decode, "Decode")
+  assert waiting == "Execute : en attente d'une entrée…"
+  assert consumed == "Execute : ACC ← entrée (9)"
+  assert changed == "Execute : ACC 0 → 9"
+}
+
 pub fn events_clear_on_reset_test() {
   let m =
     model.init("INP\nOUT\nHLT\n")
