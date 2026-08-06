@@ -206,6 +206,38 @@ in mind when deciding where new logic belongs: push it into the pure Gleam core 
 DOM directly (`webviewPanel.ts`, `client.ts`, `app_ffi.mjs`) as inherently higher-risk regardless of how
 solid the core underneath it is.
 
+### This split has a name: functional core, imperative shell (Gary Bernhardt)
+
+The architecture above isn't an accident, and it isn't specific to this codebase — it's a recognized
+pattern: keep all decision-making in a pure, deterministic **core**, and reduce the **shell** (anything
+that has to touch an external, mutable, someone-else's-API system) to the smallest possible surface that
+does no more than relay — no branching, no state, nothing worth writing a test for because there's
+nothing in it to get wrong. This repo already follows it without ever having named it:
+
+- **Core**: `webview/model.gleam` + `webview/render.gleam` here, and `lmc_lsp`'s `parse/` →
+  `semantic/` → `runner/` layers on the other side of the git dependency. Pure, immutable,
+  `gleam test`-covered — see the design note above for why that pays off.
+- **Shell**: `webviewPanel.ts`, `client.ts`, `app_ffi.mjs`, and the FFI declarations in `ffi.gleam` —
+  mechanical wiring only (`postMessage`, `addEventListener`, `createWebviewPanel`, `onDidChange...`).
+  `webview/app.gleam` is the seam between the two: it's the one place allowed to call both sides, and
+  even it stays a thin `update(cell, f)` loop — pull the model out, apply a pure transition, push the
+  render back out. That shape is structurally the same as *The Elm Architecture* (Model → update →
+  Cmd/render), not a coincidence — TEA is the same pattern under a different name.
+
+**Why the shell can't shrink to nothing**: `vscode.window.createWebviewPanel(...)` and
+`document.getElementById(...).addEventListener(...)` are calls into systems VS Code and the browser own
+and mutate, not functions — the moment they run, something observable happens outside the program. That
+*is* what "impure" means; no language changes it. Even Haskell's `IO` monad doesn't make these calls
+pure, it just catalogs and defers them to a single runtime that, underneath, still executes them
+imperatively at `main`. The pattern isn't about eliminating the shell, it's about shrinking it and
+banning logic from it — which this repo already does.
+
+**The actionable ceiling, if it's ever worth it**: since Gleam targets JS, `client.ts` and
+`webviewPanel.ts` could in principle move into Gleam too, using the same `ref`/`deref`/`setRef` FFI-cell
+pattern `ffi.gleam`/`app_ffi.mjs` already use, shrinking the TypeScript down to bare literal API calls.
+Low priority — those files are already thin and mechanical (see their descriptions under "Architecture"
+above), so there's little latent risk left to remove; the win would be mostly consistency, not safety.
+
 ## Status: where things stand, what's left
 
 Done and working, each verified by actually running it (`gleam test`, or driving the built bundle —
