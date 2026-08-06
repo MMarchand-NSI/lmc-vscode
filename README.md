@@ -80,7 +80,7 @@ VS Code ←—LSP (stdio)—→ lmc-language-server (Node.js)
 ### Build & test
 
 ```sh
-gleam test        # Run all 48 tests (lexer, parser, emulator)
+gleam test        # Run all tests (lexer, parser, emulator)
 gleam build       # Compile to build/dev/javascript/
 ```
 
