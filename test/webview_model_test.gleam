@@ -219,6 +219,32 @@ pub fn step_produces_one_entry_per_phase_test() {
   assert execute.details == ["sortie ← ACC (9)"]
 }
 
+pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
+  // "STA, adresse 21" alone would read exactly like a line of source code
+  // (STA 21 is valid LMC) and invite the false idea that decode
+  // reconstructs it — the raw number decode actually works from (902 for
+  // OUT here) must stay visible, tying the derived mnemonic back to *a
+  // number*, not to the student's original ("total") label, long gone by
+  // this point.
+  let m =
+    model.init("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(9)
+    |> model.step
+    |> model.step
+  let assert [_fetch, decode, _execute] = model.last_cycle(m)
+  assert decode.details == ["902 → OUT"]
+}
+
+pub fn decode_shows_the_raw_number_with_an_address_test() {
+  // "total" est à l'adresse 2 (ligne 2) — l'assembleur a résolu le label
+  // vers ce numéro, le nom "total" lui-même n'existe plus dans le mot
+  // mémoire assemblé (302 = 3·100 + 2).
+  let m = model.init("STA total\nHLT\ntotal DAT 0\n") |> model.step
+  let assert [_fetch, decode, _execute] = model.last_cycle(m)
+  assert decode.details == ["302 → STA, adresse 2"]
+}
+
 pub fn events_accumulate_across_an_input_pause_test() {
   // The whole point: Fetch and Decode only happen once, right before the
   // machine discovers it needs input and pauses mid-Execute — the events

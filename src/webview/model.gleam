@@ -392,7 +392,7 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
       "Fetch",
       "lire mem[" <> int.to_string(address) <> "] → " <> int.to_string(raw),
     )
-    event.Decoded(instr) -> #("Decode", describe_runtime_instruction(instr))
+    event.Decoded(instr) -> #("Decode", describe_decoded(instr))
     event.InputConsumed(v) -> #(
       "Execute",
       "ACC ← entrée (" <> int.to_string(v) <> ")",
@@ -438,19 +438,35 @@ fn group_consecutive_by_phase(
   |> list.reverse
 }
 
-fn describe_runtime_instruction(instr: instruction.Instruction) -> String {
+/// Keeps the raw fetched number visible in the Decode line itself (not
+/// just on the Fetch line above it), so "STA, adresse 21" reads as *this
+/// number, decoded* rather than as a freestanding line of assembly — which
+/// otherwise looks exactly like something you could type ("STA 21" is
+/// valid LMC), inviting the (false) idea that decode reconstructs source
+/// code. It can't: the label "total" the programmer wrote is long gone by
+/// this point, only the numeric address 21 survives — decode only ever
+/// recovers *that*, via the same arithmetic split lmc_lsp's own
+/// instruction.decode uses (raw / 100 for the opcode, raw % 100 for the
+/// address). instruction.encode(instr) reconstructs the raw number here —
+/// the exact inverse of decode, so it's always the same value Fetch showed.
+fn describe_decoded(instr: instruction.Instruction) -> String {
+  let raw = int.to_string(instruction.encode(instr))
   case instr {
-    instruction.Inp -> "INP"
-    instruction.Out -> "OUT"
-    instruction.Hlt -> "HLT"
-    instruction.Add(a) -> "ADD " <> int.to_string(a)
-    instruction.Sub(a) -> "SUB " <> int.to_string(a)
-    instruction.Sta(a) -> "STA " <> int.to_string(a)
-    instruction.Lda(a) -> "LDA " <> int.to_string(a)
-    instruction.Bra(a) -> "BRA " <> int.to_string(a)
-    instruction.Brz(a) -> "BRZ " <> int.to_string(a)
-    instruction.Brp(a) -> "BRP " <> int.to_string(a)
+    instruction.Inp -> raw <> " → INP"
+    instruction.Out -> raw <> " → OUT"
+    instruction.Hlt -> raw <> " → HLT"
+    instruction.Add(a) -> decoded_with_address(raw, "ADD", a)
+    instruction.Sub(a) -> decoded_with_address(raw, "SUB", a)
+    instruction.Sta(a) -> decoded_with_address(raw, "STA", a)
+    instruction.Lda(a) -> decoded_with_address(raw, "LDA", a)
+    instruction.Bra(a) -> decoded_with_address(raw, "BRA", a)
+    instruction.Brz(a) -> decoded_with_address(raw, "BRZ", a)
+    instruction.Brp(a) -> decoded_with_address(raw, "BRP", a)
   }
+}
+
+fn decoded_with_address(raw: String, mnemonic: String, address: Int) -> String {
+  raw <> " → " <> mnemonic <> ", adresse " <> int.to_string(address)
 }
 
 fn load_error_message(err: load.LoadError) -> String {
