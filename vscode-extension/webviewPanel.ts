@@ -246,13 +246,13 @@ async function writeObjectFile(content: unknown): Promise<void> {
   if (!target) return;
   await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(content));
 
-  // Opened beside the source rather than focused: you asked for a file, not
-  // for your cursor to be moved out of the program you were writing.
-  const document = await vscode.workspace.openTextDocument(target);
-  await vscode.window.showTextDocument(document, {
-    preserveFocus: true,
-    viewColumn: findOpenTabGroupColumn() ?? vscode.ViewColumn.One,
-  });
+  // A notification rather than opening the file. Assembling happens often
+  // while teaching, and opening the object file every time churned the tab
+  // strip — the point is that the file now exists, not that you must read
+  // it. Open it yourself when you want to look inside.
+  vscode.window.showInformationMessage(
+    "Code assemblé dans " + path.basename(target.fsPath),
+  );
 }
 
 /// Applies (or clears) the current-line highlight on the live editor for
