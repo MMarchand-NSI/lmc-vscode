@@ -408,6 +408,9 @@ fn describe_instruction(instr: ast.Instruction) -> String {
     // source, pas une case : elle les montre donc toutes.
     ast.Dat(values, _) ->
       "DAT " <> string.join(list.map(values, int.to_string), ", ")
+    ast.Jsr(op, _) ->
+      "JSR " <> operand_text(op) <> " — appeler un sous-programme"
+    ast.Ret(_) -> "RET — revenir au dernier appelant"
     ast.Mov(destination, source, _) ->
       "MOV "
       <> mov_side_text(destination)
@@ -438,6 +441,8 @@ fn mov_side_text(side: ast.MovSide) -> String {
   case side {
     ast.MovRegister(ast.Acc, _) -> "ACC"
     ast.MovRegister(ast.X, _) -> "X"
+    ast.MovRegister(ast.Lr, _) -> "LR"
+    ast.MovRegister(ast.Pc, _) -> "PC"
     ast.MovMemory(op) -> operand_text(op)
     ast.MovMissing(_) -> ""
   }
@@ -472,6 +477,24 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
     event.IndexChanged(old, new) -> #(
       "Execute",
       "X " <> int.to_string(old) <> " → " <> int.to_string(new),
+    )
+    event.LinkChanged(old, new) -> #(
+      "Execute",
+      "LR "
+        <> int.to_string(old)
+        <> " → "
+        <> int.to_string(new)
+        <> " (adresse de retour)",
+    )
+    // Un saut est une écriture dans le compteur ordinal, et le dire est tout
+    // l'intérêt : « revenir » d'un sous-programme n'est rien d'autre.
+    event.Jumped(from, to) -> #(
+      "Execute",
+      "PC "
+        <> int.to_string(from)
+        <> " → "
+        <> int.to_string(to)
+        <> " (écriture dans le compteur ordinal)",
     )
     event.Halted -> #("Execute", "HLT")
     event.InputRequested -> #("Execute", "en attente d'une entrée…")
@@ -567,6 +590,14 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
         circuit_note("un transfert entre registres"),
       )
 
+    instruction.Jsr(a) ->
+      decoded_with_address(
+        raw,
+        "JSR",
+        a,
+        instruction.Direct,
+        circuit_note("un saut avec mémorisation de l'adresse de retour"),
+      )
     instruction.Bra(a) ->
       decoded_with_address(
         raw,
@@ -598,6 +629,8 @@ fn register_name(register: instruction.Register) -> String {
   case register {
     instruction.Acc -> "ACC"
     instruction.X -> "X"
+    instruction.Lr -> "LR"
+    instruction.Pc -> "PC"
   }
 }
 
