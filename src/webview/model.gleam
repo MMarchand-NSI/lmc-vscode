@@ -2,6 +2,7 @@ import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 import lmc/parse/span
 import lmc/runner/event.{type Event}
 import lmc/runner/instruction
@@ -403,8 +404,10 @@ fn describe_instruction(instr: ast.Instruction) -> String {
     ast.Bra(op, _) -> "BRA " <> operand_text(op) <> " — sauter"
     ast.Brz(op, _) -> "BRZ " <> operand_text(op) <> " — sauter si ACC = 0"
     ast.Brp(op, _) -> "BRP " <> operand_text(op) <> " — sauter si ACC ≥ 0"
-    ast.Dat(Some(v), _) -> "DAT " <> int.to_string(v)
-    ast.Dat(None, _) -> "DAT"
+    // Une liste occupe plusieurs cases, mais cette légende décrit la *ligne*
+    // source, pas une case : elle les montre donc toutes.
+    ast.Dat(values, _) ->
+      "DAT " <> string.join(list.map(values, int.to_string), ", ")
     ast.Invalid(_) -> "?"
   }
 }
