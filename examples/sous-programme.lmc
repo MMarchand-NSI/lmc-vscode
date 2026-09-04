@@ -1,0 +1,30 @@
+// Un sous-programme, avec JSR et RET.
+//
+// BRA saute mais oublie d'où il vient. JSR fait le même saut plus une
+// écriture : l'adresse de l'instruction suivante va dans LR. RET y revient
+// — c'est littéralement MOV PC, LR, un saut vers l'adresse notée.
+//
+// C'est ce qui rend « double » appelable depuis trois endroits sans rien
+// savoir de ses appelants.
+//
+// Tant qu'un sous-programme n'en appelle pas un autre, LR suffit.
+// Voir appel-imbrique-casse.lmc pour le moment où il ne suffit plus.
+
+        LDA a
+        JSR double
+        LDA b
+        JSR double
+        INP             // et sur une valeur saisie
+        JSR double
+        HLT
+
+// double : affiche ACC, puis ACC + ACC.
+double: OUT
+        STA t           // ADD ne sait additionner qu'une case mémoire,
+        ADD t           // pas l'accumulateur avec lui-même
+        OUT
+        RET
+
+a:      DAT 7
+b:      DAT 21
+t:      DAT

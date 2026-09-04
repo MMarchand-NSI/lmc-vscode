@@ -1,0 +1,31 @@
+// Parcours d'une chaîne jusqu'à son zéro terminal.
+//
+// DAT "LMC" réserve quatre cases : 76, 77, 67, puis 0. Ce zéro remplace la
+// longueur — la boucle s'arrête dessus au lieu de compter, donc elle marche
+// sur n'importe quelle chaîne sans rien savoir de sa taille.
+//
+// Les caractères sont codés en ISO-8859-1 : OUT affiche leurs codes.
+// Affiche 76, 77, 67, puis 3, la longueur trouvée par le parcours.
+
+        LDA zero
+        STA i
+
+boucle: LDA i
+        MOV X, ACC
+        LDA mot[X]      // ACC <- le caractère de rang i
+        BRZ fin         // 0 : fin de chaîne
+        OUT
+
+        LDA i
+        ADD un
+        STA i
+        BRA boucle
+
+fin:    LDA i           // i vaut le nombre de caractères parcourus
+        OUT
+        HLT
+
+mot:    DAT "LMC"
+i:      DAT
+zero:   DAT 0
+un:     DAT 1

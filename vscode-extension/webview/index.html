@@ -8,62 +8,123 @@
     <title>LMC — Émulateur</title>
   </head>
   <body>
-    <div id="error" class="error-banner" style="display: none"></div>
+    <div id="error" class="error-banner"></div>
 
+    <!-- Barre de conduite, hors des cadres et c'est voulu : Step, Run et
+         Reset ne sont pas des organes de la machine, c'est vous — un
+         processeur n'a pas de bouton « pas à pas ». L'état les accompagne :
+         ce n'est pas un registre non plus (LANGAGE.md n'en nomme que cinq),
+         et c'est ce qu'on lit juste après avoir cliqué.
+
+         Il y avait ici une légende rappelant l'instruction en cours. Elle a
+         été retirée : l'éditeur surligne déjà la ligne exécutée, et redire
+         la même chose à deux endroits n'ajoutait rien. -->
+    <div class="toolbar">
+      <div class="controls">
+        <button id="step" type="button">Step</button>
+        <button id="run" type="button">Run</button>
+        <button id="reset" type="button">Reset</button>
+      </div>
+
+      <span class="tip-anchor">
+        <button id="assemble" type="button" class="secondary">Assembler</button>
+        <span class="tip" role="tooltip"><strong>Produire le fichier objet</strong> — écrit
+          <code>.lmcobj</code> à côté du source : un mot de quatre chiffres par ligne, sans
+          mnémonique ni label, parce que c'est tout ce que le processeur reçoit. Assembler
+          <code>LDA 42</code> et <code>MOV ACC, 42</code> donne deux fois la même ligne. N'exécute
+          rien et ne charge rien.</span>
+      </span>
+
+      <span class="tip-anchor">
+        <button id="load" type="button" class="secondary">Charger</button>
+        <span class="tip" role="tooltip"><strong>Charger en RAM</strong> — relit
+          <code>.lmcobj</code> sur le disque et le dépose en mémoire. C'est bien le fichier qui est
+          chargé : sans lui rien ne s'exécute, et si tu modifies le source sans réassembler, tu
+          charges l'ancien programme. Une vraie chaîne d'outils fait exactement ça.</span>
+      </span>
+
+      <div class="register">
+        <span class="label" tabindex="0">État</span>
+        <span class="tip" role="tooltip"><strong>État du processeur</strong> — vide (rien n'est chargé en RAM : assemblez, puis chargez), running (prêt à exécuter), waiting_input (arrêté sur un INP, en attente d'une valeur), halted (arrêté par HLT), error.</span>
+        <span id="status" class="status">—</span>
+      </div>
+    </div>
+
+    <!-- Les trois organes de l'architecture de von Neumann, un par cadre :
+         le processeur, la mémoire unique, les entrées-sorties. Le découpage
+         doit se voir avant même qu'on lise ce qu'il y a dedans. -->
     <div class="layout">
-      <section class="cpu">
-        <div class="register">
-          <span class="label">ACC</span>
-          <span id="acc" class="value">—</span>
-        </div>
-        <div class="register">
-          <span class="label">PC</span>
-          <span id="pc" class="value">—</span>
-        </div>
-        <!-- X, LR et SP n'apparaissent qu'avec les tableaux, les
-             sous-programmes et la pile. Ils sont affichés plus discrètement
-             qu'ACC et PC pour que les premières séances ne soient pas
-             encombrées par des registres dont on ne parle pas encore. -->
-        <div class="register secondary">
-          <span class="label">X</span>
-          <span id="x" class="value">—</span>
-        </div>
-        <div class="register secondary">
-          <span class="label">LR</span>
-          <span id="lr" class="value">—</span>
-        </div>
-        <div class="register secondary">
-          <span class="label">SP</span>
-          <span id="sp" class="value">—</span>
-        </div>
-        <div class="register">
-          <span class="label">État</span>
-          <span id="status" class="status">—</span>
-        </div>
+      <!-- Processeur et entrées-sorties empilés dans une colonne étroite :
+           la grille mémoire est ce qui a besoin de largeur, pas eux. -->
+      <div class="column">
+        <section class="unit cpu">
+          <h2>Processeur</h2>
+          <div class="register">
+            <span class="label" tabindex="0">ACC</span>
+            <span class="tip" role="tooltip"><strong>Accumulator</strong> — l'accumulateur. Toute l'arithmétique et toutes les entrées-sorties passent par lui : ADD, SUB, INP et OUT ne travaillent que sur ACC.</span>
+            <span id="acc" class="value">—</span>
+          </div>
+          <div class="register">
+            <span class="label" tabindex="0">PC</span>
+            <span class="tip" role="tooltip"><strong>Program Counter</strong> — le compteur ordinal : l'adresse de la prochaine instruction à lire. Écrire dedans, c'est sauter, et c'est tout ce que font BRA, BRZ, BRP et RET. Il est incrémenté dès la phase Fetch, comme sur un vrai processeur — à l'arrêt, il pointe donc déjà après la dernière instruction exécutée.</span>
+            <span id="pc" class="value">—</span>
+          </div>
+          <!-- X, LR et SP n'apparaissent qu'avec les tableaux, les
+               sous-programmes et la pile. Ils sont affichés plus discrètement
+               qu'ACC et PC pour que les premières séances ne soient pas
+               encombrées par des registres dont on ne parle pas encore. -->
+          <div class="register secondary">
+            <span class="label" tabindex="0">X</span>
+            <span class="tip" role="tooltip"><strong>Registre d'index</strong> — X n'est pas un acronyme : c'est le nom traditionnel d'un registre d'index, hérité du 6800 et du 6502. Le suffixe [X] ajoute son contenu à l'adresse écrite — lst[X] désigne la case lst + X, ce qui permet de parcourir un tableau ou une chaîne.</span>
+            <span id="x" class="value">—</span>
+          </div>
+          <div class="register secondary">
+            <span class="label" tabindex="0">LR</span>
+            <span class="tip" role="tooltip"><strong>Link Register</strong> — l'adresse de retour, sous son nom ARM. JSR y écrit l'adresse de l'instruction qui suit l'appel, RET y revient. LR n'en contient qu'une seule : un appel imbriqué l'écrase, et c'est ce qui rend la pile nécessaire.</span>
+            <span id="lr" class="value">—</span>
+          </div>
+          <div class="register secondary">
+            <span class="label" tabindex="0">SP</span>
+            <span class="tip" role="tooltip"><strong>Stack Pointer</strong> — le pointeur de pile : il désigne la prochaine case libre. La pile descend depuis la case 99 ; PSH y range ACC, POP l'en retire.</span>
+            <span id="sp" class="value">—</span>
+          </div>
 
-        <div id="instruction" class="instruction-caption">—</div>
+        </section>
 
-        <div class="controls">
-          <button id="step" type="button">Step</button>
-          <button id="run" type="button">Run</button>
-          <button id="reset" type="button">Reset</button>
-        </div>
+        <section class="unit io">
+          <h2>Entrées / Sorties</h2>
+          <div class="io-part">
+            <h3>Entrée (INP)</h3>
+            <form id="input-form">
+              <label for="input-value">Valeur</label>
+              <input id="input-value" type="number" inputmode="numeric" autofocus />
+              <button type="submit">OK</button>
+            </form>
+          </div>
+          <div class="io-part output-tray">
+            <h3>Sortie (OUT)</h3>
+            <ul id="output"></ul>
+          </div>
+        </section>
+      </div>
 
-        <form id="input-form" style="display: none">
-          <label for="input-value">Entrée (INP)</label>
-          <input id="input-value" type="number" inputmode="numeric" autofocus />
-          <button type="submit">OK</button>
-        </form>
-
-        <div class="output-tray">
-          <h2>Sortie</h2>
-          <ul id="output"></ul>
-        </div>
-      </section>
-
-      <section class="memory-wrap">
+      <section class="unit memory-wrap">
         <h2>Mémoire</h2>
+        <p class="unit-note">
+          Une seule mémoire pour le programme et pour les données : c'est le
+          principe de von Neumann, et c'est ce que montrent les marquages
+          ci-dessous.
+        </p>
         <div id="memory" class="memory-grid"></div>
+        <!-- Les pastilles portent les mêmes classes que les cases de la
+             grille, et style.css applique les mêmes règles aux deux : la
+             légende ne peut pas dériver de ce qu'elle décrit. -->
+        <ul class="legend">
+          <li><span class="swatch"></span>Programme</li>
+          <li><span class="swatch data"></span>Données (DAT)</li>
+          <li><span class="swatch stack"></span>Pile</li>
+          <li><span class="swatch unused"></span>Libre</li>
+        </ul>
       </section>
     </div>
 

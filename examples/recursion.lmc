@@ -1,0 +1,47 @@
+// Récursion : somme(n) = n + somme(n - 1), somme(0) = 0.
+//
+// Un sous-programme qui s'appelle lui-même a besoin de la pile deux fois :
+// pour son adresse de retour, comme dans appel-imbrique-pile.lmc, et pour
+// sa propre valeur de n, que l'appel suivant va écraser en mémoire.
+//
+// La pile est ce qui donne à chaque appel ses variables à lui. Lancez-le
+// avec n = 5 et regardez la zone de pile de l'émulateur : elle grandit de
+// deux cases par appel à la descente, et se vide à la remontée.
+//
+// Lit n, affiche 1 + 2 + ... + n.
+//
+// Deux cases de pile par appel, et le programme en occupe 25 : au-delà de
+// n = 37 la pile rejoint le code et l'émulateur signale un débordement.
+// Une vraie machine, elle, écraserait le programme sans rien dire.
+
+        INP
+        STA n
+        JSR somme
+        OUT
+        HLT
+
+somme:  MOV ACC, LR
+        PSH                 // 1re case : l'adresse de retour
+
+        LDA n
+        BRZ base            // somme(0) = 0, ACC vaut déjà 0
+
+        PSH                 // 2e case : notre n, que l'appel suivant écrasera
+        SUB un
+        STA n
+        JSR somme           // ACC <- somme(n - 1)
+
+        STA partiel
+        POP                 // ACC <- notre n, retrouvé intact
+        ADD partiel
+
+base:   STA resultat        // POP passe par ACC : mettre le résultat de côté
+        POP                 // ACC <- l'adresse de retour
+        MOV LR, ACC
+        LDA resultat
+        RET
+
+n:        DAT
+resultat: DAT
+partiel:  DAT
+un:       DAT 1

@@ -56,6 +56,14 @@ export function onInputSubmit(handler) {
   });
 }
 
+export function onAssembleClick(handler) {
+  document.getElementById("assemble").addEventListener("click", () => handler());
+}
+
+export function onLoadClick(handler) {
+  document.getElementById("load").addEventListener("click", () => handler());
+}
+
 export function onMailboxClick(handler) {
   document.getElementById("memory").addEventListener("click", (event) => {
     const cell = event.target.closest("[data-address]");
@@ -71,7 +79,6 @@ export function render(json) {
   const state = JSON.parse(json);
   renderMemory(state);
   renderRegisters(state);
-  renderInstruction(state);
   renderCycleEvents(state);
   renderOutput(state);
   renderStatus(state);
@@ -96,6 +103,7 @@ function renderMemory(state) {
 
   const memory = state.memory ?? new Array(100).fill(0);
   const programLength = state.programLength ?? 0;
+  const dataAddresses = new Set(state.dataAddresses ?? []);
   const cells = grid.children;
   for (let addr = 0; addr < cells.length; addr++) {
     const cell = cells[addr];
@@ -112,6 +120,12 @@ function renderMemory(state) {
     const stacked =
       state.sp !== null && state.sp !== undefined && addr > state.sp;
     cell.classList.toggle("stack", stacked);
+    // À l'intérieur du programme, les cases réservées par un DAT. Le
+    // marquage vient du source, pas de la machine : voir
+    // model.data_addresses et le commentaire de .mailbox.data dans
+    // style.css. Cédé à la pile en cas de recouvrement — un débordement
+    // est ce qu'il faut voir en premier.
+    cell.classList.toggle("data", dataAddresses.has(addr) && !stacked);
     // Dim cells the assembled program never touches, so attention goes to
     // the handful that matter instead of all 100 looking equally relevant.
     cell.classList.toggle("unused", addr >= programLength && !stacked);
@@ -124,10 +138,6 @@ function renderRegisters(state) {
     document.getElementById(name).textContent =
       value === null || value === undefined ? "—" : String(value);
   }
-}
-
-function renderInstruction(state) {
-  document.getElementById("instruction").textContent = state.instructionText ?? "—";
 }
 
 // One <li> per *phase* (Fetch, Decode, Execute — never more than three),
@@ -176,6 +186,10 @@ function renderStatus(state) {
   const canStep = state.status === "running";
   document.getElementById("step").disabled = !canStep;
   document.getElementById("run").disabled = !canStep;
+  // Rien en RAM : rien à remettre à zéro non plus.
+  document.getElementById("reset").disabled = state.status === "vide";
+  // Pas d'assemblage, pas de fichier objet à produire — et rien à charger.
+  document.getElementById("assemble").disabled = !state.assembled;
 }
 
 function renderInput(state) {

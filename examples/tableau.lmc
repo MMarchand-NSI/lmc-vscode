@@ -1,0 +1,39 @@
+// Parcours d'un tableau avec l'adressage indexé.
+//
+// Le suffixe [X] ajoute le contenu du registre X à l'adresse écrite :
+// lst[X] désigne la case lst + X. C'est ce qui permet d'écrire une seule
+// instruction pour lire n'importe quelle case du tableau.
+//
+// Affiche chaque élément, puis leur somme.
+
+        LDA zero
+        STA i
+        STA total
+
+boucle: LDA i
+        SUB n           // i - n : nul quand le tableau est épuisé
+        BRZ fin
+
+        LDA i
+        MOV X, ACC      // X <- i ; LDA ne sait pas nommer X, MOV si
+        LDA lst[X]      // ACC <- mem[lst + i]
+        OUT
+
+        ADD total       // total = total + lst[i]
+        STA total
+
+        LDA i           // i = i + 1
+        ADD un
+        STA i
+        BRA boucle
+
+fin:    LDA total
+        OUT
+        HLT
+
+lst:    DAT 12, 4, 86, 7    // une ligne, quatre cases ; lst désigne la première
+n:      DAT 4
+i:      DAT
+total:  DAT
+zero:   DAT 0
+un:     DAT 1

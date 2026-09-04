@@ -2,11 +2,13 @@ import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 import lmc/parse/span
 import lmc/runner/event.{type Event}
 import lmc/runner/instruction
 import lmc/runner/load
+import lmc/runner/memory
 import lmc/runner/run
 import lmc/runner/state.{type MachineState}
 import lmc/semantic/ast
@@ -21,6 +23,22 @@ pub type Model {
   Model(
     source: String,
     parse: Option(pipeline.ParseResult),
+    // Trois états distincts, et c'est tout le sujet : assembler n'est pas
+    // charger, et charger n'est pas exécuter.
+    //
+    //   assembled  le résultat de l'assemblage du source courant. Recalculé
+    //              à chaque frappe. Ne sert qu'à produire le fichier objet —
+    //              ce n'est PAS la mémoire de la machine.
+    //   loaded     l'image chargée en RAM, telle qu'au moment du chargement.
+    //              C'est là que revient Reset.
+    //   machine    la machine vivante, qui s'éloigne de `loaded` à mesure
+    //              qu'on exécute.
+    //
+    // Les trois peuvent se désaccorder, et doivent pouvoir le faire :
+    // modifier le source réassemble sans toucher à la RAM, exactement comme
+    // éditer un .c ne change pas le binaire déjà chargé.
+    assembled: Option(MachineState),
+    loaded: Option(MachineState),
     machine: Option(MachineState),
     // Address <-> source line (0-indexed), derived once per `load_source`
     // from `load.address_offsets` — NOT re-derived by assuming address i is
@@ -30,13 +48,19 @@ pub type Model {
     line_to_address: Dict(Int, Int),
     // Same addressing as address_to_line (derived from the same
     // load.address_offsets call — see build_address_maps), just mapped to
-    // the instruction itself instead of the line number. Powers the
-    // current-instruction caption; not needed for the editor sync.
+    // the instruction itself instead of the line number. Powers
+    // data_addresses, i.e. the grid's `DAT` marking; not needed for the
+    // editor sync.
     address_to_instruction: Dict(Int, ast.Instruction),
     // Line the host's cursor is currently on — independent of execution
     // state, doesn't get reset by step/run/reset.
     cursor_line: Option(Int),
-    load_error: Option(String),
+    // Pourquoi le source ne s'assemble pas, s'il ne s'assemble pas.
+    assembly_error: Option(String),
+    // Pourquoi le dernier chargement en RAM a échoué : fichier objet absent
+    // (on n'a pas assemblé), ou illisible. Distinct de assembly_error : un
+    // source parfaitement valide peut très bien n'avoir jamais été assemblé.
+    ram_error: Option(String),
     // Fetch/Decode/Execute events from the *last* step/run_to_halt call —
     // lmc_lsp's runner already produces these per sub-phase, previously
     // just discarded. Powers the collapsible "what actually just
@@ -58,97 +82,179 @@ pub fn init(source: String) -> Model {
   Model(
     source: "",
     parse: None,
+    assembled: None,
+    loaded: None,
     machine: None,
     address_to_line: dict.new(),
     line_to_address: dict.new(),
     address_to_instruction: dict.new(),
     cursor_line: None,
-    load_error: None,
+    assembly_error: None,
+    ram_error: None,
     last_events: [],
     run_after_input: False,
   )
-  |> load_source(source)
+  |> assemble_source(source)
 }
 
-/// Like load_source, but a no-op if `source` is unchanged from what's
-/// already loaded. The webview host resends the source on every editor
-/// refocus, not only on real edits (see webviewPanel.ts,
-/// onDidChangeActiveTextEditor — it also needs to re-sync the cursor) — so
-/// clicking back into the source editor must not blow away step-through
-/// progress (PC/ACC/output) just because a SetSource happened to arrive
-/// with unchanged text. `reset` goes through `load_source` directly and is
-/// unaffected: it must reload even with unchanged text, that's the point
-/// of a reset button.
+/// Ré-assemble si le source a changé. La webview reçoit le source à chaque
+/// reprise de focus de l'éditeur et pas seulement aux vraies modifications
+/// (webviewPanel.ts, onDidChangeActiveTextEditor, qui doit aussi
+/// resynchroniser le curseur) — sans ce garde-fou, revenir sur l'onglet du
+/// programme referait le travail pour rien.
+///
+/// Ne touche jamais à la RAM : éditer le source ne recharge pas la machine,
+/// pas plus qu'éditer un .c ne change le binaire déjà en mémoire. Il faut
+/// réassembler puis recharger.
 pub fn set_source_if_changed(model: Model, source: String) -> Model {
   case source == model.source {
     True -> model
-    False -> load_source(model, source)
+    False -> assemble_source(model, source)
   }
 }
 
-/// (Re)parse and (re)assemble `source`, resetting execution state. Input is
-/// always empty at load time — INP is handled interactively via
-/// `provide_input`, never supplied upfront (this is a step-through teaching
-/// tool, not a batch runner).
-pub fn load_source(model: Model, source: String) -> Model {
+/// Assemble `source` : (re)construit les correspondances adresse <-> ligne
+/// et le résultat d'assemblage dont sortira le fichier objet. N'écrit rien
+/// en RAM — c'est `load_object_code` qui le fait, depuis le fichier.
+pub fn assemble_source(model: Model, source: String) -> Model {
   let result = pipeline.parse(source)
-  let address_to_line = build_address_to_line(result)
-  let line_to_address = invert(address_to_line)
-  let address_to_instruction = build_address_to_instruction(result)
+  let base =
+    Model(
+      ..model,
+      source: source,
+      parse: Some(result),
+      address_to_line: build_address_to_line(result),
+      line_to_address: invert(build_address_to_line(result)),
+      address_to_instruction: build_address_to_instruction(result),
+    )
 
   case result.diagnostics {
     [] ->
       case load.load(result, []) {
-        Ok(machine) ->
-          Model(
-            ..model,
-            source: source,
-            parse: Some(result),
-            machine: Some(machine),
-            address_to_line: address_to_line,
-            line_to_address: line_to_address,
-            address_to_instruction: address_to_instruction,
-            load_error: None,
-            last_events: [],
-            run_after_input: False,
-          )
+        // L'entrée est toujours vide à l'assemblage : INP est traité
+        // interactivement par `provide_input`, jamais fourni d'avance —
+        // c'est un outil de pas à pas, pas un exécuteur de lots.
+        Ok(assembled) ->
+          Model(..base, assembled: Some(assembled), assembly_error: None)
         Error(err) ->
           Model(
-            ..model,
-            source: source,
-            parse: Some(result),
-            machine: None,
-            address_to_line: address_to_line,
-            line_to_address: line_to_address,
-            address_to_instruction: address_to_instruction,
-            load_error: Some(load_error_message(err)),
-            last_events: [],
-            run_after_input: False,
+            ..base,
+            assembled: None,
+            assembly_error: Some(load_error_message(err)),
           )
       }
     _ ->
-      // Des erreurs de syntaxe/résolution existent déjà (visibles dans
-      // l'éditeur via les diagnostics LSP) — pas la peine de dupliquer ce
-      // signal ici, mais pas d'assemblage possible non plus.
+      // Les erreurs de syntaxe et de résolution sont déjà visibles dans
+      // l'éditeur via les diagnostics LSP — inutile de dupliquer le détail
+      // ici, mais il n'y a pas d'assemblage possible non plus.
       Model(
-        ..model,
-        source: source,
-        parse: Some(result),
-        machine: None,
-        address_to_line: address_to_line,
-        line_to_address: line_to_address,
-        address_to_instruction: address_to_instruction,
-        load_error: Some(
+        ..base,
+        assembled: None,
+        assembly_error: Some(
           "le programme contient des erreurs — voir les diagnostics dans l'éditeur",
         ),
-        last_events: [],
-        run_after_input: False,
       )
   }
 }
 
+/// Charge un fichier objet en RAM. `content` est le texte du `.lmcobj` tel
+/// que l'hôte l'a lu sur le disque — pas les mots que la webview a en
+/// mémoire. C'est délibéré : on charge le fichier, donc charger sans avoir
+/// assemblé échoue, et modifier le source sans réassembler charge l'ancien
+/// programme. Une vraie chaîne d'outils se comporte exactement comme ça.
+pub fn load_object_code(model: Model, content: String) -> Model {
+  case parse_object_code(content) {
+    Error(message) -> Model(..model, ram_error: Some(message), last_events: [])
+    Ok(words) -> {
+      let image = machine_from_words(words)
+      Model(
+        ..model,
+        loaded: Some(image),
+        machine: Some(image),
+        ram_error: None,
+        last_events: [],
+        run_after_input: False,
+      )
+    }
+  }
+}
+
+/// Le chargement a échoué côté hôte (fichier objet absent, illisible).
+pub fn fail_load(model: Model, message: String) -> Model {
+  Model(..model, ram_error: Some(message))
+}
+
+/// Un mot par ligne, quatre chiffres, rien d'autre — le format qu'écrit
+/// `object_code`. Le vérifier plutôt que de faire confiance : le fichier est
+/// sur le disque, quelqu'un a pu l'éditer à la main, et c'est même une chose
+/// intéressante à essayer.
+fn parse_object_code(content: String) -> Result(List(Int), String) {
+  let lines =
+    content
+    |> string.split("\n")
+    |> list.map(string.trim)
+    |> list.filter(fn(line) { line != "" })
+
+  case lines {
+    [] -> Error("le fichier objet est vide")
+    _ ->
+      case list.try_map(lines, parse_word) {
+        Error(bad) ->
+          Error(
+            "le fichier objet contient une ligne illisible : « " <> bad <> " »",
+          )
+        Ok(words) ->
+          case list.length(words) > memory.size {
+            True ->
+              Error("le fichier objet dépasse les 100 cases de la mémoire")
+            False -> Ok(words)
+          }
+      }
+  }
+}
+
+fn parse_word(line: String) -> Result(Int, String) {
+  case int.parse(line) {
+    Ok(value) if value >= 0 && value <= 9999 -> Ok(value)
+    _ -> Error(line)
+  }
+}
+
+/// Construit l'état initial de la machine autour d'une image mémoire. Même
+/// forme que celle que produit `load.load` dans lmc_lsp — SP en haut de la
+/// mémoire, PC à zéro, phase Fetch — mais à partir de mots bruts, puisque
+/// c'est un fichier objet qu'on charge et non un source qu'on assemble.
+fn machine_from_words(words: List(Int)) -> MachineState {
+  let mem =
+    list.index_fold(words, memory.new(), fn(m, word, address) {
+      memory.write(m, address, word) |> result.unwrap(m)
+    })
+
+  state.MachineState(
+    memory: mem,
+    accumulator: 0,
+    index: 0,
+    link: 0,
+    // La pile part du haut et descend ; SP désigne la prochaine case libre.
+    stack_pointer: memory.size - 1,
+    // Ce que le chargeur sait du programme : sa longueur. C'est ce qui
+    // permet de détecter une pile qui descendrait jusque dans le code.
+    program_end: list.length(words),
+    program_counter: 0,
+    instruction_register: 0,
+    current_instruction: instruction.Hlt,
+    phase: state.Fetch,
+    input: [],
+    output: [],
+    status: state.Running,
+  )
+}
+
+/// Remet la machine dans l'état où le chargement l'avait laissée. Ne
+/// réassemble pas et ne recharge pas : Reset est un bouton du panneau avant,
+/// pas une recompilation. Sans rien en RAM, il n'y a rien à remettre.
 pub fn reset(model: Model) -> Model {
-  load_source(model, model.source)
+  Model(..model, machine: model.loaded, last_events: [], run_after_input: False)
 }
 
 /// Advance exactly one instruction (fetch/decode/execute), unless the
@@ -239,19 +345,31 @@ pub fn set_cursor_line(model: Model, line: Option(Int)) -> Model {
 // ── Requêtes dérivées ─────────────────────────────────────────────
 
 /// The mailbox address the machine is on, if any — either about to execute
-/// (Running: PC hasn't been fetched from yet) or stuck on (WaitingForInput:
-/// lmc_lsp's runner advances the PC during the *fetch* phase, before INP's
-/// own execute phase can discover there's no input to consume — by the
-/// time we observe WaitingForInput, PC already points one past the
-/// instruction that's actually paused). This is what the memory-grid
-/// highlight should key off; current_line is derived from it, for the
-/// editor side of the sync.
+/// (Running: PC hasn't been fetched from yet) or the one it stopped on
+/// (WaitingForInput, Halted). This is what the memory-grid highlight keys
+/// off; current_line is derived from it, for the editor side of the sync.
+///
+/// The `- 1` for the two stopped states is not a workaround: lmc_lsp's
+/// runner increments the PC during the *fetch* phase, which is where a real
+/// processor increments it too (Dive Into Systems §5.2; RISC-V's `JAL`
+/// stores `pc+4` and ARM A32 reads the PC as "current instruction + 8" for
+/// the same reason; on x86, an interrupt resuming after `HLT` finds the
+/// saved instruction pointer *past* the `HLT`). So by the time we observe a
+/// stopped machine, PC already points one past the instruction that
+/// actually stopped it — `INP` with nothing to consume, or the `HLT`.
+///
+/// Keeping PC's raw value in the register panel and correcting only the
+/// highlight is deliberate. The number is true and worth showing; what was
+/// false was marking the *next* cell as the current one. On these programs
+/// that cell is usually the first `DAT`, so a halted machine claimed it was
+/// about to execute its own data — and decorated that source line in the
+/// editor.
 pub fn current_address(model: Model) -> Option(Int) {
   case model.machine {
     None -> None
     Some(m) ->
       Some(case m.status {
-        state.WaitingForInput -> m.program_counter - 1
+        state.WaitingForInput | state.Halted -> m.program_counter - 1
         _ -> m.program_counter
       })
   }
@@ -283,22 +401,6 @@ pub fn line_for_address(model: Model, address: Int) -> Option(Int) {
   dict.get(model.address_to_line, address) |> option.from_result
 }
 
-/// Human-readable caption for the instruction at current_address, e.g.
-/// "STA dividend — stocker ACC". Deliberately just the instruction as
-/// written (mnemonic + operand text) plus a static one-line description of
-/// what that mnemonic does — not the *resolved* effect (e.g. not "mem[7] =
-/// ACC"), which would need pulling in the symbol table just for a caption.
-/// Static and always correct beats dynamic and one more thing to get wrong.
-pub fn current_instruction_text(model: Model) -> Option(String) {
-  case current_address(model) {
-    None -> None
-    Some(addr) ->
-      dict.get(model.address_to_instruction, addr)
-      |> option.from_result
-      |> option.map(describe_instruction)
-  }
-}
-
 /// How many addresses the assembled program actually occupies — i.e. the
 /// number of instruction-bearing lines, per load.address_offsets. Always a
 /// contiguous range [0, count) since collect_addresses_loop in lmc_lsp
@@ -307,7 +409,69 @@ pub fn current_instruction_text(model: Model) -> Option(String) {
 /// webview de-emphasize those cells instead of giving all 100 equal visual
 /// weight regardless of how short the program is.
 pub fn program_length(model: Model) -> Int {
-  dict.size(model.address_to_line)
+  case model.machine {
+    None -> 0
+    Some(m) -> m.program_end
+  }
+}
+
+/// Le contenu d'un fichier objet : un mot machine de quatre chiffres par
+/// ligne, une ligne par case assemblée, et rien d'autre. Pas de mnémonique,
+/// pas de label, pas de commentaire — c'est tout l'intérêt de l'objet. Le
+/// processeur ne voit que ces nombres, et `LDA 42` comme `MOV ACC, 42`
+/// produisent la même ligne (LANGAGE.md, « MOV, et pourquoi LDA en est un
+/// raccourci »).
+///
+/// Ce sont les mots que l'émulateur a réellement chargés, pas une seconde
+/// traduction faite pour l'occasion : ils sortent de la même mémoire que
+/// celle qu'affiche la grille, donc le fichier ne peut pas diverger de ce
+/// qui tourne. `None` quand le programme n'assemble pas — un assembleur qui
+/// rencontre une erreur ne produit pas d'objet.
+pub fn object_code(model: Model) -> Option(String) {
+  case model.assembled {
+    None -> None
+    Some(m) ->
+      memory.to_list(m.memory)
+      |> list.take(m.program_end)
+      |> list.map(fn(word) { int.to_string(word) |> string.pad_start(4, "0") })
+      |> string.join("\n")
+      |> fn(text) { text <> "\n" }
+      |> Some
+  }
+}
+
+/// Les adresses que le source a réservées avec `DAT`, dans l'ordre. Une
+/// entrée par *case* et non par ligne : « lst: DAT 12, 4, 86 » en donne
+/// trois, « mot: DAT "LMC" » quatre — c'est déjà l'adressage de
+/// `load.address_offsets`, dont address_to_instruction est dérivé, donc
+/// rien n'est re-dérivé ici.
+///
+/// Attention à ce que cette information est, et à ce qu'elle n'est pas :
+/// c'est de la *provenance*, pas une propriété de la machine. « Une
+/// instruction est un nombre comme un autre. Rien ne distingue une case de
+/// code d'une case de données : c'est le compteur ordinal qui décide, en
+/// s'y arrêtant » (LANGAGE.md). La grille marque donc ce que le texte a
+/// écrit, pas une frontière que le processeur connaîtrait — un `STA` qui
+/// écrit dans une case de code, ou un `PC` qui tombe dans un `DAT`, ne
+/// changent rien à ce marquage. C'est voulu : l'écart entre les deux est
+/// précisément ce qu'il y a à comprendre.
+pub fn data_addresses(model: Model) -> List(Int) {
+  case model.machine {
+    None -> []
+    Some(_) -> data_addresses_of_source(model)
+  }
+}
+
+fn data_addresses_of_source(model: Model) -> List(Int) {
+  model.address_to_instruction
+  |> dict.to_list
+  |> list.filter_map(fn(pair) {
+    case pair.1 {
+      ast.Dat(_, _) -> Ok(pair.0)
+      _ -> Error(Nil)
+    }
+  })
+  |> list.sort(int.compare)
 }
 
 /// One entry per *phase* (Fetch, Decode, Execute — never more than three),
@@ -390,65 +554,6 @@ fn build_address_to_instruction(
     }
   })
   |> dict.from_list
-}
-
-fn describe_instruction(instr: ast.Instruction) -> String {
-  case instr {
-    ast.Inp(_) -> "INP — lire une entrée"
-    ast.Out(_) -> "OUT — écrire la sortie"
-    ast.Hlt(_) -> "HLT — arrêter le programme"
-    ast.Add(op, _) -> "ADD " <> operand_text(op) <> " — additionner"
-    ast.Sub(op, _) -> "SUB " <> operand_text(op) <> " — soustraire"
-    ast.Sta(op, _) -> "STA " <> operand_text(op) <> " — stocker ACC"
-    ast.Lda(op, _) -> "LDA " <> operand_text(op) <> " — charger dans ACC"
-    ast.Bra(op, _) -> "BRA " <> operand_text(op) <> " — sauter"
-    ast.Brz(op, _) -> "BRZ " <> operand_text(op) <> " — sauter si ACC = 0"
-    ast.Brp(op, _) -> "BRP " <> operand_text(op) <> " — sauter si ACC ≥ 0"
-    // Une liste occupe plusieurs cases, mais cette légende décrit la *ligne*
-    // source, pas une case : elle les montre donc toutes.
-    ast.Dat(values, _) ->
-      "DAT " <> string.join(list.map(values, int.to_string), ", ")
-    ast.Jsr(op, _) ->
-      "JSR " <> operand_text(op) <> " — appeler un sous-programme"
-    ast.Ret(_) -> "RET — revenir au dernier appelant"
-    ast.Psh(_) -> "PSH — empiler l'accumulateur"
-    ast.Pop(_) -> "POP — dépiler vers l'accumulateur"
-    ast.Mov(destination, source, _) ->
-      "MOV "
-      <> mov_side_text(destination)
-      <> ", "
-      <> mov_side_text(source)
-      <> " — déplacer une valeur"
-    ast.Invalid(_) -> "?"
-  }
-}
-
-fn operand_text(op: ast.Operand) -> String {
-  case op {
-    ast.LabelRef(name, addressing, _) -> name <> index_suffix(addressing)
-    ast.Immediate(v, addressing, _) ->
-      int.to_string(v) <> index_suffix(addressing)
-    ast.MissingOperand(_) -> ""
-  }
-}
-
-fn index_suffix(addressing: ast.Addressing) -> String {
-  case addressing {
-    ast.Indexed -> "[X]"
-    ast.Direct -> ""
-  }
-}
-
-fn mov_side_text(side: ast.MovSide) -> String {
-  case side {
-    ast.MovRegister(ast.Acc, _) -> "ACC"
-    ast.MovRegister(ast.X, _) -> "X"
-    ast.MovRegister(ast.Lr, _) -> "LR"
-    ast.MovRegister(ast.Sp, _) -> "SP"
-    ast.MovRegister(ast.Pc, _) -> "PC"
-    ast.MovMemory(op) -> operand_text(op)
-    ast.MovMissing(_) -> ""
-  }
 }
 
 /// #(phase, detail) — kept separate rather than pre-joined into one
@@ -652,15 +757,6 @@ fn memory_text(address: Int, mode: instruction.Addressing) -> String {
   case mode {
     instruction.Direct -> "mem[" <> int.to_string(address) <> "]"
     instruction.Indexed -> "mem[" <> int.to_string(address) <> "+X]"
-  }
-}
-
-/// Formulation des instructions qui ne sont pas des MOV : on garde
-/// « adresse N », le mot qu'employait déjà l'explication.
-fn address_text(address: Int, mode: instruction.Addressing) -> String {
-  case mode {
-    instruction.Direct -> "adresse " <> int.to_string(address)
-    instruction.Indexed -> "adresse " <> int.to_string(address) <> " + X"
   }
 }
 

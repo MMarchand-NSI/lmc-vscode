@@ -28,6 +28,21 @@ pub fn main() -> Nil {
     // one of the two wrong depending on how you got here.
     update(cell, fn(m) { model.resume_after_input(m, value) })
   })
+  // L'assemblage a déjà eu lieu — la webview réassemble à chaque frappe.
+  // Ce bouton ne fait qu'écrire le résultat dans un fichier, pour que
+  // l'étape existe sous forme d'artefact et pas seulement d'effet de bord.
+  ffi.on_assemble_click(fn() {
+    case model.object_code(ffi.deref(cell)) {
+      // Rien à écrire si le programme n'assemble pas : le bandeau d'erreur
+      // affiche déjà pourquoi.
+      None -> Nil
+      Some(code) -> ffi.post_to_host(object_code_message(code))
+    }
+  })
+  // Charger, c'est demander à l'hôte de relire le .lmcobj sur le disque :
+  // c'est bien le fichier qu'on charge, pas les mots que la webview a sous
+  // la main. D'où l'aller-retour, au lieu d'un simple appel local.
+  ffi.on_load_click(fn() { ffi.post_to_host(request_load_message()) })
   ffi.on_mailbox_click(fn(address) {
     case model.line_for_address(ffi.deref(cell), address) {
       Some(line) -> ffi.post_to_host(reveal_line_message(line))
@@ -63,6 +78,8 @@ fn render_and_notify(cell: Ref(Model)) -> Nil {
 type HostMessage {
   SetSource(source: String)
   CursorLine(line: Option(Int))
+  ObjectLoaded(content: String)
+  ObjectLoadFailed(message: String)
   Unrecognized
 }
 
@@ -71,6 +88,10 @@ fn handle_host_message(cell: Ref(Model), raw: String) -> Nil {
     SetSource(source) ->
       update(cell, fn(m) { model.set_source_if_changed(m, source) })
     CursorLine(line) -> update(cell, fn(m) { model.set_cursor_line(m, line) })
+    ObjectLoaded(content) ->
+      update(cell, fn(m) { model.load_object_code(m, content) })
+    ObjectLoadFailed(message) ->
+      update(cell, fn(m) { model.fail_load(m, message) })
     Unrecognized -> Nil
   }
 }
@@ -92,6 +113,14 @@ fn host_message_decoder() -> decode.Decoder(HostMessage) {
       use line <- decode.field("line", decode.optional(decode.int))
       decode.success(CursorLine(line))
     }
+    "objectLoaded" -> {
+      use content <- decode.field("content", decode.string)
+      decode.success(ObjectLoaded(content))
+    }
+    "objectLoadFailed" -> {
+      use message <- decode.field("message", decode.string)
+      decode.success(ObjectLoadFailed(message))
+    }
     _ -> decode.success(Unrecognized)
   }
 }
@@ -104,6 +133,18 @@ fn ready_message() -> String {
 
 fn reveal_line_message(line: Int) -> String {
   json.object([#("type", json.string("revealLine")), #("line", json.int(line))])
+  |> json.to_string
+}
+
+fn request_load_message() -> String {
+  json.object([#("type", json.string("requestLoad"))]) |> json.to_string
+}
+
+fn object_code_message(content: String) -> String {
+  json.object([
+    #("type", json.string("objectCode")),
+    #("content", json.string(content)),
+  ])
   |> json.to_string
 }
 

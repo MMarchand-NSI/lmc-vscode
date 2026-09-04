@@ -140,10 +140,18 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   `runner` (`load`/`run`/`state`) directly, same as the Emulator API — no local emulator. Also owns
   `address_to_line`/`line_to_address` (built from `load.address_offsets`, **not** re-derived by
   assuming address == line index — that assumption is exactly the v0.1.5 bug in `lmc_lsp`, see its
-  ARCHI.md) for the editor <-> webview sync, and `current_address`/`current_line`, which account for
-  a real runner quirk: PC advances during the *fetch* phase, before `INP`'s execute phase can
-  discover there's no input — so when `WaitingForInput`, PC already points one past the instruction
-  actually paused on.
+  ARCHI.md) for the editor <-> webview sync, and `current_address`/`current_line`, which subtract 1
+  when the machine is stopped (`WaitingForInput` **or** `Halted`): the runner increments PC during
+  the *fetch* phase — which is where real hardware increments it too, and is why `JSR` can save `LR`
+  by copying PC with no arithmetic — so a stopped machine's PC already points one past the
+  instruction that stopped it. The register panel still shows PC's raw value, deliberately: the
+  number is true (an x86 resuming from `HLT` finds its saved IP past the `HLT` as well); what was
+  wrong was marking the *next* cell as the current one. Since these programs put their `DAT`s after
+  the `HLT`, a halted machine used to claim it was about to execute its own data, and decorated that
+  line in the editor. `Halted` was missed when `WaitingForInput`
+  was fixed; the reverse case — execution falling *into* a `DAT`, which halts because opcode 0 is
+  `HLT` — is what makes `pc - 1` the right correction rather than blanking the highlight, and has
+  its own test.
 - **`webview/render.gleam`** — `Model` -> single JSON payload (`gleam_json`), also `gleam test`-covered.
   One `ffi.render(json)` call re-renders the whole memory grid each time; 100 cells is cheap enough
   that a diffing renderer isn't worth the complexity.
@@ -156,8 +164,10 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   don't reach for `node:*` imports in this file.
 - **`vscode-extension/webviewPanel.ts`** — creates the panel (`retainContextWhenHidden: true`, so
   stepping progress survives switching tabs), fills in `webview/index.html`'s `{{cspSource}}` /
-  `{{styleUri}}` / `{{scriptUri}}` / `{{nonce}}` placeholders, and relays exactly two message
-  directions: host->webview (`setSource`, `cursorLine`) and webview->host (`ready`, `revealLine`).
+  `{{styleUri}}` / `{{scriptUri}}` / `{{nonce}}` placeholders, and relays messages both ways:
+  host->webview (`setSource`, `cursorLine`) and webview->host (`ready`, `revealLine`,
+  `currentLine`, `objectCode`). `objectCode` is the one that does more than relay — it writes the
+  file — and it is deliberately the *only* one: see the object-file note below.
   Command `lmc.openEmulator` ("LMC: Open Emulator") is registered in `client.ts`.
 
 **Editor <-> webview sync is the actual point of this being a webview** instead of embedding an
@@ -251,10 +261,33 @@ never just code review):
   Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
   session-style current-line decoration).
 - All five registers are shown (`ACC`, `PC`, then `X`, `LR`, `SP` more discreetly, since they only
-  come into play with arrays, subroutines and the stack), and the memory grid distinguishes three
-  zones — the program at the bottom, the stack above `SP`, the unused middle dimmed. Watching the
-  stack grow cell by cell during a recursion is the point of that last one: a stack you cannot see
-  is a stack you cannot teach.
+  come into play with arrays, subroutines and the stack), and the memory grid marks four things —
+  the stack above `SP` (dashed orange), the cells a `DAT` reserved (dotted blue), the unused middle
+  dimmed, and code left unmarked as the default case. Watching the stack grow cell by cell during a
+  recursion is the point of the first: a stack you cannot see is a stack you cannot teach.
+- **Assemble -> load -> execute are three separate acts, and the model has three separate
+  states for them.** `Model` carries `assembled` (the result of assembling the current source,
+  recomputed on every keystroke, used *only* to produce the object file), `loaded` (the RAM image
+  as it was at load time — where Reset returns to) and `machine` (the live machine, which drifts
+  from `loaded` as you execute). The panel opens with an empty memory: `machine` is `None` until
+  something is loaded, `program_length` reads `machine.program_end` rather than the source, and the
+  grid dims all 100 cells.
+  - **"Assembler"** writes `<name>.lmcobj` next to the source: four digits per line, one line per
+    cell, no mnemonics and no labels, because that is all the processor ever receives.
+    `lda_and_mov_acc_produce_the_same_object_file_test` pins the claim the button's tooltip makes.
+  - **"Charger"** asks the host to *actually read that file off disk* (`requestLoad` ->
+    `objectLoaded`/`objectLoadFailed`) and turns its words into RAM via `model.machine_from_words`.
+    Loading a file rather than the in-memory copy is the whole point, and the two consequences are
+    deliberate, not accidents to be smoothed away: loading before assembling fails, and editing the
+    source without reassembling loads the **old** program. Both are how a real toolchain behaves.
+  - The cost, accepted knowingly: `address_to_line` and `data_addresses` are derived from the
+    *source*, so after an edit they describe something other than what is in RAM. That is exactly
+    what debug information is, and why a stale binary confuses a debugger. Do not "fix" it by
+    deriving the mapping from the object file — the file does not contain it; that is the point.
+  The `DAT` marking (`model.data_addresses`) is deliberately **provenance, not machine state** —
+  "rien ne distingue une case de code d'une case de données" (LANGAGE.md), so it never changes when
+  a `STA` writes into code or a `PC` runs into a `DAT` and halts on it. That gap is the lesson, not
+  a bug to fix by making the marking follow execution.
 - A long list of real bugs caught by actually exercising the extension/webview, not by guessing:
   hover-on-operand, missing HLT/length diagnostics, a confusing mnemonic error message, blank lines
   silently becoming an implicit HLT (`lmc_lsp`, the most serious one), a stale `TextEditor` reference

@@ -1,20 +1,42 @@
+import gleam/list
 import gleam/option.{None, Some}
+import gleam/string
 import lmc/runner/state
 import webview/model
 
-// ── Chargement / assemblage ───────────────────────────────────────
+/// Assemble puis charge en RAM, comme le feraient les boutons Assembler
+/// puis Charger. Passe par le vrai aller-retour : le texte du fichier objet
+/// est produit puis relu, donc ce raccourci exerce aussi ce chemin-là.
+fn loaded(source: String) -> model.Model {
+  let m = model.init(source)
+  let assert Some(code) = model.object_code(m)
+  model.load_object_code(m, code)
+}
 
-pub fn init_valid_program_test() {
+// ── Assemblage ────────────────────────────────────────────────────
+
+pub fn init_assembles_but_does_not_load_test() {
+  // Assembler n'est pas charger : après l'ouverture, la RAM est vide et il
+  // y a seulement de quoi produire un fichier objet.
   let m = model.init("INP\nOUT\nHLT\n")
-  assert m.load_error == None
+  assert m.assembly_error == None
+  assert m.assembled != None
+  assert m.machine == None
+  assert model.program_length(m) == 0
+}
+
+pub fn loading_fills_the_ram_test() {
+  let m = loaded("INP\nOUT\nHLT\n")
   let assert Some(machine) = m.machine
   assert machine.status == state.Running
+  assert machine.program_counter == 0
+  assert model.program_length(m) == 3
 }
 
 pub fn init_program_with_syntax_error_test() {
   let m = model.init("XXX\n")
-  assert m.machine == None
-  assert m.load_error != None
+  assert m.assembled == None
+  assert m.assembly_error != None
 }
 
 pub fn init_program_with_undefined_label_test() {
@@ -22,8 +44,8 @@ pub fn init_program_with_undefined_label_test() {
   // vides" côté pipeline, donc même message générique côté webview (les
   // diagnostics détaillés vivent déjà dans l'éditeur via le LSP).
   let m = model.init("LDA ghost\nHLT\n")
-  assert m.machine == None
-  assert m.load_error != None
+  assert m.assembled == None
+  assert m.assembly_error != None
 }
 
 pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
@@ -33,7 +55,7 @@ pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
   // program must not reset PC/ACC/output just because the (unchanged)
   // source arrived again.
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(9)
     |> model.step
@@ -45,41 +67,48 @@ pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
   assert after.accumulator == before.accumulator
 }
 
-pub fn set_source_if_changed_reloads_on_real_change_test() {
+pub fn editing_the_source_reassembles_without_touching_the_ram_test() {
+  // Le point de tout le découpage : modifier le source réassemble, mais la
+  // machine continue de tourner sur ce qui a été chargé. Éditer un .c ne
+  // change pas le binaire déjà en mémoire.
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(9)
     |> model.step
+  let assert Some(before) = m.machine
+
   let m2 = model.set_source_if_changed(m, "INP\nHLT\n")
   let assert Some(machine) = m2.machine
-  // Rechargé depuis zéro : de retour au début du (nouveau) programme.
-  assert machine.program_counter == 0
-  assert machine.accumulator == 0
+  assert machine.program_counter == before.program_counter
+  assert machine.accumulator == before.accumulator
+  // Le nouvel assemblage, lui, a bien changé : deux cases au lieu de trois.
+  assert model.object_code(m2) == Some("9001\n0000\n")
 }
 
 // ── Step / run ────────────────────────────────────────────────────
 
 pub fn step_advances_one_instruction_test() {
-  let m = model.init("INP\nOUT\nHLT\n") |> model.step
+  let m = loaded("INP\nOUT\nHLT\n") |> model.step
   let assert Some(machine) = m.machine
   assert machine.status == state.WaitingForInput
 }
 
-pub fn step_on_unloaded_program_is_a_no_op_test() {
-  let m = model.init("XXX\n") |> model.step
+pub fn step_before_loading_is_a_no_op_test() {
+  // Il faut charger avant d'exécuter : sans RAM, Step ne peut rien faire.
+  let m = model.init("INP\nOUT\nHLT\n") |> model.step
   assert m.machine == None
 }
 
 pub fn run_to_halt_runs_until_input_needed_test() {
-  let m = model.init("INP\nOUT\nHLT\n") |> model.run_to_halt
+  let m = loaded("INP\nOUT\nHLT\n") |> model.run_to_halt
   let assert Some(machine) = m.machine
   assert machine.status == state.WaitingForInput
 }
 
 pub fn provide_input_then_run_halts_test() {
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(42)
     |> model.run_to_halt
@@ -97,7 +126,7 @@ pub fn resume_after_input_keeps_running_when_run_triggered_the_wait_test() {
   // (run_after_input); resume_after_input must honour that and keep going
   // past the INP it paused on, all the way to HLT here.
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.resume_after_input(9)
   let assert Some(machine) = m.machine
@@ -110,7 +139,7 @@ pub fn resume_after_input_completes_only_the_instruction_when_step_triggered_the
   // once input arrives — complete only that instruction, not run to
   // completion.
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.step
     |> model.resume_after_input(9)
   let assert Some(machine) = m.machine
@@ -125,7 +154,7 @@ pub fn reset_reruns_from_scratch_test() {
   // auto-run up to the first INP the way a fresh model.init would look
   // right after (both land on the same thing: Running, PC at the start).
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(1)
     |> model.run_to_halt
@@ -139,7 +168,7 @@ pub fn reset_reruns_from_scratch_test() {
 // ── Correspondance adresse <-> ligne ──────────────────────────────
 
 pub fn current_line_tracks_program_counter_test() {
-  let m = model.init("INP\nOUT\nHLT\n")
+  let m = loaded("INP\nOUT\nHLT\n")
   // PC=0 avant la première instruction -> ligne 0
   assert model.current_line(m) == Some(0)
 
@@ -150,7 +179,7 @@ pub fn current_line_tracks_program_counter_test() {
 
 pub fn current_line_advances_after_input_provided_test() {
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(5)
     |> model.step
@@ -159,7 +188,7 @@ pub fn current_line_advances_after_input_provided_test() {
 }
 
 pub fn line_for_address_and_cursor_address_are_inverse_test() {
-  let m = model.init("INP\nOUT\nHLT\n")
+  let m = loaded("INP\nOUT\nHLT\n")
   assert model.line_for_address(m, 1) == Some(1)
 
   let m2 = model.set_cursor_line(m, Some(1))
@@ -177,7 +206,7 @@ pub fn cursor_line_on_blank_line_has_no_address_test() {
 pub fn labels_dont_shift_the_address_line_map_test() {
   // Un label décale la colonne mais pas les adresses — vérifie que le
   // mapping suit bien les *lignes*, pas un compteur d'instructions naïf.
-  let m = model.init("start: INP\nOUT\nHLT\n")
+  let m = loaded("start: INP\nOUT\nHLT\n")
   assert model.line_for_address(m, 0) == Some(0)
   assert model.line_for_address(m, 1) == Some(1)
   assert model.line_for_address(m, 2) == Some(2)
@@ -185,51 +214,25 @@ pub fn labels_dont_shift_the_address_line_map_test() {
 
 // ── Légende d'instruction / longueur du programme ─────────────────
 
-pub fn current_instruction_text_mnemonic_with_operand_test() {
-  let m = model.init("STA total\nHLT\ntotal: DAT 0\n")
-  assert model.current_instruction_text(m) == Some("STA total — stocker ACC")
-}
-
-pub fn current_instruction_text_nullary_test() {
-  let m = model.init("INP\nHLT\n")
-  assert model.current_instruction_text(m) == Some("INP — lire une entrée")
-}
-
-pub fn current_instruction_text_advances_with_pc_test() {
-  let m =
-    model.init("INP\nOUT\nHLT\n")
-    |> model.run_to_halt
-    |> model.provide_input(1)
-    |> model.step
-  assert model.current_instruction_text(m) == Some("OUT — écrire la sortie")
-}
-
-pub fn current_instruction_text_none_when_not_loaded_test() {
-  let m = model.init("XXX\n")
-  assert model.current_instruction_text(m) == None
-}
-
 pub fn program_length_counts_instructions_test() {
   // Lignes vides comprises dans le source, pas dans le compte — même
   // logique que load.address_offsets côté lmc_lsp.
-  let m = model.init("INP\n\nOUT\nHLT\n")
+  let m = loaded("INP\n\nOUT\nHLT\n")
   assert model.program_length(m) == 3
 }
 
-pub fn program_length_counts_the_invalid_line_even_when_it_wont_load_test() {
-  // "XXX" alone doesn't parse as a real instruction, but the parser's error
-  // recovery still gives it an Invalid placeholder that occupies an
-  // address (matches lmc_lsp's own addressing — see load.gleam) — even
-  // though this program never actually loads (m.machine == None).
-  let m = model.init("XXX\n")
-  assert m.machine == None
-  assert model.program_length(m) == 1
+pub fn program_length_is_zero_until_something_is_loaded_test() {
+  // program_length décrit la RAM, pas le source : c'est lui qui dit à la
+  // grille où s'arrête le programme chargé. Sans chargement, rien.
+  let m = model.init("INP\nOUT\nHLT\n")
+  assert model.program_length(m) == 0
+  assert model.program_length(loaded("INP\nOUT\nHLT\n")) == 3
 }
 
 // ── Cycle Fetch → Decode → Execute ────────────────────────────────
 
 pub fn no_events_before_any_step_test() {
-  let m = model.init("INP\nOUT\nHLT\n")
+  let m = loaded("INP\nOUT\nHLT\n")
   assert model.last_cycle(m) == []
 }
 
@@ -237,7 +240,7 @@ pub fn step_produces_one_entry_per_phase_test() {
   // OUT (nullaire) : le cas le plus simple pour vérifier les 3 phases sans
   // le cas particulier de INP qui bloque avant l'Execute.
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(9)
     |> model.step
@@ -258,7 +261,7 @@ pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
   // number*, not to the student's original ("total") label, long gone by
   // this point.
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(9)
     |> model.step
@@ -276,7 +279,7 @@ pub fn decode_shows_the_raw_number_with_an_address_test() {
   // mémoire assemblé (3002 = 3·1000 + 2, soit opcode 3, mode direct,
   // adresse 02). Le décodage montre la forme générale MOV avec, en regard,
   // le raccourci STA qui s'assemble vers ce même mot.
-  let m = model.init("STA total\nHLT\ntotal: DAT 0\n") |> model.step
+  let m = loaded("STA total\nHLT\ntotal: DAT 0\n") |> model.step
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
   assert decode.details
     == [
@@ -291,7 +294,7 @@ pub fn events_accumulate_across_an_input_pause_test() {
   // Execute actually finishes, or the panel would misleadingly look like
   // this instruction skipped straight to Execute.
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(9)
     |> model.step
@@ -313,7 +316,7 @@ pub fn add_accumulator_change_is_not_deduped_test() {
   // décrivent le même fait) — ADD n'émet qu'un seul AccumulatorChanged, il
   // ne doit surtout pas être filtré par erreur.
   let m =
-    model.init("LDA n\nADD n\nHLT\nn: DAT 5\n")
+    loaded("LDA n\nADD n\nHLT\nn: DAT 5\n")
     |> model.step
     |> model.step
   let assert [_fetch, _decode, execute] = model.last_cycle(m)
@@ -322,10 +325,135 @@ pub fn add_accumulator_change_is_not_deduped_test() {
 
 pub fn events_clear_on_reset_test() {
   let m =
-    model.init("INP\nOUT\nHLT\n")
+    loaded("INP\nOUT\nHLT\n")
     |> model.run_to_halt
     |> model.provide_input(9)
     |> model.step
     |> model.reset
   assert model.last_cycle(m) == []
+}
+
+// ── Zone de données (DAT) ─────────────────────────────────────────
+
+pub fn data_addresses_marks_only_the_dat_cells_test() {
+  // "n" est en case 3, après les trois instructions.
+  let m = loaded("INP\nSTA n\nHLT\nn: DAT 0\n")
+  assert model.data_addresses(m) == [3]
+}
+
+pub fn data_addresses_covers_every_cell_of_a_multi_value_dat_test() {
+  // Une ligne, trois cases : le marquage suit les cases, pas les lignes.
+  let m = loaded("HLT\nlst: DAT 12, 4, 86\n")
+  assert model.data_addresses(m) == [1, 2, 3]
+}
+
+pub fn data_addresses_includes_a_strings_terminating_zero_test() {
+  // « LMC » fait quatre cases : 76, 77, 67, puis le zéro terminal, qui est
+  // une case réservée par le DAT comme les autres.
+  let m = loaded("HLT\nmot: DAT \"LMC\"\n")
+  assert model.data_addresses(m) == [1, 2, 3, 4]
+}
+
+pub fn data_addresses_is_not_a_region_but_a_set_of_cells_test() {
+  // Un DAT peut se trouver au milieu du code, et le marquage doit le
+  // suivre case par case — ce n'est pas « tout ce qui est après la
+  // dernière instruction ». Ici les données sont en 2 et en 5.
+  let m = loaded("LDA a\nOUT\na: DAT 42\nLDA b\nOUT\nb: DAT 7\nHLT\n")
+  assert model.data_addresses(m) == [2, 5]
+}
+
+pub fn data_addresses_empty_when_the_program_has_no_dat_test() {
+  let m = loaded("INP\nOUT\nHLT\n")
+  assert model.data_addresses(m) == []
+}
+
+// ── Surbrillance à l'arrêt ────────────────────────────────────────
+
+pub fn halted_highlights_the_hlt_not_the_cell_after_it_test() {
+  // Le HLT est en case 2. Le PC vaut 3 à l'arrêt — c'est correct, et c'est
+  // ce que fait un vrai processeur, qui incrémente pendant la phase Fetch.
+  // Mais la case *courante* est celle qui a arrêté la machine, pas la
+  // suivante.
+  let m =
+    loaded("INP\nOUT\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(42)
+    |> model.run_to_halt
+  let assert Some(machine) = m.machine
+  assert machine.status == state.Halted
+  assert machine.program_counter == 3
+  assert model.current_address(m) == Some(2)
+}
+
+pub fn halted_does_not_highlight_the_first_dat_test() {
+  // Le cas qui a fait remonter le défaut : les données suivent le HLT, donc
+  // la case d'après est un DAT. L'émulateur annonçait une machine arrêtée
+  // sur le point d'exécuter ses propres données, et l'éditeur décorait la
+  // ligne du DAT.
+  let source = "LDA n\nOUT\nHLT\nn: DAT 7\n"
+  let m = loaded(source) |> model.run_to_halt
+  let assert Some(machine) = m.machine
+  assert machine.program_counter == 3
+  assert model.data_addresses(m) == [3]
+  assert model.current_address(m) == Some(2)
+  assert model.current_line(m) == Some(2)
+}
+
+pub fn halting_on_a_dat_cell_still_points_at_that_cell_test() {
+  // Cas inverse, et c'est pourquoi « pc - 1 » est le bon correctif plutôt
+  // que « ne rien surligner » : ici le flux d'exécution tombe *dans* les
+  // données. 42 vaut moins de 1000, donc opcode 0, donc HLT (LANGAGE.md).
+  // La case qui a arrêté la machine est bien la case de données, et c'est
+  // exactement ce qu'il faut montrer.
+  let m = loaded("LDA a\nOUT\na: DAT 42\nHLT\n") |> model.run_to_halt
+  let assert Some(machine) = m.machine
+  assert machine.status == state.Halted
+  assert model.data_addresses(m) == [2]
+  assert model.current_address(m) == Some(2)
+}
+
+pub fn running_still_points_at_the_instruction_about_to_execute_test() {
+  // Non-régression : hors des états d'arrêt, PC n'a pas encore servi au
+  // fetch, donc aucune correction.
+  let m = loaded("INP\nOUT\nHLT\n")
+  assert model.current_address(m) == Some(0)
+}
+
+// ── Fichier objet ─────────────────────────────────────────────────
+
+pub fn object_code_is_one_four_digit_word_per_cell_test() {
+  let m = model.init("INP\nOUT\nHLT\n")
+  assert model.object_code(m) == Some("9001\n9002\n0000\n")
+}
+
+pub fn object_code_covers_every_cell_of_a_multi_value_dat_test() {
+  // Une ligne source, trois lignes de fichier objet : l'objet compte en
+  // cases, pas en lignes.
+  let m = model.init("HLT\nlst: DAT 12, 4, 86\n")
+  assert model.object_code(m) == Some("0000\n0012\n0004\n0086\n")
+}
+
+pub fn object_code_stops_at_the_end_of_the_program_test() {
+  // Les 100 cases de la mémoire existent, mais l'objet ne contient que le
+  // programme : le reste n'a pas été assemblé, il a seulement été mis à 0.
+  let m = model.init("INP\nOUT\nHLT\n")
+  let assert Some(code) = model.object_code(m)
+  assert string.split(code, "\n") |> list.length == 4
+}
+
+pub fn lda_and_mov_acc_produce_the_same_object_file_test() {
+  // La promesse affichée dans l'infobulle du bouton « Assembler », et la
+  // raison pour laquelle LANGAGE.md dit que LDA est un *raccourci* de MOV
+  // et pas une seconde instruction : le fichier objet est identique.
+  let with_lda = model.init("LDA n\nHLT\nn: DAT 42\n")
+  let with_mov = model.init("MOV ACC, n\nHLT\nn: DAT 42\n")
+  assert model.object_code(with_lda) == model.object_code(with_mov)
+  assert model.object_code(with_lda) == Some("5002\n0000\n0042\n")
+}
+
+pub fn object_code_none_when_the_program_does_not_assemble_test() {
+  // Un assembleur qui rencontre une erreur ne produit pas d'objet.
+  let m = model.init("LDA ghost\nHLT\n")
+  assert m.machine == None
+  assert model.object_code(m) == None
 }

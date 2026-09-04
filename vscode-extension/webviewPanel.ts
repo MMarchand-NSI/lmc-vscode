@@ -13,6 +13,10 @@ import * as vscode from "vscode";
 //   webview -> host  {"type":"ready"}
 //   webview -> host  {"type":"revealLine","line":N}
 //   webview -> host  {"type":"currentLine","line":N|null}
+//   webview -> host  {"type":"objectCode","content":"5042\n..."}
+//   webview -> host  {"type":"requestLoad"}
+//   host -> webview  {"type":"objectLoaded","content":"5042\n..."}
+//   host -> webview  {"type":"objectLoadFailed","message":"..."}
 //   host -> webview  {"type":"setSource","source":"..."}
 //   host -> webview  {"type":"cursorLine","line":N|null}
 //
@@ -182,7 +186,73 @@ function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {
       lastCurrentLine = typeof message.line === "number" ? message.line : null;
       applyCurrentLineDecoration();
       break;
+    case "objectCode":
+      writeObjectFile(message.content);
+      break;
+    case "requestLoad":
+      sendObjectFile(panel);
+      break;
   }
+}
+
+/// Writes the assembled words next to the source as `<name>.lmcobj` and
+/// opens it. The webview assembles (it already does, on every keystroke)
+/// and the host writes: the webview has no filesystem access, and the
+/// split keeps the assembling in the tested Gleam core rather than here.
+///
+/// The point of the file is that it's a real artifact — normally you
+/// assemble to a file and *that* is what gets loaded into RAM. The
+/// emulator still runs from its own in-memory assembly rather than
+/// re-reading this file; the words are identical because both come from
+/// the same `load.load` (see model.object_code), so the two cannot drift.
+/// The `.lmcobj` sitting next to the source. Derived from sourceUri rather
+/// than remembered from the last write: the file on disk is the thing being
+/// loaded, and it may well have been written by an earlier session, or not
+/// exist at all.
+function objectFileUri(): vscode.Uri | undefined {
+  if (!sourceUri) return undefined;
+  return sourceUri.with({ path: sourceUri.path.replace(/\.lmc$/i, "") + ".lmcobj" });
+}
+
+/// Reads the object file and hands its text to the webview, which turns it
+/// into RAM. The read really does hit the disk — that is the whole point of
+/// having a file: loading fails when nothing has been assembled, and loads
+/// a stale program when the source has moved on since. Both are how a real
+/// toolchain behaves, and both are worth being able to show.
+async function sendObjectFile(panel: vscode.WebviewPanel): Promise<void> {
+  const target = objectFileUri();
+  if (!target) return;
+  try {
+    const bytes = await vscode.workspace.fs.readFile(target);
+    panel.webview.postMessage({
+      type: "objectLoaded",
+      content: new TextDecoder().decode(bytes),
+    });
+  } catch {
+    panel.webview.postMessage({
+      type: "objectLoadFailed",
+      message:
+        "pas de fichier objet à charger (" +
+        path.basename(target.fsPath) +
+        ") — assemblez d'abord",
+    });
+  }
+}
+
+async function writeObjectFile(content: unknown): Promise<void> {
+  if (!sourceUri || typeof content !== "string") return;
+
+  const target = objectFileUri();
+  if (!target) return;
+  await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(content));
+
+  // Opened beside the source rather than focused: you asked for a file, not
+  // for your cursor to be moved out of the program you were writing.
+  const document = await vscode.workspace.openTextDocument(target);
+  await vscode.window.showTextDocument(document, {
+    preserveFocus: true,
+    viewColumn: findOpenTabGroupColumn() ?? vscode.ViewColumn.One,
+  });
 }
 
 /// Applies (or clears) the current-line highlight on the live editor for

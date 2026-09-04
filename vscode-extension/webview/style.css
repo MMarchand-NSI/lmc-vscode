@@ -22,6 +22,11 @@ h2 {
 }
 
 .error-banner {
+  /* Caché par défaut ici, et non par un attribut style= dans le HTML : la
+     CSP du webview (style-src sans 'unsafe-inline') bloque les attributs de
+     style. renderError() le rouvre en écrivant element.style.display, ce qui
+     passe par le CSSOM et n'est pas soumis à la CSP. */
+  display: none;
   background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
   border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
   color: var(--vscode-inputValidation-errorForeground, inherit);
@@ -33,17 +38,93 @@ h2 {
 
 .layout {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   align-items: flex-start;
+  /* Le panneau de l'émulateur est souvent étroit (une demi-fenêtre à côté
+     de l'éditeur) : les trois cadres passent à la ligne plutôt que de
+     comprimer la grille mémoire. */
+  flex-wrap: wrap;
 }
 
-/* ── CPU panel ─────────────────────────────────────────────────── */
+/* ── Les trois organes de von Neumann ──────────────────────────────
+   Processeur, mémoire, entrées-sorties : un cadre chacun, pour que le
+   découpage se voie avant même qu'on lise ce qu'il y a dedans. Les
+   commandes Step/Run/Reset restent dehors — ce ne sont pas des organes de
+   la machine, c'est l'opérateur.
 
-.cpu {
+   Bordure prise sur --vscode-panel-border et non --vscode-widget-border :
+   ce dernier vaut transparent dans plusieurs thèmes (c'est déjà pourquoi
+   une case de code n'a pas de bordure visible), et un cadre invisible ne
+   découpe rien. */
+.unit {
+  border: 1px solid var(--vscode-panel-border, #454545);
+  border-radius: 5px;
+  padding: 10px 12px 12px;
+}
+
+.unit-note {
+  font-size: 0.8em;
+  opacity: 0.7;
+  margin: -2px 0 8px;
+}
+
+.unit h3 {
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  opacity: 0.6;
+  margin: 0 0 5px;
+}
+
+/* Barre de conduite : les boutons et l'état, sur une ligne au-dessus des
+   trois cadres. Ni l'un ni l'autre n'est un organe de la machine ou un des
+   cinq registres — ce sont les deux choses qu'on regarde en pilotant. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.controls {
+  display: flex;
+  gap: 6px;
+}
+
+/* L'état réutilise .register — même nom en retrait, même ancre d'infobulle,
+   même règle .register .tip — mais collé à sa valeur au lieu d'être poussé
+   aux deux bords comme dans la colonne des registres. */
+.toolbar .register {
+  justify-content: flex-start;
+  gap: 7px;
+}
+
+/* Processeur et entrées-sorties partagent une colonne étroite : ce sont
+   deux cadres distincts, mais aucun des deux n'a besoin de largeur, alors
+   que la grille mémoire en réclame. C'est la colonne qui porte la largeur,
+   pas les cadres — sinon leur `flex` fixerait leur *hauteur* une fois
+   empilés, l'axe principal ayant tourné. */
+.column {
   flex: 0 0 200px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Processeur ────────────────────────────────────────────────── */
+
+.cpu {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+}
+
+/* ── Entrées / Sorties ─────────────────────────────────────────── */
+
+.io-part + .io-part {
+  margin-top: 14px;
 }
 
 .register {
@@ -51,11 +132,97 @@ h2 {
   justify-content: space-between;
   align-items: baseline;
   font-variant-numeric: tabular-nums;
+  /* Ancre de l'infobulle : c'est la ligne entière qui sert de repère, pas
+     seulement le nom, pour que les six bulles s'alignent au même bord. */
+  position: relative;
 }
 
 .register .label {
   opacity: 0.7;
   font-size: 0.85em;
+}
+
+/* Infobulle du nom de registre. Toujours sans JS, mais dessinée plutôt que
+   native : apparition immédiate au lieu de la seconde d'attente de title=,
+   et l'aspect des survols de VS Code.
+
+   Le texte est un vrai élément du DOM et non un content:attr(...) : il reste
+   lisible par un lecteur d'écran, et il n'existe qu'à un seul endroit — un
+   data-tip doublé d'un aria-label aurait été deux copies à garder d'accord.
+
+   .tip est un frère de .label, pas son enfant, et ce n'est pas indifférent :
+   .label porte opacity 0.7, or une opacité < 1 crée un contexte
+   d'empilement, dans lequel une bulle enfant se serait fait recouvrir par le
+   cadre Mémoire, déclaré plus loin dans le document. En frère, le z-index
+   ci-dessous est comparé à la racine et la bulle passe au-dessus. */
+.register .label {
+  cursor: help;
+}
+.register .label:hover,
+.register .label:focus-visible {
+  opacity: 1;
+}
+
+.tip {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 260px;
+  /* Ne peut jamais déborder de la fenêtre, même dans un panneau étroit :
+     sans cette borne, la bulle ferait apparaître une barre de défilement
+     horizontale sur toute la page. */
+  max-width: calc(100vw - 40px);
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--vscode-editorHoverWidget-background, #252526);
+  color: var(--vscode-editorHoverWidget-foreground, inherit);
+  border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  /* Taille absolue : .tip hérite sinon du 0.85em du nom de registre, et la
+     bulle deviendrait illisible. */
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 90ms ease;
+}
+.tip strong {
+  color: var(--vscode-textPreformat-foreground, inherit);
+  font-weight: 600;
+}
+.register .label:hover ~ .tip,
+.register .label:focus-visible ~ .tip,
+.tip-anchor > *:hover ~ .tip,
+.tip-anchor > *:focus-visible ~ .tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Deuxième ancre d'infobulle, pour un élément qui n'est pas une ligne de
+   registre — le bouton « Assembler ». Même règle .tip, même déclencheur. */
+.tip-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.tip code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.95em;
+}
+
+/* « Assembler » n'est pas une commande d'exécution : il produit un fichier.
+   Traité en bouton secondaire pour qu'il ne se confonde pas avec Step, Run
+   et Reset, qui font avancer la machine. */
+button.secondary {
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, inherit);
+  border: 1px solid var(--vscode-button-border, var(--vscode-panel-border, #454545));
+}
+button.secondary:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, transparent);
 }
 
 .register .value {
@@ -75,20 +242,6 @@ h2 {
 .status-error { background: var(--vscode-testing-iconFailed, #f14c4c); color: #fff; }
 .status-waiting_input { background: var(--vscode-testing-iconQueued, #cca700); color: #000; }
 
-.instruction-caption {
-  font-size: 0.85em;
-  opacity: 0.75;
-  font-family: var(--vscode-editor-font-family, monospace);
-  min-height: 1.2em;
-  /* Text, not a competing visual anchor — same reasoning as putting it
-     next to the registers instead of its own boxed/bordered section. */
-}
-
-.controls {
-  display: flex;
-  gap: 6px;
-}
-
 button {
   font-family: inherit;
   background: var(--vscode-button-background);
@@ -107,12 +260,15 @@ button:disabled {
 }
 
 #input-form {
-  display: flex;
+  /* Même raison que .error-banner : caché ici, ouvert par renderInput() en
+     display:flex quand la machine attend une valeur. */
+  display: none;
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
 }
 #input-form input {
-  width: 80px;
+  width: 70px;
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
   border: 1px solid var(--vscode-input-border, transparent);
@@ -138,7 +294,7 @@ button:disabled {
 /* ── Memory grid ───────────────────────────────────────────────── */
 
 .memory-wrap {
-  flex: 1;
+  flex: 1 1 340px;
   min-width: 0;
 }
 
@@ -179,11 +335,47 @@ button:disabled {
   outline-offset: -1px;
 }
 
+/* Légende de la grille. Quatre états, dont trois marqués et un — le code —
+   qui ne l'est pas : c'est le cas par défaut, et le plus fréquent, donc le
+   montrer nu est exact. La pastille reprend le fond et la bordure d'une
+   case, et les règles de zone qui suivent s'appliquent aux deux, pour qu'un
+   changement de couleur ne puisse pas mentir dans un seul des deux endroits.
+
+   Déclaré AVANT ces règles de zone, et pas après : la spécificité suffirait
+   (.legend .swatch.data l'emporte sur .legend .swatch), mais faire dépendre
+   la lisibilité de la légende d'un calcul de spécificité, c'est se préparer
+   une régression au premier remaniement. Ici l'ordre source dit déjà la
+   bonne chose. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8em;
+  opacity: 0.85;
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend .swatch {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-widget-border, transparent);
+}
+
 /* Cells past the end of the assembled program — always 0, never touched.
    Dimmed rather than hidden (still legible if someone wants to check),
    so attention naturally goes to the handful of cells that actually
    matter instead of all 100 carrying equal visual weight. */
-.mailbox.unused {
+.mailbox.unused,
+.legend .swatch.unused {
   opacity: 0.35;
 }
 .mailbox.unused:hover {
@@ -194,9 +386,30 @@ button:disabled {
    plutôt que mises en avant — la pile n'est pas plus importante que le
    programme, elle est simplement ailleurs, et c'est justement ce qu'il faut
    voir : elle descend depuis le haut à mesure qu'on empile. */
-.mailbox.stack {
+.mailbox.stack,
+.legend .swatch.stack {
   border-color: var(--vscode-charts-orange, #d18616);
   border-style: dashed;
+}
+
+/* Cases réservées par un DAT. Pointillé fin et bleu, là où la pile est en
+   tirets et orange : les deux marquages doivent se lire d'un coup d'œil
+   comme deux choses différentes, pas comme deux nuances de la même. Les
+   cases de code, elles, ne portent aucun marquage — c'est le cas par
+   défaut, et le plus fréquent.
+
+   Ce que ce marquage dit exactement : il vient du texte source, pas de la
+   machine. « Une instruction est un nombre comme un autre. Rien ne
+   distingue une case de code d'une case de données : c'est le compteur
+   ordinal qui décide, en s'y arrêtant » (LANGAGE.md). Un STA qui écrirait
+   dans une case de code ne changerait donc pas ces bordures, et un PC qui
+   tombe dans un DAT l'exécutera quand même. Le marquage montre l'intention
+   du programme ; l'écart entre cette intention et ce que fait la machine
+   est justement ce qu'il y a à voir. */
+.mailbox.data,
+.legend .swatch.data {
+  border-color: var(--vscode-charts-blue, #3794ff);
+  border-style: dotted;
 }
 
 /* Registres qui n'entrent en jeu qu'avec les tableaux, les sous-programmes

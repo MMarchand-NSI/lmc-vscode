@@ -6,3 +6,5 @@ node_modules/
 /vendor
 /vscode-extension/out
 /vscode-extension/webview/app.bundle.js
+# Fichiers objets produits par le bouton « Assembler » de l'émulateur.
+*.lmcobj

@@ -32,13 +32,44 @@ there are five registers (`ACC`, `X`, `LR`, `SP`, `PC`) and sixteen mnemonics, i
 subroutines (`JSR`/`RET`) and a stack (`PSH`/`POP`). Programs written for a stock LMC emulator will
 not run here, and the reverse is also true.
 
+## Examples
+
+`examples/` is what the F5 launch config opens, so there is always something to run. The comments
+are in French, like the language reference.
+
+| | |
+|---|---|
+| `test-pgm.lmc`, `fibo.lmc` | integer division and Fibonacci — the eleven classic mnemonics only |
+| `broken.lmc` | deliberately invalid, to see the diagnostics |
+| `tableau.lmc` | an array walked with `lst[X]` |
+| `chaine.lmc` | a string walked to its terminal zero |
+| `double-boucle.lmc` | nested loops: a multiplication table, since the language has no multiply |
+| `sous-programme.lmc` | `JSR`/`RET` — enough as long as calls are not nested |
+| `appel-imbrique-casse.lmc` | a nested call overwrites `LR`: the program loops, on purpose |
+| `appel-imbrique-pile.lmc` | the same program, fixed by saving `LR` with `PSH`/`POP` |
+| `recursion.lmc` | `somme(n) = n + somme(n-1)`, one stack frame per call |
+
+The last three are a progression, in that order: `JSR` alone, the breakage it cannot survive, and
+the stack that repairs it. That order is the one argued for in `lmc_lsp`'s ARCHI.md — the stack is
+introduced because you have just hit the wall that needs it, not because it exists.
+
+Every one of them is run before being committed; none is a program that only looks plausible.
+
 ## Project Structure
 
 ```
 lsp-server.mjs         # LSP entry point: loads vendor/lmc-lsp.bundle.mjs
-examples/              # Opened automatically by the "Run LMC Extension" launch config
-  test-pgm.lmc          # (F5) — a valid program and a deliberately broken one, so
-  broken.lmc            # there's always something to try without editing anything
+examples/              # Opened automatically by the "Run LMC Extension" launch
+  test-pgm.lmc          # config (F5) — see "Examples" below
+  fibo.lmc
+  broken.lmc
+  tableau.lmc
+  chaine.lmc
+  double-boucle.lmc
+  sous-programme.lmc
+  appel-imbrique-casse.lmc
+  appel-imbrique-pile.lmc
+  recursion.lmc
 scripts/
   fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vendor/ (gitignored)
   build-webview.mjs    # Bundles src/webview/ for the browser into vscode-extension/webview/

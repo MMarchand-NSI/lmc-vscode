@@ -43,6 +43,17 @@ pub fn on_input_submit(handler: fn(Int) -> Nil) -> Nil
 @external(javascript, "./app_ffi.mjs", "onMailboxClick")
 pub fn on_mailbox_click(handler: fn(Int) -> Nil) -> Nil
 
+/// L'utilisateur a demandé la production du fichier objet. Le contenu est
+/// calculé par model.object_code puis envoyé à l'hôte, qui seul sait écrire
+/// sur le disque — la webview n'a pas accès au système de fichiers.
+@external(javascript, "./app_ffi.mjs", "onAssembleClick")
+pub fn on_assemble_click(handler: fn() -> Nil) -> Nil
+
+/// L'utilisateur demande le chargement du fichier objet en RAM. La webview
+/// n'a pas accès au disque : elle demande, l'hôte lit et renvoie le contenu.
+@external(javascript, "./app_ffi.mjs", "onLoadClick")
+pub fn on_load_click(handler: fn() -> Nil) -> Nil
+
 /// Raw JSON string of a message from the extension host (setSource,
 /// cursorLine — see webviewPanel.ts for the protocol). Passed as a raw
 /// string rather than decoded here: app.gleam owns the decode, ffi.gleam

@@ -1,0 +1,29 @@
+// La panne qui rend la pile nécessaire. Ce programme ne s'arrête pas.
+//
+// LR ne contient qu'une seule adresse. Ici « paire » appelle « affiche » :
+// le JSR de « paire » a écrit dans LR l'adresse de retour de « paire », puis
+// chaque JSR affiche l'écrase par la sienne. Quand « paire » arrive à son
+// RET, LR ne désigne plus l'appelant mais ce RET lui-même : le programme
+// saute sur place, indéfiniment.
+//
+// Lancez-le pas à pas dans l'émulateur et regardez LR : il change au premier
+// JSR affiche, et l'adresse de retour de « paire » n'existe plus nulle part.
+// Elle n'a pas été perdue par maladresse — rien ne l'avait mise à l'abri.
+//
+// Il affiche 7 et 21, puis boucle jusqu'à la limite de pas.
+// La version qui marche : appel-imbrique-pile.lmc.
+
+        JSR paire
+        HLT             // jamais atteint
+
+paire:  LDA a
+        JSR affiche     // écrase LR : l'adresse de retour de « paire » est perdue
+        LDA b
+        JSR affiche
+        RET             // LR désigne cette ligne : saut sur place
+
+affiche: OUT
+         RET
+
+a:      DAT 7
+b:      DAT 21

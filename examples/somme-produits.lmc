@@ -1,0 +1,75 @@
+// res = somme des i*j pour i et j de 0 à 4. En Python :
+//
+//     res = 0
+//     for i in range(5):
+//         for j in range(5):
+//             res = res + i*j
+//     print(res)
+//
+// Deux boucles en Python, trois ici. Le langage n'a pas de multiplication,
+// donc i*j doit être calculé par additions répétées : c'est la boucle
+// « mult », qui n'existe pas dans le texte Python parce que l'opérateur *
+// la cache. Un niveau d'imbrication de plus, pour un caractère de moins.
+//
+// N'attend aucune entrée. Affiche 100.
+
+        LDA zero
+        STA res
+        STA i
+
+// for i in range(5)
+pouri:  LDA i
+        SUB n
+        BRZ fin
+
+        LDA zero
+        STA j
+
+// for j in range(5)
+pourj:  LDA j
+        SUB n
+        BRZ finj
+
+// prod = i*j, par additions répétées : i ajouté j fois.
+        LDA zero
+        STA prod
+        STA k
+
+mult:   LDA k
+        SUB j
+        BRZ ajout
+        LDA prod
+        ADD i
+        STA prod
+        LDA k
+        ADD un
+        STA k
+        BRA mult
+
+// res = res + i*j
+ajout:  LDA res
+        ADD prod
+        STA res
+
+        LDA j           // j = j + 1
+        ADD un
+        STA j
+        BRA pourj
+
+finj:   LDA i           // i = i + 1
+        ADD un
+        STA i
+        BRA pouri
+
+fin:    LDA res
+        OUT
+        HLT
+
+res:    DAT
+prod:   DAT
+i:      DAT
+j:      DAT
+k:      DAT
+n:      DAT 5
+zero:   DAT 0
+un:     DAT 1

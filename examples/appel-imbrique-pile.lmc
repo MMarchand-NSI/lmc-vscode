@@ -1,0 +1,33 @@
+// Le même programme que appel-imbrique-casse.lmc, réparé par la pile.
+//
+// Rien n'a changé sauf deux lignes au début de « paire » et deux à la fin :
+// le sous-programme sauve LR lui-même avant d'appeler, et le restaure avant
+// de revenir. C'est exactement le prologue d'un vrai processeur (push {lr}
+// sur ARM), et la raison d'être de la pile.
+//
+// PSH empile ACC, POP dépile vers ACC — les deux passent par l'accumulateur,
+// d'où le MOV de part et d'autre. La pile descend depuis la case 99 : dans
+// l'émulateur, SP recule d'une case au PSH et revient au POP.
+//
+// Affiche 7 et 21, puis s'arrête.
+
+        JSR paire
+        HLT
+
+paire:  MOV ACC, LR     // ACC <- l'adresse de retour reçue
+        PSH             // à l'abri : les JSR qui suivent ne détruisent plus rien
+
+        LDA a
+        JSR affiche
+        LDA b
+        JSR affiche
+
+        POP             // ACC <- l'adresse de retour
+        MOV LR, ACC
+        RET
+
+affiche: OUT
+         RET
+
+a:      DAT 7
+b:      DAT 21

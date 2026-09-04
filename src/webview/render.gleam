@@ -27,13 +27,20 @@ pub fn to_json(mdl: Model) -> String {
     #("currentLine", json_option_int(model.current_line(mdl))),
     #("currentAddress", json_option_int(model.current_address(mdl))),
     #("cursorAddress", json_option_int(model.cursor_address(mdl))),
-    #(
-      "instructionText",
-      json_option_string(model.current_instruction_text(mdl)),
-    ),
     #("programLength", json.int(model.program_length(mdl))),
+    // Les cases réservées par un DAT. Voir model.data_addresses : c'est la
+    // provenance du texte, pas une frontière que la machine connaîtrait.
+    #("dataAddresses", json.array(model.data_addresses(mdl), json.int)),
     #("cycle", json_cycle(mdl)),
-    #("loadError", json_option_string(mdl.load_error)),
+    // Un seul bandeau pour deux échecs possibles. L'erreur de chargement
+    // passe devant : c'est celle qui répond à « pourquoi Run ne fait rien ».
+    #(
+      "loadError",
+      json_option_string(option.or(mdl.ram_error, mdl.assembly_error)),
+    ),
+    // Y a-t-il de quoi produire un fichier objet ? Le bouton Assembler s'en
+    // sert pour se désactiver quand le source ne s'assemble pas.
+    #("assembled", json.bool(option.is_some(mdl.assembled))),
   ])
   |> json.to_string
 }
@@ -56,7 +63,9 @@ fn json_memory(mdl: Model) -> Json {
 
 fn json_status(mdl: Model) -> Json {
   case mdl.machine {
-    None -> json.null()
+    None -> json.string("vide")
+    // Rien en RAM : la machine n'est pas « en cours », elle n'existe pas
+    // encore. Un état à part, pour que la grille vide s'explique d'elle-même.
     Some(m) ->
       json.string(case m.status {
         state.Running -> "running"

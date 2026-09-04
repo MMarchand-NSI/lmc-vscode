@@ -1,0 +1,66 @@
+// Deux boucles imbriquées : la table de multiplication de m.
+//
+// Le langage n'a pas d'instruction de multiplication. i x m se calcule donc
+// en ajoutant m à lui-même i fois — c'est la boucle interne. La boucle
+// externe, elle, fait avancer i de 1 à 10. Ici l'imbrication n'est pas une
+// façon d'écrire les choses parmi d'autres : sans elle, il n'y a pas de
+// multiplication.
+//
+// La boucle interne tourne en entier à chaque tour de la boucle externe, et
+// ses deux variables doivent repartir de zéro à chaque fois. Les oublier est
+// l'erreur classique des boucles imbriquées ; ici elle se mesure. Avec m = 7,
+// en retirant l'une ou l'autre des lignes marquées « remise à zéro » :
+//
+//   sans celle de k         7, 7, 7, 7, ...      m n'est ajouté qu'une fois
+//   sans celle de produit   7, 21, 42, 70, ...   les lignes s'additionnent
+//   sans les deux           7, 14, 21, 28, ...   la bonne table
+//
+// Le dernier cas mérite qu'on s'y arrête : les deux oublis se compensent et
+// le programme redevient juste, par accident. Un résultat correct ne prouve
+// pas que le raisonnement l'était.
+//
+// Lit m, affiche 1xm, 2xm, ..., 10xm.
+
+        INP
+        STA m
+
+        LDA zero
+        STA i
+
+// Boucle externe : une ligne de la table par tour.
+ligne:  LDA i
+        SUB n
+        BRZ fin         // i a atteint 10 : la table est finie
+        LDA i
+        ADD un
+        STA i           // i = numéro de la ligne courante, de 1 à 10
+
+        LDA zero
+        STA produit     // remise à zéro
+        STA k           // remise à zéro
+
+// Boucle interne : produit = m ajouté i fois.
+mult:   LDA k
+        SUB i
+        BRZ sortie      // m a été ajouté i fois
+        LDA produit
+        ADD m
+        STA produit
+        LDA k
+        ADD un
+        STA k
+        BRA mult
+
+sortie: LDA produit
+        OUT
+        BRA ligne
+
+fin:    HLT
+
+m:        DAT
+produit:  DAT
+i:        DAT
+k:        DAT
+n:        DAT 10
+zero:     DAT 0
+un:       DAT 1

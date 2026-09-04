@@ -2,52 +2,112 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "LMC",
   "scopeName": "source.lmc",
+  "comment": "Vérifié contre ../lmc_lsp/LANGAGE.md et src/lmc/parse/lexer.gleam (v0.3.0). La liste des mnémoniques et des registres existe donc à deux endroits : ici et dans le lexer du serveur, qui reste la référence. Une évolution du langage doit passer par les deux — c'est ce genre de duplication qui avait laissé le README de ce dépôt affirmer des choses fausses.",
   "patterns": [
-    { "include": "#comments" },
-    { "include": "#numbers" },
-    { "include": "#keywords" },
-    { "include": "#labels" }
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#registers"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#punctuation"
+    }
   ],
   "repository": {
     "comments": {
       "patterns": [
         {
-          "comment": "Only '//' opens a comment. ';' used to be highlighted as one here, but the lexer in lmc_lsp has never accepted it \u2014 a ';' line was coloured as a comment while the server reported 'mn\u00e9monique attendu' on it.",
+          "comment": "Only '//' opens a comment. ';' used to be highlighted as one here, but the lexer in lmc_lsp has never accepted it — a ';' line was coloured as a comment while the server reported 'mnémonique attendu' on it.",
           "name": "comment.line.double-slash.lmc",
           "match": "//.*$"
         }
       ]
     },
-    "numbers": {
+    "strings": {
       "patterns": [
         {
-          "name": "constant.numeric.lmc",
-          "match": "-?\\b[0-9]+\\b"
+          "comment": "DAT \"ABCD\" — codes de caractères ISO-8859-1 suivis d'un zéro terminal. Pas d'échappement : le guillemet suivant ferme la chaîne.",
+          "name": "string.quoted.double.lmc",
+          "match": "\"[^\"\\n]*\""
+        },
+        {
+          "comment": "Une chaîne ne franchit pas la fin de ligne (lexer.gleam, état InString) : un guillemet oublié est une erreur, pas le début d'une chaîne qui avale le reste du fichier.",
+          "name": "invalid.illegal.unterminated-string.lmc",
+          "match": "\"[^\"\\n]*$"
         }
       ]
     },
     "keywords": {
       "patterns": [
         {
+          "comment": "Les seize mnémoniques, insensibles à la casse.",
           "name": "keyword.control.lmc",
-          "match": "(?i)\\b(ADD|SUB|STA|LDA|BRA|BRZ|BRP|INP|OUT|HLT|DAT)\\b"
+          "match": "(?i)\\b(ADD|SUB|STA|LDA|MOV|BRA|BRZ|BRP|JSR|RET|HLT|PSH|POP|INP|OUT|DAT)\\b"
+        }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "comment": "Les cinq registres sont des mots réservés, reconnus par le lexer au même titre que les mnémoniques — un label ne peut pas s'appeler X ni SP.",
+          "name": "variable.language.register.lmc",
+          "match": "(?i)\\b(ACC|X|LR|SP|PC)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "comment": "Pas de littéral négatif : DAT -1 n'existe pas, le '-' reste donc hors du nombre.",
+          "name": "constant.numeric.lmc",
+          "match": "\\b[0-9]+\\b"
         }
       ]
     },
     "labels": {
       "patterns": [
         {
-          "comment": "Label definition: a name at the start of a line followed by ':'. The ':' is what makes this unambiguous \u2014 before it was mandatory, every identifier had to be coloured as a label, operands included.",
-          "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(:)",
+          "comment": "Label definition: a name at the start of a line followed by ':'. The ':' is what makes this unambiguous — before it was mandatory, every identifier had to be coloured as a label, operands included. Un identifiant est fait de lettres et de chiffres, sans souligné (lexer.gleam, is_alnum).",
+          "match": "^\\s*([A-Za-z][A-Za-z0-9]*)\\s*(:)",
           "captures": {
-            "1": { "name": "entity.name.label.lmc" },
-            "2": { "name": "punctuation.separator.label.lmc" }
+            "1": {
+              "name": "entity.name.label.lmc"
+            },
+            "2": {
+              "name": "punctuation.separator.label.lmc"
+            }
           }
         },
         {
-          "comment": "Label reference in operand position \u2014 anything left after keywords and numbers have had their turn.",
+          "comment": "Label reference in operand position — anything left after keywords, registers and numbers have had their turn.",
           "name": "variable.other.lmc",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+          "match": "\\b[A-Za-z][A-Za-z0-9]*\\b"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.comma.lmc",
+          "match": ","
+        },
+        {
+          "comment": "Crochets de l'adressage indexé : dans lst[X], le X est coloré par la règle des registres, comme partout ailleurs.",
+          "name": "punctuation.section.brackets.lmc",
+          "match": "[\\[\\]]"
         }
       ]
     }
