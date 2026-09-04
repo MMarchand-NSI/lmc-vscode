@@ -408,15 +408,38 @@ fn describe_instruction(instr: ast.Instruction) -> String {
     // source, pas une case : elle les montre donc toutes.
     ast.Dat(values, _) ->
       "DAT " <> string.join(list.map(values, int.to_string), ", ")
+    ast.Mov(destination, source, _) ->
+      "MOV "
+      <> mov_side_text(destination)
+      <> ", "
+      <> mov_side_text(source)
+      <> " — déplacer une valeur"
     ast.Invalid(_) -> "?"
   }
 }
 
 fn operand_text(op: ast.Operand) -> String {
   case op {
-    ast.LabelRef(name, _) -> name
-    ast.Immediate(v, _) -> int.to_string(v)
+    ast.LabelRef(name, addressing, _) -> name <> index_suffix(addressing)
+    ast.Immediate(v, addressing, _) ->
+      int.to_string(v) <> index_suffix(addressing)
     ast.MissingOperand(_) -> ""
+  }
+}
+
+fn index_suffix(addressing: ast.Addressing) -> String {
+  case addressing {
+    ast.Indexed -> "[X]"
+    ast.Direct -> ""
+  }
+}
+
+fn mov_side_text(side: ast.MovSide) -> String {
+  case side {
+    ast.MovRegister(ast.Acc, _) -> "ACC"
+    ast.MovRegister(ast.X, _) -> "X"
+    ast.MovMemory(op) -> operand_text(op)
+    ast.MovMissing(_) -> ""
   }
 }
 
@@ -445,6 +468,10 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
     event.AccumulatorChanged(old, new) -> #(
       "Execute",
       "ACC " <> int.to_string(old) <> " → " <> int.to_string(new),
+    )
+    event.IndexChanged(old, new) -> #(
+      "Execute",
+      "X " <> int.to_string(old) <> " → " <> int.to_string(new),
     )
     event.Halted -> #("Execute", "HLT")
     event.InputRequested -> #("Execute", "en attente d'une entrée…")
@@ -505,26 +532,55 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
       raw <> " → OUT (" <> circuit_note("écriture de la sortie") <> ")"
     instruction.Hlt ->
       raw <> " → HLT (" <> circuit_note("arrêt du processeur") <> ")"
-    instruction.Add(a) ->
-      decoded_with_address(raw, "ADD", a, circuit_note("une addition"))
-    instruction.Sub(a) ->
-      decoded_with_address(raw, "SUB", a, circuit_note("une soustraction"))
-    instruction.Sta(a) ->
-      decoded_with_address(raw, "STA", a, circuit_note("stockage en mémoire"))
-    instruction.Lda(a) ->
-      decoded_with_address(
+    instruction.Add(a, m) ->
+      decoded_with_address(raw, "ADD", a, m, circuit_note("une addition"))
+    instruction.Sub(a, m) ->
+      decoded_with_address(raw, "SUB", a, m, circuit_note("une soustraction"))
+
+    // Un mot comme 5042 peut se lire « LDA 42 » ou « MOV ACC, 42 » : c'est
+    // le même mot, il n'y a pas de bonne réponse déductible. On montre la
+    // forme générale, avec le raccourci en regard quand il en existe un —
+    // l'équivalence est ainsi visible à chaque cycle plutôt qu'à expliquer
+    // une fois pour toutes.
+    instruction.Load(register, a, m) ->
+      decoded_move(
         raw,
-        "LDA",
-        a,
+        register_name(register),
+        memory_text(a, m),
+        alias("LDA", register, a, m),
         circuit_note("chargement depuis la mémoire"),
       )
+    instruction.Store(register, a, m) ->
+      decoded_move(
+        raw,
+        memory_text(a, m),
+        register_name(register),
+        alias("STA", register, a, m),
+        circuit_note("stockage en mémoire"),
+      )
+    instruction.Move(destination, source) ->
+      decoded_move(
+        raw,
+        register_name(destination),
+        register_name(source),
+        "",
+        circuit_note("un transfert entre registres"),
+      )
+
     instruction.Bra(a) ->
-      decoded_with_address(raw, "BRA", a, circuit_note("un saut"))
+      decoded_with_address(
+        raw,
+        "BRA",
+        a,
+        instruction.Direct,
+        circuit_note("un saut"),
+      )
     instruction.Brz(a) ->
       decoded_with_address(
         raw,
         "BRZ",
         a,
+        instruction.Direct,
         circuit_note("un saut conditionnel (si ACC = 0)"),
       )
     instruction.Brp(a) ->
@@ -532,9 +588,72 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
         raw,
         "BRP",
         a,
+        instruction.Direct,
         circuit_note("un saut conditionnel (si ACC ≥ 0)"),
       )
   }
+}
+
+fn register_name(register: instruction.Register) -> String {
+  case register {
+    instruction.Acc -> "ACC"
+    instruction.X -> "X"
+  }
+}
+
+/// Notation d'une case en position d'opérande de MOV : « mem[2] », la même
+/// que celle déjà employée pour la phase Fetch.
+fn memory_text(address: Int, mode: instruction.Addressing) -> String {
+  case mode {
+    instruction.Direct -> "mem[" <> int.to_string(address) <> "]"
+    instruction.Indexed -> "mem[" <> int.to_string(address) <> "+X]"
+  }
+}
+
+/// Formulation des instructions qui ne sont pas des MOV : on garde
+/// « adresse N », le mot qu'employait déjà l'explication.
+fn address_text(address: Int, mode: instruction.Addressing) -> String {
+  case mode {
+    instruction.Direct -> "adresse " <> int.to_string(address)
+    instruction.Indexed -> "adresse " <> int.to_string(address) <> " + X"
+  }
+}
+
+/// Le raccourci historique, quand il en existe un : seules les formes sur
+/// l'accumulateur en adressage direct s'écrivaient `LDA` ou `STA`.
+fn alias(
+  mnemonic: String,
+  register: instruction.Register,
+  address: Int,
+  mode: instruction.Addressing,
+) -> String {
+  case register, mode {
+    instruction.Acc, instruction.Direct ->
+      mnemonic <> " " <> int.to_string(address)
+    _, _ -> ""
+  }
+}
+
+fn decoded_move(
+  raw: String,
+  destination: String,
+  source: String,
+  alias_text: String,
+  note: String,
+) -> String {
+  let shortcut = case alias_text {
+    "" -> ""
+    _ -> " (alias " <> alias_text <> ")"
+  }
+  raw
+  <> " → MOV "
+  <> destination
+  <> ", "
+  <> source
+  <> shortcut
+  <> " ("
+  <> note
+  <> ")"
 }
 
 fn circuit_note(purpose: String) -> String {
@@ -545,13 +664,14 @@ fn decoded_with_address(
   raw: String,
   mnemonic: String,
   address: Int,
+  mode: instruction.Addressing,
   note: String,
 ) -> String {
   raw
   <> " → "
   <> mnemonic
-  <> ", adresse "
-  <> int.to_string(address)
+  <> ", "
+  <> memory_text(address, mode)
   <> " ("
   <> note
   <> ")"
