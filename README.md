@@ -8,35 +8,29 @@ A Visual Studio Code extension for the **Little Man Computer (LMC)** assembly la
   - undefined labels
   - duplicate label definitions
   - missing `HLT` instruction
-  - programs exceeding 100 instructions
+  - programs whose code and data exceed the 100 memory cells
 - **Hover** — shows where a label is defined and how many times it is referenced
 - **Go to Definition** — jump to the line where a label is defined
 - **Find References** — list every line that references a label
 - **Completion** — auto-complete LMC mnemonics (with descriptions) and labels defined in the current file
 - **Formatting** — canonical reformatting of the whole document
 - **Emulator webview** — "LMC: Open Emulator" command: a step-through visual emulator (memory grid,
-  ACC/PC, input/output trays) synced bidirectionally with the source editor — see
+  registers, input/output trays) synced bidirectionally with the source editor — see
   [Emulator webview](#emulator-webview)
 
-## LMC Instruction Set
+## The LMC language
 
-| Mnemonic | Operation |
-|---|---|
-| `ADD addr` | ACC = ACC + mem[addr] |
-| `SUB addr` | ACC = ACC − mem[addr] |
-| `STA addr` | mem[addr] = ACC |
-| `LDA addr` | ACC = mem[addr] |
-| `BRA addr` | branch always to addr |
-| `BRZ addr` | branch to addr if ACC = 0 |
-| `BRP addr` | branch to addr if ACC ≥ 0 |
-| `INP` | ACC = next input value |
-| `OUT` | output ACC |
-| `HLT` | halt execution |
-| `DAT [n]` | define data cell (default 0) |
+The language reference — instructions, registers, addressing, encoding, diagnostics — lives with
+the language itself, in
+[lmc_lsp/LANGAGE.md](https://github.com/MMarchand-NSI/lmc_lsp/blob/master/LANGAGE.md) (in French).
+It is deliberately not duplicated here: this README used to carry its own instruction table, and
+that table drifted into claiming things that were false — that labels were case-insensitive, and
+that `;` opened a comment. One source of truth is worth the extra click.
 
-A label definition ends with `:` (`loop:`, `total: DAT 0`); in operand position the label is
-written without one (`BRA loop`). A label may sit alone on its line, in which case it names the
-next line that carries an instruction. Mnemonics are case-insensitive. Comments start with `//`.
+In short: this variant extends the classic LMC. The machine word is four digits rather than three,
+there are five registers (`ACC`, `X`, `LR`, `SP`, `PC`) and sixteen mnemonics, including `MOV`,
+subroutines (`JSR`/`RET`) and a stack (`PSH`/`POP`). Programs written for a stock LMC emulator will
+not run here, and the reverse is also true.
 
 ## Project Structure
 
