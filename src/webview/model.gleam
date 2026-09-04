@@ -480,8 +480,10 @@ fn group_consecutive_by_phase(
 /// code. It can't: the label "total" the programmer wrote is long gone by
 /// this point, only the numeric address 21 survives — decode only ever
 /// recovers *that*, via the same arithmetic split lmc_lsp's own
-/// instruction.decode uses (raw / 100 for the opcode, raw % 100 for the
-/// address). instruction.encode(instr) reconstructs the raw number here —
+/// instruction.decode uses. The machine word is four digits, O M AA: the
+/// opcode is raw / 1000, the addressing mode raw % 1000 / 100 (always 0 for
+/// now — indexed and indirect are reserved) and the address raw % 100.
+/// instruction.encode(instr) reconstructs the raw number here —
 /// the exact inverse of decode, so it's always the same value Fetch showed.
 ///
 /// Also names what decode is *for*: it doesn't do the operation (no

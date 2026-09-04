@@ -266,19 +266,20 @@ pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
   assert decode.details
     == [
-      "902 → OUT (configuration des circuits du processeur pour écriture de la sortie)",
+      "9002 → OUT (configuration des circuits du processeur pour écriture de la sortie)",
     ]
 }
 
 pub fn decode_shows_the_raw_number_with_an_address_test() {
   // "total" est à l'adresse 2 (ligne 2) — l'assembleur a résolu le label
   // vers ce numéro, le nom "total" lui-même n'existe plus dans le mot
-  // mémoire assemblé (302 = 3·100 + 2).
+  // mémoire assemblé (3002 = 3·1000 + 2, soit opcode 3, mode direct,
+  // adresse 02).
   let m = model.init("STA total\nHLT\ntotal: DAT 0\n") |> model.step
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
   assert decode.details
     == [
-      "302 → STA, adresse 2 (configuration des circuits du processeur pour stockage en mémoire)",
+      "3002 → STA, adresse 2 (configuration des circuits du processeur pour stockage en mémoire)",
     ]
 }
 
