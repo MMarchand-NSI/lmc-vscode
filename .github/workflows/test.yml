@@ -12,12 +12,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+
+      # Le binaire gleam est autonome (écrit en Rust) et ce projet cible
+      # JavaScript : Erlang n'intervient nulle part. `erlef/setup-beam`
+      # n'était là que parce que c'est la façon habituelle d'obtenir gleam,
+      # et elle installait OTP et rebar3 avec, pour rien — vérifié en
+      # neutralisant erl/erlc/escript/rebar3 : `gleam test` et
+      # `gleam format --check` passent sans qu'aucun soit appelé.
+      # Télécharger le binaire, c'est aussi la recette de lmc_lsp.
+      - name: Install Gleam
+        run: |
+          VERSION="1.18.1"
+          curl -fsSL "https://github.com/gleam-lang/gleam/releases/download/v${VERSION}/gleam-v${VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            | tar -xz -C /tmp
+          sudo mv /tmp/gleam /usr/local/bin/gleam
+
+      # `gleam test` s'exécute sous node (target = "javascript"). Il était
+      # jusqu'ici pris sur l'image du runner, sans version fixée : elle
+      # change sans prévenir.
+      - uses: actions/setup-node@v4
         with:
-          otp-version: "28"
-          gleam-version: "1.14.0"
-          rebar3-version: "3"
-          # elixir-version: "1"
+          node-version: "20"
 
       # gleam.toml depends on the private MMarchand-NSI/lmc_lsp repo over
       # git (Emulator API — see CLAUDE.md). `gleam deps download` shells out

@@ -88,7 +88,8 @@ manually opening a folder each time. `vscode-extension/.vscode/launch.json` has 
 Extension" config for when `vscode-extension/` itself is the open workspace instead of the repo root
 (it used to be misnamed `lauch.json` and silently invisible to VS Code — fixed).
 
-CI (`.github/workflows/test.yml`) runs on OTP 28 / gleam 1.14.0: it first configures SSH access to
+CI (`.github/workflows/test.yml`) runs on gleam 1.18.1 and node 20, with no Erlang at all (the
+gleam binary is standalone and this project targets JavaScript): it first configures SSH access to
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites
 `https://github.com/` git URLs to SSH via `git config --global url.insteadOf`), then runs `gleam deps
 download`, `gleam test`, `gleam format --check src test`. It doesn't touch the LSP bundle at all —
