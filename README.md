@@ -34,7 +34,9 @@ A Visual Studio Code extension for the **Little Man Computer (LMC)** assembly la
 | `HLT` | halt execution |
 | `DAT [n]` | define data cell (default 0) |
 
-Labels are case-insensitive. Comments start with `//` or `;`.
+A label definition ends with `:` (`loop:`, `total: DAT 0`); in operand position the label is
+written without one (`BRA loop`). A label may sit alone on its line, in which case it names the
+next line that carries an instruction. Mnemonics are case-insensitive. Comments start with `//`.
 
 ## Project Structure
 

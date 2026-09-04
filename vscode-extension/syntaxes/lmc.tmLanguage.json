@@ -12,12 +12,9 @@
     "comments": {
       "patterns": [
         {
+          "comment": "Only '//' opens a comment. ';' used to be highlighted as one here, but the lexer in lmc_lsp has never accepted it \u2014 a ';' line was coloured as a comment while the server reported 'mn\u00e9monique attendu' on it.",
           "name": "comment.line.double-slash.lmc",
           "match": "//.*$"
-        },
-        {
-          "name": "comment.line.semicolon.lmc",
-          "match": ";.*$"
         }
       ]
     },
@@ -40,7 +37,16 @@
     "labels": {
       "patterns": [
         {
-          "name": "entity.name.label.lmc",
+          "comment": "Label definition: a name at the start of a line followed by ':'. The ':' is what makes this unambiguous \u2014 before it was mandatory, every identifier had to be coloured as a label, operands included.",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(:)",
+          "captures": {
+            "1": { "name": "entity.name.label.lmc" },
+            "2": { "name": "punctuation.separator.label.lmc" }
+          }
+        },
+        {
+          "comment": "Label reference in operand position \u2014 anything left after keywords and numbers have had their turn.",
+          "name": "variable.other.lmc",
           "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
         }
       ]

@@ -175,10 +175,9 @@ pub fn cursor_line_on_blank_line_has_no_address_test() {
 }
 
 pub fn labels_dont_shift_the_address_line_map_test() {
-  // Un label sur sa propre ligne (ADS: pas d'instruction) décale les
-  // adresses par rapport aux numéros de ligne — vérifie que le mapping
-  // suit bien les *lignes*, pas un compteur d'instructions naïf.
-  let m = model.init("start INP\nOUT\nHLT\n")
+  // Un label décale la colonne mais pas les adresses — vérifie que le
+  // mapping suit bien les *lignes*, pas un compteur d'instructions naïf.
+  let m = model.init("start: INP\nOUT\nHLT\n")
   assert model.line_for_address(m, 0) == Some(0)
   assert model.line_for_address(m, 1) == Some(1)
   assert model.line_for_address(m, 2) == Some(2)
@@ -187,7 +186,7 @@ pub fn labels_dont_shift_the_address_line_map_test() {
 // ── Légende d'instruction / longueur du programme ─────────────────
 
 pub fn current_instruction_text_mnemonic_with_operand_test() {
-  let m = model.init("STA total\nHLT\ntotal DAT 0\n")
+  let m = model.init("STA total\nHLT\ntotal: DAT 0\n")
   assert model.current_instruction_text(m) == Some("STA total — stocker ACC")
 }
 
@@ -275,7 +274,7 @@ pub fn decode_shows_the_raw_number_with_an_address_test() {
   // "total" est à l'adresse 2 (ligne 2) — l'assembleur a résolu le label
   // vers ce numéro, le nom "total" lui-même n'existe plus dans le mot
   // mémoire assemblé (302 = 3·100 + 2).
-  let m = model.init("STA total\nHLT\ntotal DAT 0\n") |> model.step
+  let m = model.init("STA total\nHLT\ntotal: DAT 0\n") |> model.step
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
   assert decode.details
     == [
@@ -312,7 +311,7 @@ pub fn add_accumulator_change_is_not_deduped_test() {
   // décrivent le même fait) — ADD n'émet qu'un seul AccumulatorChanged, il
   // ne doit surtout pas être filtré par erreur.
   let m =
-    model.init("LDA n\nADD n\nHLT\nn DAT 5\n")
+    model.init("LDA n\nADD n\nHLT\nn: DAT 5\n")
     |> model.step
     |> model.step
   let assert [_fetch, _decode, execute] = model.last_cycle(m)

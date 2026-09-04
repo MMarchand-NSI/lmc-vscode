@@ -1,31 +1,39 @@
-start   INP
-        STA n
-        LDA zero
-        STA a
-        LDA one
-        STA b
-        LDA n
-        BRZ done
+// Suite de Fibonacci : lit n, affiche les n premiers termes
+// (0, 1, 1, 2, 3, 5, ...).
+//
+// Une définition de label se termine par « : » ; en position d'opérande le
+// label s'écrit sans, puisqu'il n'y a rien à y définir.
 
-loop    LDA b
+start:  INP             // n = nombre de termes à afficher
+        STA n
+        LDA zero        // a = 0
+        STA a
+        LDA one         // b = 1
+        STA b
+
+loop:   LDA n           // reste-t-il un terme à afficher ?
+        BRZ done
+        SUB one         // n = n - 1
+        STA n
+
+        LDA a           // afficher le terme courant
         OUT
-        LDA a
+
+        LDA a           // temp = a + b
         ADD b
         STA temp
-        LDA b
+        LDA b           // a = b
         STA a
-        LDA temp
+        LDA temp        // b = temp
         STA b
-        LDA n
-        SUB one
-        STA n
-        BRP loop
 
-done    HLT
+        BRA loop
 
-zero    DAT 0
-one     DAT 1
-a       DAT
-b       DAT
-temp    DAT
-n       DAT
+done:   HLT
+
+zero:   DAT 0
+one:    DAT 1
+a:      DAT
+b:      DAT
+temp:   DAT
+n:      DAT
