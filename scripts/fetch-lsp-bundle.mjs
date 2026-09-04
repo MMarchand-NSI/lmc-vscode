@@ -6,7 +6,7 @@
 // Usage:
 //   node scripts/fetch-lsp-bundle.mjs [version]
 //
-// `version` defaults to the LMC_LSP_VERSION env var, or v0.2.0 if unset.
+// `version` defaults to the LMC_LSP_VERSION env var, or v0.3.0 if unset.
 // The result is written to vendor/lmc-lsp.bundle.mjs (gitignored — re-run
 // this script to pick it up, it is not committed).
 //
@@ -26,7 +26,7 @@ const run = promisify(execFile);
 const REPO = "MMarchand-NSI/lmc_lsp";
 const ASSET = "lmc-lsp.bundle.mjs";
 
-const version = process.argv[2] ?? process.env.LMC_LSP_VERSION ?? "v0.2.0";
+const version = process.argv[2] ?? process.env.LMC_LSP_VERSION ?? "v0.3.0";
 const here = dirname(fileURLToPath(import.meta.url));
 const destDir = join(here, "..", "vendor");
 

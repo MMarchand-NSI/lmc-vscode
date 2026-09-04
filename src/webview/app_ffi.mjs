@@ -105,17 +105,25 @@ function renderMemory(state) {
     // execution — a separate, lighter highlight (see style.css).
     cell.classList.toggle("current", addr === state.currentAddress);
     cell.classList.toggle("cursor", addr === state.cursorAddress);
+    // Trois zones, qui sont l'image mémoire elle-même : le programme en bas,
+    // la pile en haut, et le vide entre les deux. Tout ce qui est au-dessus
+    // de SP a été empilé — c'est ce qui rend visible la pile qui descend
+    // pendant une récursion.
+    const stacked =
+      state.sp !== null && state.sp !== undefined && addr > state.sp;
+    cell.classList.toggle("stack", stacked);
     // Dim cells the assembled program never touches, so attention goes to
     // the handful that matter instead of all 100 looking equally relevant.
-    cell.classList.toggle("unused", addr >= programLength);
+    cell.classList.toggle("unused", addr >= programLength && !stacked);
   }
 }
 
 function renderRegisters(state) {
-  document.getElementById("acc").textContent =
-    state.acc === null || state.acc === undefined ? "—" : String(state.acc);
-  document.getElementById("pc").textContent =
-    state.pc === null || state.pc === undefined ? "—" : String(state.pc);
+  for (const name of ["acc", "pc", "x", "lr", "sp"]) {
+    const value = state[name];
+    document.getElementById(name).textContent =
+      value === null || value === undefined ? "—" : String(value);
+  }
 }
 
 function renderInstruction(state) {

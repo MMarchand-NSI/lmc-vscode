@@ -13,6 +13,12 @@ pub fn to_json(mdl: Model) -> String {
     #("memory", json_memory(mdl)),
     #("acc", json_or_null(mdl.machine, fn(m) { json.int(m.accumulator) })),
     #("pc", json_or_null(mdl.machine, fn(m) { json.int(m.program_counter) })),
+    #("x", json_or_null(mdl.machine, fn(m) { json.int(m.index) })),
+    #("lr", json_or_null(mdl.machine, fn(m) { json.int(m.link) })),
+    // Le pointeur de pile sert deux fois : à l'afficher, et à savoir dans la
+    // grille où commence la pile — tout ce qui est au-dessus de SP a été
+    // empilé.
+    #("sp", json_or_null(mdl.machine, fn(m) { json.int(m.stack_pointer) })),
     #("status", json_status(mdl)),
     #(
       "output",

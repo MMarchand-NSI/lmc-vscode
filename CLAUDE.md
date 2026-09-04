@@ -245,10 +245,16 @@ never just code review):
 
 - LSP integration (`lsp-server.mjs` → `vendor/lmc-lsp.bundle.mjs`), no fallback.
 - Emulator API as an `lmc_lsp` git dependency; CI pulls it over the `LMC_LSP_DEPLOY_KEY` deploy key.
-- `lmc_lsp`'s own release pipeline, publishing tagged bundles — this repo currently pinned to `v0.1.6`.
+- `lmc_lsp`'s own release pipeline, publishing tagged bundles — this repo pins a tag in two places,
+  `gleam.toml` and `scripts/fetch-lsp-bundle.mjs`, and both must move together.
 - Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
   Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
   session-style current-line decoration).
+- All five registers are shown (`ACC`, `PC`, then `X`, `LR`, `SP` more discreetly, since they only
+  come into play with arrays, subroutines and the stack), and the memory grid distinguishes three
+  zones — the program at the bottom, the stack above `SP`, the unused middle dimmed. Watching the
+  stack grow cell by cell during a recursion is the point of that last one: a stack you cannot see
+  is a stack you cannot teach.
 - A long list of real bugs caught by actually exercising the extension/webview, not by guessing:
   hover-on-operand, missing HLT/length diagnostics, a confusing mnemonic error message, blank lines
   silently becoming an implicit HLT (`lmc_lsp`, the most serious one), a stale `TextEditor` reference

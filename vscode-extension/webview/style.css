@@ -190,6 +190,24 @@ button:disabled {
   opacity: 0.7;
 }
 
+/* Cases occupées par la pile : tout ce qui est au-dessus de SP. Marquées
+   plutôt que mises en avant — la pile n'est pas plus importante que le
+   programme, elle est simplement ailleurs, et c'est justement ce qu'il faut
+   voir : elle descend depuis le haut à mesure qu'on empile. */
+.mailbox.stack {
+  border-color: var(--vscode-charts-orange, #d18616);
+  border-style: dashed;
+}
+
+/* Registres qui n'entrent en jeu qu'avec les tableaux, les sous-programmes
+   et la pile : présents mais en retrait, pour ne pas encombrer les premières
+   séances. */
+.register.secondary .value {
+  font-size: 1.1em;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
 /* ── Fetch/Decode/Execute panel ───────────────────────────────────
    Collapsed by default (native <details>, no JS needed for the fold) —
    the point is that it's available for the lesson on "what a CPU cycle

@@ -8,6 +8,12 @@ pub fn valid_program_renders_expected_fields_test() {
   assert string.contains(json, "\"status\":\"running\"")
   assert string.contains(json, "\"pc\":0")
   assert string.contains(json, "\"acc\":0")
+  assert string.contains(json, "\"x\":0")
+  assert string.contains(json, "\"lr\":0")
+  // La pile part du haut : SP désigne la prochaine case libre, donc 99 sur
+  // une machine fraîchement chargée. C'est aussi ce qui permet à la grille
+  // de savoir où commence la zone empilée.
+  assert string.contains(json, "\"sp\":99")
   assert string.contains(json, "\"currentLine\":0")
   assert string.contains(json, "\"loadError\":null")
   // 100 mots mémoire, séparés par des virgules -> 99 virgules dans le tableau
@@ -18,6 +24,7 @@ pub fn program_with_error_renders_null_machine_fields_test() {
   let json = model.init("XXX\n") |> render.to_json
   assert string.contains(json, "\"status\":null")
   assert string.contains(json, "\"pc\":null")
+  assert string.contains(json, "\"sp\":null")
   assert string.contains(json, "\"memory\":null")
   assert string.contains(json, "\"loadError\":\"")
 }
