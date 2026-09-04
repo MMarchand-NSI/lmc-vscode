@@ -411,6 +411,8 @@ fn describe_instruction(instr: ast.Instruction) -> String {
     ast.Jsr(op, _) ->
       "JSR " <> operand_text(op) <> " — appeler un sous-programme"
     ast.Ret(_) -> "RET — revenir au dernier appelant"
+    ast.Psh(_) -> "PSH — empiler l'accumulateur"
+    ast.Pop(_) -> "POP — dépiler vers l'accumulateur"
     ast.Mov(destination, source, _) ->
       "MOV "
       <> mov_side_text(destination)
@@ -442,6 +444,7 @@ fn mov_side_text(side: ast.MovSide) -> String {
     ast.MovRegister(ast.Acc, _) -> "ACC"
     ast.MovRegister(ast.X, _) -> "X"
     ast.MovRegister(ast.Lr, _) -> "LR"
+    ast.MovRegister(ast.Sp, _) -> "SP"
     ast.MovRegister(ast.Pc, _) -> "PC"
     ast.MovMemory(op) -> operand_text(op)
     ast.MovMissing(_) -> ""
@@ -488,6 +491,10 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
     )
     // Un saut est une écriture dans le compteur ordinal, et le dire est tout
     // l'intérêt : « revenir » d'un sous-programme n'est rien d'autre.
+    event.StackPointerChanged(old, new) -> #(
+      "Execute",
+      "SP " <> int.to_string(old) <> " → " <> int.to_string(new),
+    )
     event.Jumped(from, to) -> #(
       "Execute",
       "PC "
@@ -590,6 +597,10 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
         circuit_note("un transfert entre registres"),
       )
 
+    instruction.Push ->
+      raw <> " → PSH (" <> circuit_note("empilement de l'accumulateur") <> ")"
+    instruction.Pop ->
+      raw <> " → POP (" <> circuit_note("dépilement vers l'accumulateur") <> ")"
     instruction.Jsr(a) ->
       decoded_with_address(
         raw,
@@ -630,6 +641,7 @@ fn register_name(register: instruction.Register) -> String {
     instruction.Acc -> "ACC"
     instruction.X -> "X"
     instruction.Lr -> "LR"
+    instruction.Sp -> "SP"
     instruction.Pc -> "PC"
   }
 }
