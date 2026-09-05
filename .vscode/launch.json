@@ -7,6 +7,12 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}/vscode-extension",
+        // Copilot s'active tout seul dans la fenêtre de développement
+        // (activationEvent 'onChatSession:copilotcli') et complète à la frappe
+        // sans qu'on lui demande rien. Son thread « TikToken worker » a tué
+        // l'extension host deux fois le 2026-09-05 (signal 5, dmesg), ce qui
+        // ferme la fenêtre F5 puisque c'est le processus débogué.
+        "--disable-extension=GitHub.copilot-chat",
         "${workspaceFolder}/examples"
       ]
     }

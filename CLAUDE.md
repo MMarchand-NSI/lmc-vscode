@@ -97,6 +97,18 @@ manually opening a folder each time. `vscode-extension/.vscode/launch.json` has 
 Extension" config for when `vscode-extension/` itself is the open workspace instead of the repo root
 (it used to be misnamed `lauch.json` and silently invisible to VS Code — fixed).
 
+That config passes `--disable-extension=GitHub.copilot-chat`, and the reason is a crash, not a
+preference. The Extension Development Host inherits the user's extensions, and VS Code's built-in
+Copilot activates itself there (`activationEvent: 'onChatSession:copilotcli'`, 144 ms after the host
+starts) and completes as you type without being asked. On 2026-09-05 its `TikToken worker` thread
+took a fatal signal 5 twice, at 06:08:59 and 06:25:51 (`dmesg`: `trap int3 ... in node`, no OOM, 21
+GiB free), which kills the whole extension host process. Under `F5` that process is the debuggee, so
+its death closes the development window, mid-edit, with no error dialog. Both crashed hosts are the
+ones that had activated `lmc-vscode.lmc-vscode`; the LMC extension itself is not implicated (its
+language server is a separate forked process, plain JS, no native module). Why the tokenizer aborts
+is unknown, and the flag does not answer it, it only keeps it out of this window. If a development
+window dies again, `dmesg | grep CaptureCrash` says in one line whether it is the same cause.
+
 CI (`.github/workflows/test.yml`) runs on gleam 1.18.1 and node 20, with no Erlang at all (the
 gleam binary is standalone and this project targets JavaScript): it first configures SSH access to
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites
