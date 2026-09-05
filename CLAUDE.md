@@ -316,3 +316,9 @@ Still open, roughly in the order it's worth tackling them:
    VS Code client using it.
 5. **The VS Code extension itself isn't packaged/published anywhere** — `npx vsce package` works
    locally, but there's no CI job building a `.vsix`, let alone a Marketplace listing.
+6. **Renaming the language is under consideration** — `LMC` stands for Little Man Computer and the
+   Man has to go. The analysis (candidates, what rules each one out, and the cost layer by layer)
+   lives in `lmc_lsp`'s CLAUDE.md under "Envisagé, pas fait", because the language is its business,
+   not this repo's. Only the ordering matters here: the **file extension goes first or never**,
+   since every `.lmc` written meanwhile is one more file to rename — and this repo owns the
+   extension, the `lmc` language id, the `source.lmc` grammar scope and nine example programs.
