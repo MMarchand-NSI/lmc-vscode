@@ -32,7 +32,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the fetch script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.1.6" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.3.1" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -76,7 +76,9 @@ VS Code extension (separate npm project in `vscode-extension/`):
 ```sh
 cd vscode-extension
 npm install
-npx tsc              # or `npm run compile` — compiles client.ts to out/client.js
+npm run compile      # compiles client.ts to out/client.js — prefer this over `npx tsc`,
+                     #   which downloads and runs an unrelated registry package named
+                     #   `tsc` if the local typescript isn't resolvable from the cwd
 npx vsce package      # package as .vsix
 ```
 
@@ -108,15 +110,20 @@ deploy key, and don't leave the private key material on disk anywhere once it's 
 VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fetched from lmc_lsp releases)
 ```
 
-- **`vscode-extension/client.ts`** — the extension host. On activate, it spawns
-  `node <repo-root>/lsp-server.mjs` (one directory above the extension itself) via
-  `vscode-languageclient`, scoped to files with language id `lmc`.
+- **`vscode-extension/client.ts`** — the extension host. On activate, it hands
+  `<repo-root>/lsp-server.mjs` (one directory above the extension itself) to
+  `vscode-languageclient` as a `module`, scoped to files with language id `lmc`. `module` and not
+  `command: "node"`: the library then forks it with `cp.fork`, i.e. `process.execPath` under
+  `ELECTRON_RUN_AS_NODE=1` — **the Node inside VS Code**. Spawning `"node"` required one on the
+  user's PATH, so the extension did not start at all for anyone who has VS Code but no separate
+  Node install.
 - **`lsp-server.mjs`** (repo root) — imports `main` from `./vendor/lmc-lsp.bundle.mjs` and calls it.
   Exits with a clear error (not a silent fallback) if that file is missing — run
   `scripts/fetch-lsp-bundle.mjs` first.
 - **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
   download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
-  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.1.6`; pass a version to pin a different tag.
+  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.3.1`; pass a version to pin a different tag.
+  That default and `gleam.toml`'s `ref` are the two pins that must always move together.
 
 None of the LSP protocol logic (diagnostics, hover, completion, formatting, etc.) lives in this repo
 any more — see `lmc_lsp`'s own `CLAUDE.md`/`ARCHI.md` for that.
