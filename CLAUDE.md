@@ -323,9 +323,20 @@ Still open, roughly in the order it's worth tackling them:
    VS Code client using it.
 5. **The VS Code extension itself isn't packaged/published anywhere** — `npx vsce package` works
    locally, but there's no CI job building a `.vsix`, let alone a Marketplace listing.
-6. **Renaming the language is under consideration** — `LMC` stands for Little Man Computer and the
-   Man has to go. The analysis (candidates, what rules each one out, and the cost layer by layer)
-   lives in `lmc_lsp`'s CLAUDE.md under "Envisagé, pas fait", because the language is its business,
-   not this repo's. Only the ordering matters here: the **file extension goes first or never**,
-   since every `.lmc` written meanwhile is one more file to rename — and this repo owns the
-   extension, the `lmc` language id, the `source.lmc` grammar scope and nine example programs.
+6. **Four language changes are planned in `lmc_lsp`, three of them decided** — the plan, the
+   reasoning and the order live in that repo's CLAUDE.md under "Envisagé, pas fait"; it is not
+   repeated here, the language is its business. What lands in *this* repo when they happen:
+   - **`X` becomes `IX`** (decided, do it first while nothing else is in flight) — the TextMate
+     grammar's register rule, the register tooltip in `webview/index.html`, the `lst[X]` suffix in
+     the grammar comment, and every example that indexes.
+   - **Opcode 9 becomes polymorphic, and `PSH`/`POP` gain a register operand** — nothing here
+     changes except the pinned version, but note `PSH`/`POP` change machine word, so any committed
+     `.lmcobj` is stale (they regenerate on a click).
+   - **`PIX`, a screen instruction** — a small canvas under "Sortie (OUT)" in the I/O frame, fed by
+     a new `PixelPlotted` runner event, rendered by the webview. This repo owns that rendering.
+   - **Renaming the language itself** (`LMC` → ?) is undecided and independent. Only its ordering
+     concerns this repo: the **file extension goes first or never**, since every `.lmc` written
+     meanwhile is one more file to rename, and this repo owns `.lmc`, `.lmcobj`, the `lmc` language
+     id, the `source.lmc` grammar scope and nine example programs.
+   Each of these ends with a `lmc_lsp` release and the **double pin** here — `gleam.toml` and
+   `scripts/fetch-lsp-bundle.mjs`, always together.
