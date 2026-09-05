@@ -274,7 +274,7 @@ fn machine_from_words(words: List(Int)) -> MachineState {
     current_instruction: instruction.Hlt,
     phase: state.Fetch,
     input: [],
-    output: [],
+    output_reversed: [],
     status: state.Running,
   )
 }
@@ -1003,10 +1003,22 @@ fn decoded_with_address(
 
 fn load_error_message(err: load.LoadError) -> String {
   case err {
-    load.ProgramTooLong(count) ->
+    // « cases » et non « lignes » : ce que le chargeur compte, ce sont les
+    // mots posés en mémoire. Un seul `lst: DAT` de cent-et-une valeurs tient
+    // sur une ligne et déborde quand même. Le champ s'appelait `line_count`
+    // et disait déjà des cases ; renommé `cell_count` en v0.5.0, il compile
+    // pareil puisque le filtrage est positionnel.
+    //
+    // Cette branche est défensive : `check_length` (semantic/lints.gleam)
+    // applique la même règle, `ast.cell_count`, et signale le débordement
+    // avant que l'assemblage n'appelle le chargeur, si bien que c'est le
+    // message générique « voir les diagnostics » qui s'affiche. Elle existe
+    // parce que `load.load` rend un `Result` qu'il faut traiter, pas parce
+    // qu'on l'a vue.
+    load.ProgramTooLong(cell_count) ->
       "programme trop long : "
-      <> int.to_string(count)
-      <> " lignes (maximum 100)"
+      <> int.to_string(cell_count)
+      <> " cases (maximum 100)"
     load.UndefinedLabel(name) -> "label non défini : " <> name
   }
 }

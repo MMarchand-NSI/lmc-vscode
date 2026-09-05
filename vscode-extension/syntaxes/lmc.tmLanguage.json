@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "LMC",
   "scopeName": "source.lmc",
-  "comment": "Vérifié contre ../lmc_lsp/LANGAGE.md et src/lmc/parse/lexer.gleam (v0.4.0). La liste des mnémoniques et des registres existe donc à deux endroits : ici et dans le lexer du serveur, qui reste la référence. Une évolution du langage doit passer par les deux — c'est ce genre de duplication qui avait laissé le README de ce dépôt affirmer des choses fausses.",
+  "comment": "Vérifié contre ../lmc_lsp/LANGAGE.md et src/lmc/parse/lexer.gleam (v0.6.0). La liste des mnémoniques et des registres existe donc à deux endroits : ici et dans le lexer du serveur, qui reste la référence. Une évolution du langage doit passer par les deux — c'est ce genre de duplication qui avait laissé le README de ce dépôt affirmer des choses fausses.",
   "patterns": [
     {
       "include": "#comments"
@@ -80,8 +80,8 @@
     "labels": {
       "patterns": [
         {
-          "comment": "Label definition: a name at the start of a line followed by ':'. The ':' is what makes this unambiguous — before it was mandatory, every identifier had to be coloured as a label, operands included. Un identifiant est fait de lettres et de chiffres, sans souligné (lexer.gleam, is_alnum).",
-          "match": "^\\s*([A-Za-z][A-Za-z0-9]*)\\s*(:)",
+          "comment": "Label definition: a name at the start of a line followed by ':'. The ':' is what makes this unambiguous — before it was mandatory, every identifier had to be coloured as a label, operands included. Un nom commence par une lettre ASCII, un souligné ou une lettre latine accentuée, et se poursuit avec les chiffres et les diacritiques combinants (lexer.gleam v0.6.0, is_alpha/is_alnum) : « é » s'écrit aussi bien en un point de code qu'en deux, et les deux formes doivent donner le même nom. Le souligné et les accents sont admis depuis la v0.5.0 ; les refuser ici laissait « compteur_1 » et « numéro » sans aucune coloration alors que le serveur les accepte.",
+          "match": "^\\s*([A-Za-z_\\x{00C0}-\\x{00D6}\\x{00D8}-\\x{00F6}\\x{00F8}-\\x{017F}][A-Za-z0-9_\\x{00C0}-\\x{00D6}\\x{00D8}-\\x{00F6}\\x{00F8}-\\x{017F}\\x{0300}-\\x{036F}]*)\\s*(:)",
           "captures": {
             "1": {
               "name": "entity.name.label.lmc"
@@ -92,9 +92,9 @@
           }
         },
         {
-          "comment": "Label reference in operand position — anything left after keywords, registers and numbers have had their turn.",
+          "comment": "Label reference in operand position — anything left after keywords, registers and numbers have had their turn. La garde arrière remplace la limite de mot qui ouvrait la règle : celle-ci ne connaît que les caractères de mot ASCII, et un nom peut désormais commencer par une lettre accentuée.",
           "name": "variable.other.lmc",
-          "match": "\\b[A-Za-z][A-Za-z0-9]*\\b"
+          "match": "(?<![A-Za-z0-9_\\x{00C0}-\\x{00D6}\\x{00D8}-\\x{00F6}\\x{00F8}-\\x{017F}\\x{0300}-\\x{036F}])[A-Za-z_\\x{00C0}-\\x{00D6}\\x{00D8}-\\x{00F6}\\x{00F8}-\\x{017F}][A-Za-z0-9_\\x{00C0}-\\x{00D6}\\x{00D8}-\\x{00F6}\\x{00F8}-\\x{017F}\\x{0300}-\\x{036F}]*"
         }
       ]
     },

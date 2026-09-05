@@ -30,6 +30,7 @@ const pipeline = await import(join(js, "lmc_lsp/lmc/semantic/pipeline.mjs"));
 const load = await import(join(js, "lmc_lsp/lmc/runner/load.mjs"));
 const run = await import(join(js, "lmc_lsp/lmc/runner/run.mjs"));
 const format = await import(join(js, "lmc_lsp/lmc/features/format.mjs"));
+const inspect = await import(join(js, "lmc_lsp/lmc/runner/inspect.mjs"));
 const prelude = await import(join(js, "prelude.mjs"));
 
 const dir = join(root, "examples");
@@ -78,7 +79,9 @@ for (const name of files) {
       continue;
     }
     const [final] = run.run_to_halt(loaded[0]);
-    const output = final.output.toArray();
+    // `MachineState` range la sortie à l'envers pour que `OUT` coûte un
+    // cons ; `output_buffer` la remet à l'endroit.
+    const output = inspect.output_buffer(final).toArray();
 
     if (final.status.constructor.name !== "Halted") {
       fail(`${name} [${inputs}] : ${final.status.constructor.name}`);

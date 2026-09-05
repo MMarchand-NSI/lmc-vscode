@@ -9,6 +9,7 @@ A Visual Studio Code extension for the **Little Man Computer (LMC)** assembly la
   - duplicate label definitions
   - missing `HLT` instruction
   - programs whose code and data exceed the 100 memory cells
+  - addresses outside 0-99, which would otherwise assemble into a different instruction entirely
 - **Hover** — shows where a label is defined and how many times it is referenced
 - **Go to Definition** — jump to the line where a label is defined
 - **Find References** — list every line that references a label
@@ -49,12 +50,16 @@ are in French, like the language reference.
 | `appel-imbrique-casse.lmc` | a nested call overwrites `LR`: the program loops, on purpose |
 | `appel-imbrique-pile.lmc` | the same program, fixed by saving `LR` with `PSH`/`POP` |
 | `recursion.lmc` | `somme(n) = n + somme(n-1)`, one stack frame per call |
+| `unit-01` … `unit-13` | a progressive series, one new thing per file, from `INP`/`OUT` to the loops |
 
 The last three are a progression, in that order: `JSR` alone, the breakage it cannot survive, and
 the stack that repairs it. That order is the one argued for in `lmc_lsp`'s ARCHI.md — the stack is
 introduced because you have just hit the wall that needs it, not because it exists.
 
-Every one of them is run before being committed; none is a program that only looks plausible.
+Every one of them is run before being committed; none is a program that only looks plausible. For
+the `unit-*` series that is not a promise but a script: each file states its own cases in its header
+(`Entrée : … Sortie : …`), and `node scripts/check-examples.mjs` runs every one of them against the
+real `lmc_lsp` dependency, then checks the formatter would leave the file untouched.
 
 ## Project Structure
 
@@ -71,9 +76,14 @@ examples/              # Opened automatically by the "Run LMC Extension" launch
   appel-imbrique-casse.lmc
   appel-imbrique-pile.lmc
   recursion.lmc
+  ecran.lmc
+  unit-01-inp-out.lmc … unit-13-boucle-somme.lmc
 scripts/
   fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vendor/ (gitignored)
   build-webview.mjs    # Bundles src/webview/ for the browser into vscode-extension/webview/
+  smoke-webview.mjs    # Drives that bundle in jsdom, playing the extension host's half
+  check-examples.mjs   # Runs every unit-*.lmc against the cases in its own header
+  check-grammar.mjs    # Checks the TextMate grammar against lmc_lsp's lexer, with Oniguruma
 src/
   webview/              # Emulator webview — see "Emulator webview" below
     model.gleam          # Pure state/transitions (gleam test-covered)
@@ -120,7 +130,7 @@ Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for pro
 
 ### Prerequisites
 
-- [Gleam](https://gleam.run) ≥ 1.0 (CI pins 1.14.0) — only needed for the standalone Emulator API,
+- [Gleam](https://gleam.run) ≥ 1.18 (`gleam.toml` sets the floor; CI installs 1.18.1) — only needed for the standalone Emulator API,
   not for running the extension
 - Node.js ≥ 18
 - [`gh`](https://cli.github.com) CLI, authenticated with access to `MMarchand-NSI/lmc_lsp` (currently
@@ -130,8 +140,8 @@ Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for pro
 ### Fetch the language server
 
 ```sh
-node scripts/fetch-lsp-bundle.mjs        # fetches the latest tagged release into vendor/
-node scripts/fetch-lsp-bundle.mjs v0.1.6 # or a specific version
+node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.6.0) into vendor/
+node scripts/fetch-lsp-bundle.mjs v0.5.0 # or a specific version
 ```
 
 Required before the extension will start — there is no in-tree fallback.
@@ -150,7 +160,8 @@ gleam build          # Compile to build/dev/javascript/
 ```sh
 cd vscode-extension
 npm install
-npx tsc           # Compile TypeScript
+npm run compile   # Compile TypeScript — not `npx tsc`, which fetches an unrelated
+                  #   registry package named `tsc` when the local one is out of reach
 npx vsce package  # Package as .vsix
 ```
 
@@ -172,6 +183,7 @@ extension:
 
 ```gleam
 import lmc/semantic/pipeline
+import lmc/runner/inspect
 import lmc/runner/load
 import lmc/runner/run
 import lmc/runner/state
@@ -180,7 +192,9 @@ import lmc/runner/state
 let result = pipeline.parse(source)     // -> ParseResult { ast, diagnostics, symbols, ... }
 let assert Ok(initial) = load.load(result, [input1, input2])
 let #(final, _events) = run.run_to_halt(initial)
-// final.output → list of output values
+// inspect.output_buffer(final) → list of output values, oldest first.
+//   The field itself is `output_reversed`, kept newest-first so that OUT
+//   costs a cons instead of copying the buffer; output_buffer reverses once.
 // final.status → state.Halted (or state.ExecutionError(_) on a runtime error)
 
 // Interactive mode — supply input on demand

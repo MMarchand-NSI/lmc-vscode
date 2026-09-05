@@ -1,4 +1,5 @@
 import gleeunit/should
+import lmc/runner/inspect
 import lmc/runner/load
 import lmc/runner/run
 import lmc/runner/state
@@ -14,7 +15,9 @@ pub fn inp_out_test() {
   let #(final, _events) = run.run_to_halt(initial)
 
   final.status |> should.equal(state.Halted)
-  final.output |> should.equal([42])
+  // La sortie se lit par `inspect.output_buffer` : `MachineState` la range
+  // à l'envers pour que `OUT` coûte un cons.
+  inspect.output_buffer(final) |> should.equal([42])
 }
 
 pub fn undefined_label_test() {

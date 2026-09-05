@@ -1,6 +1,7 @@
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
+import lmc/runner/inspect
 import lmc/runner/state
 import webview/model
 
@@ -46,6 +47,22 @@ pub fn init_program_with_undefined_label_test() {
   let m = model.init("LDA ghost\nHLT\n")
   assert m.assembled == None
   assert m.assembly_error != None
+}
+
+pub fn a_program_too_long_does_not_assemble_test() {
+  // Cent-et-une valeurs sur une seule ligne : ce qui déborde, ce sont les
+  // cases mémoire, pas les lignes du fichier. Le message vient de la couche
+  // sémantique, qui applique la même règle (`ast.cell_count`) que le
+  // chargeur ; c'est pourquoi la branche `ProgramTooLong` de
+  // `load_error_message` n'est jamais atteinte par ce chemin.
+  let source = "        HLT\nlst:    DAT " <> string.repeat("1, ", 100) <> "1\n"
+  let m = model.init(source)
+
+  assert m.assembled == None
+  assert m.assembly_error
+    == Some(
+      "le programme contient des erreurs — voir les diagnostics dans l'éditeur",
+    )
 }
 
 pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
@@ -114,7 +131,7 @@ pub fn provide_input_then_run_halts_test() {
     |> model.run_to_halt
   let assert Some(machine) = m.machine
   assert machine.status == state.Halted
-  assert machine.output == [42]
+  assert inspect.output_buffer(machine) == [42]
 }
 
 pub fn resume_after_input_keeps_running_when_run_triggered_the_wait_test() {
@@ -131,7 +148,7 @@ pub fn resume_after_input_keeps_running_when_run_triggered_the_wait_test() {
     |> model.resume_after_input(9)
   let assert Some(machine) = m.machine
   assert machine.status == state.Halted
-  assert machine.output == [9]
+  assert inspect.output_buffer(machine) == [9]
 }
 
 pub fn resume_after_input_completes_only_the_instruction_when_step_triggered_the_wait_test() {
@@ -146,7 +163,7 @@ pub fn resume_after_input_completes_only_the_instruction_when_step_triggered_the
   assert machine.status == state.Running
   assert machine.program_counter == 1
   assert machine.accumulator == 9
-  assert machine.output == []
+  assert inspect.output_buffer(machine) == []
 }
 
 pub fn reset_reruns_from_scratch_test() {
@@ -162,7 +179,7 @@ pub fn reset_reruns_from_scratch_test() {
   let assert Some(machine) = m.machine
   assert machine.status == state.Running
   assert machine.program_counter == 0
-  assert machine.output == []
+  assert inspect.output_buffer(machine) == []
 }
 
 // ── Correspondance adresse <-> ligne ──────────────────────────────

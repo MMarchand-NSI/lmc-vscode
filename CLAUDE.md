@@ -32,7 +32,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the fetch script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.3.1" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.6.0" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -63,6 +63,10 @@ node scripts/check-examples.mjs          # runs every examples/unit-*.lmc agains
                                           # "Entrée : … Sortie : …" cases in its own header, and
                                           # checks the formatter would leave the file alone
                                           # (needs `gleam build` first, like build-webview.mjs)
+node scripts/check-grammar.mjs           # tokenizes with the real Oniguruma engine and checks the
+                                          # TextMate grammar against lmc_lsp's lexer — the mnemonic
+                                          # and register tables, and what counts as a name
+                                          # (needs `gleam build` *and* `gleam deps download`)
 ```
 
 ```sh
@@ -141,7 +145,7 @@ VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fe
   `scripts/fetch-lsp-bundle.mjs` first.
 - **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
   download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
-  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.3.1`; pass a version to pin a different tag.
+  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.6.0`; pass a version to pin a different tag.
   That default and `gleam.toml`'s `ref` are the two pins that must always move together.
 
 None of the LSP protocol logic (diagnostics, hover, completion, formatting, etc.) lives in this repo
@@ -342,16 +346,53 @@ never just code review):
   machine words). They are **gitignored artefacts of the Assembler button**, not tracked files —
   `git ls-files examples/` lists no `.lmcobj` at all — so a stale one on someone's disk is a local
   matter, and re-clicking Assembler is the whole fix.
+- **The `lmc_lsp` v0.6.0 migration**, two releases in one step (v0.5.0 and v0.6.0 carry four
+  full-layer reviews — `parse/`, `runner/`, `features/`, `semantic/`). The **double pin** moved as
+  always, `gleam.toml` and `scripts/fetch-lsp-bundle.mjs` together. What it cost here:
+  - `MachineState.output` became `output_reversed` (newest-first, so `OUT` costs a cons) and is
+    read through `inspect.output_buffer`. Six call sites, not the two the plan had found:
+    `render.gleam`, `model.gleam`'s `machine_from_words`, **both** test modules,
+    `scripts/check-examples.mjs`, and the README's Emulator API snippet. The JSON key stays
+    `"output"`, so `app_ffi.mjs` was untouched.
+  - `ProgramTooLong`'s field, misnamed `line_count`, is now `cell_count`; the message says "cases".
+    But the claim that it "had been reporting lignes this whole time" is **wrong**, checked rather
+    than repeated: `semantic/lints.gleam`'s `check_length` applies the same rule (`ast.cell_count`)
+    and fires first, so the webview shows its generic "voir les diagnostics" message and that
+    branch of `load_error_message` is never reached. It is defensive code, and now says so.
+  - **The TextMate grammar had drifted, and nothing was watching.** v0.5.0 let a name start with
+    `_` or a Latin letter up to U+017F and continue with combining diacritics; the grammar still
+    said `[A-Za-z][A-Za-z0-9]*`, so `compteur_1: DAT 0` and `numéro: DAT 0` got **no colouring at
+    all** while the server accepted them. This is exactly the duplication the grammar's own header
+    comment warns about. Fixed, and pinned down by **`scripts/check-grammar.mjs`**, which
+    tokenizes with the real Oniguruma engine VS Code uses (`vscode-textmate` +
+    `vscode-oniguruma`, two new devDependencies of `vscode-extension/`) rather than with
+    JavaScript's regexes, reads the mnemonic and register tables **out of `lexer.gleam` itself**
+    instead of retyping them, and settles "is this a valid name?" by asking the real pipeline and
+    demanding the grammar agree. Verified by breaking it: with the old pattern restored it fails
+    on five names and exits non-zero.
+  What the bump buys was exercised, not assumed: an address outside 0-99 is now a diagnostic
+  instead of silently assembling to a different valid instruction (`STA 900`), a CRLF file gets no
+  bogus diagnostics (Format Document normalises it to LF, which is not the same thing as
+  destroying it), the formatter no longer eats a trailing comment on a `DAT` line nor inserts a
+  comma nobody typed, hover on an operand says "Adresse", and `OUT` in a loop is no longer slow
+  (300 outputs in 10 ms). The whole path was driven for real: `lsp-server.mjs` started over stdio
+  with a hand-written client, `initialize` answered, diagnostics and hover came back. All 26
+  tracked examples still parse clean except `broken.lmc`, which is broken on purpose.
+  One thing did **not** come along: the "integer literal too large" fix. It exists only as an
+  unpushed commit in the local `../lmc_lsp` clone (`origin/master` is exactly `v0.6.0`), so there
+  is no `v0.6.1` to pin. Push and tag it there first; the double pin here is a two-line follow-up.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
   writer, and the machine never sees it), `DAT` with an initial value, `BRA`, `BRZ`, `BRP`, a full
   if/else, and the two loops. Each header carries its own `Entrée : … Sortie : …` cases, and those
   are not decoration: a scratch harness ran every one of them against the real dependency, 22 cases,
-  plus the three "remove this line and see" claims the comments make. The headers also avoid a
-  trailing comment on any `DAT` line, deliberately, until `lmc_lsp`'s formatter stops eating them
-  (see its CLAUDE.md, "À corriger en priorité"). What the series does *not* cover, and where the
-  older examples take over: `IX` and indexed addressing, `MOV`, `JSR`/`RET`, `PSH`/`POP`, `PLT`.
+  plus the three "remove this line and see" claims the comments make. The headers avoid a trailing
+  comment on any `DAT` line, which was a workaround: `lmc_lsp`'s formatter used to eat them. It no
+  longer does (v0.6.0, checked by running the formatter on `n: DAT 5  // cinq`), so the constraint
+  is lifted — the files were left as they are because nothing in them wants such a comment, not
+  because one would be destroyed. What the series does *not* cover, and where the older examples
+  take over: `IX` and indexed addressing, `MOV`, `JSR`/`RET`, `PSH`/`POP`, `PLT`.
 - **A screen, 32 x 32, eight colours** (`examples/ecran.lmc` draws a diagonal and a line on it).
   Size and palette were `lmc_lsp`'s two deliberately-unmade decisions — the runner emits
   `PixelPlotted` and paints nothing — and they were made here, where a device belongs. See the

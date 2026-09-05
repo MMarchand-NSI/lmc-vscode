@@ -1,5 +1,6 @@
 import gleam/json.{type Json}
 import gleam/option.{None, Some}
+import lmc/runner/inspect
 import lmc/runner/memory
 import lmc/runner/state
 import webview/model.{type Model}
@@ -22,7 +23,9 @@ pub fn to_json(mdl: Model) -> String {
     #("status", json_status(mdl)),
     #(
       "output",
-      json_or_null(mdl.machine, fn(m) { json.array(m.output, json.int) }),
+      json_or_null(mdl.machine, fn(m) {
+        json.array(inspect.output_buffer(m), json.int)
+      }),
     ),
     // Seulement les points allumés, pas les 1024 cases : l'affichage repeint
     // le fond puis pose ceux-ci. Un écran vide est donc un tableau vide,
