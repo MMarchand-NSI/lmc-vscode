@@ -56,6 +56,9 @@ node scripts/fetch-lsp-bundle.mjs        # required before the extension will ru
                                           # fetches vendor/lmc-lsp.bundle.mjs (gitignored)
 gleam build && node scripts/build-webview.mjs  # required before "LMC: Open Emulator" shows
                                                 # anything — bundles src/webview/ for the browser
+node scripts/smoke-webview.mjs           # drives that built bundle in a real DOM, playing the
+                                          # host's half of the protocol — run it after touching
+                                          # the webview, and after build-webview.mjs, not before
 ```
 
 ```sh
@@ -312,9 +315,15 @@ Still open, roughly in the order it's worth tackling them:
    substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
    `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
    independent of how solid the model/render logic underneath now is.
-2. **No committed smoke-test script.** The `node:vm` scripts that caught the Step/Run/reset/decode-
-   text bugs above only ever lived in a session's scratchpad — worth promoting one into a committed
-   `scripts/` tool so the next round of webview work doesn't start from zero.
+2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+   `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
+   the extension host's half of the protocol — including the object file, which it holds as a
+   variable that starts `null`, which is what makes "load before assembling" testable at all. 26
+   checks over the assemble/load/execute pipeline, the von Neumann frame grouping, and the tooltips
+   and legend. It fails and exits non-zero when any of it breaks — verified by breaking it.
+   It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
+   nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
+   looks.
 3. **`lmc_lsp` is still private**, so `fetch-lsp-bundle.mjs` and `gleam deps download` both need `gh
    auth`/the deploy key — fine for solo development, but blocks any real distribution. No public-
    release work (Marketplace listing, making `lmc_lsp` public) has started.
