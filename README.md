@@ -28,8 +28,8 @@ that table drifted into claiming things that were false — that labels were cas
 that `;` opened a comment. One source of truth is worth the extra click.
 
 In short: this variant extends the classic LMC. The machine word is four digits rather than three,
-there are five registers (`ACC`, `X`, `LR`, `SP`, `PC`) and sixteen mnemonics, including `MOV`,
-subroutines (`JSR`/`RET`) and a stack (`PSH`/`POP`). Programs written for a stock LMC emulator will
+there are five registers (`ACC`, `IX`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`,
+subroutines (`JSR`/`RET`), a stack (`PSH`/`POP`) and a screen (`PLT`). Programs written for a stock LMC emulator will
 not run here, and the reverse is also true.
 
 ## Examples
@@ -41,9 +41,10 @@ are in French, like the language reference.
 |---|---|
 | `test-pgm.lmc`, `fibo.lmc` | integer division and Fibonacci — the eleven classic mnemonics only |
 | `broken.lmc` | deliberately invalid, to see the diagnostics |
-| `tableau.lmc` | an array walked with `lst[X]` |
+| `tableau.lmc` | an array walked with `lst[IX]` |
 | `chaine.lmc` | a string walked to its terminal zero |
 | `double-boucle.lmc` | nested loops: a multiplication table, since the language has no multiply |
+| `ecran.lmc` | `PLT` — a diagonal and a line, on the 32 × 32 screen |
 | `sous-programme.lmc` | `JSR`/`RET` — enough as long as calls are not nested |
 | `appel-imbrique-casse.lmc` | a nested call overwrites `LR`: the program loops, on purpose |
 | `appel-imbrique-pile.lmc` | the same program, fixed by saving `LR` with `PSH`/`POP` |

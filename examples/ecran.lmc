@@ -1,0 +1,56 @@
+// Un écran : l'instruction PLT.
+//
+// PLT pixel lit trois cases consécutives à partir de pixel : x, y, puis la
+// couleur — un index de palette de 0 à 7, où 0 est le fond, si bien
+// qu'allumer un point en 0 l'efface. Le processeur ne connaît ni la taille
+// de l'écran ni les couleurs : il dit « allume ce point », l'affichage
+// décide. Ici l'écran fait 32 sur 32.
+//
+// Les trois cases tiennent en un seul DAT, comme le tableau de tableau.lmc :
+// DAT 0, 0, 3 réserve trois cases à la file. Le nom pixel ne désigne donc
+// que la première, et c'est le suffixe [IX] qui atteint les deux autres —
+// pixel[IX] avec IX à 1 désigne y, avec IX à 2 la couleur.
+//
+// Trace une diagonale de seize points, puis une ligne horizontale d'une
+// autre couleur. Le compteur de boucle est la coordonnée elle-même — x est
+// déjà en mémoire, il serait inutile d'en tenir un second à côté.
+
+        MOV IX, un      // IX reste à 1 toute la diagonale : il ne sert qu'à
+                        // atteindre y, la deuxième des trois cases
+
+// --- La diagonale : x et y avancent ensemble.
+diag:   PLT pixel
+        LDA pixel       // ACC <- x
+        ADD un
+        STA pixel       // x <- x + 1
+        STA pixel[IX]   // y <- x : c'est ce qui fait la diagonale
+        SUB seize
+        BRZ ligne
+        BRA diag
+
+// --- La ligne horizontale : seul x avance, y reste posé.
+ligne:  LDA zero
+        STA pixel       // x <- 0
+        LDA vingt
+        STA pixel[IX]   // y <- 20, et il n'en bougera plus
+        MOV IX, deux    // IX passe à 2 : pixel[IX] désigne maintenant la couleur
+        LDA six
+        STA pixel[IX]   // une autre couleur, pour distinguer les deux traits
+
+trait:  PLT pixel
+        LDA pixel
+        ADD un
+        STA pixel
+        SUB seize
+        BRZ fin
+        BRA trait
+
+fin:    HLT
+
+pixel:  DAT 0, 0, 3     // x, y, couleur — les trois cases que PLT lit
+zero:   DAT 0
+un:     DAT 1
+deux:   DAT 2
+six:    DAT 6
+seize:  DAT 16
+vingt:  DAT 20

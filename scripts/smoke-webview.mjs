@@ -71,6 +71,13 @@ function openPanel() {
     getState: () => undefined,
     setState: () => {},
   });
+  // jsdom n'a pas de contexte 2d sans la dépendance native `canvas`, et sa
+  // console virtuelle recrache une trace complète à chaque appel — soit une
+  // par rendu, ce qui noierait la sortie de ce script. On rend donc null,
+  // ce que la page doit de toute façon savoir encaisser ; la section
+  // « Écran » remplace ensuite ce null par un faux contexte qui note ce
+  // qu'on lui demande de peindre.
+  w.HTMLCanvasElement.prototype.getContext = () => null;
   w.eval(readFileSync(join(webviewDir, "app.bundle.js"), "utf8"));
   w.eval("LmcApp.main();");
 
@@ -221,11 +228,69 @@ async function annotations() {
     "swatch swatch data swatch stack swatch unused");
 }
 
+// ── L'écran ───────────────────────────────────────────────────────
+
+async function screen() {
+  console.log("\nÉcran (PLT), sur examples/ecran.lmc");
+  const p = openPanel();
+  const canvas = p.id("screen");
+
+  check("le canvas est une sortie, avec OUT",
+    canvas.closest(".unit").className.replace("unit ", ""), "io");
+  // 32 pixels réels agrandis par le CSS : un point du programme est un pixel
+  // du canvas, sans arithmétique nulle part. Si ces deux nombres bougent
+  // sans que model.screen_width suive, l'écran se met à mentir.
+  check("32 pixels réels de côté",
+    `${canvas.width}x${canvas.height}`, "32x32");
+  check("la palette annonce ses huit couleurs",
+    p.document.querySelectorAll("#palette li").length, 8);
+  check("et dit que l'index 0 est le fond",
+    p.document.querySelector("#palette li").textContent, "0 fond");
+  check("l'écran a son infobulle",
+    !!p.document.querySelector(".screen-part .tip strong"), true);
+
+  // jsdom n'implémente pas le contexte 2d. On en pose un faux, qui note ce
+  // qu'on lui demande de peindre : c'est le seul moyen de vérifier que
+  // l'écran est repeint pour de bon, et c'est très exactement la frontière
+  // impure que ce script existe pour couvrir.
+  const painted = [];
+  const ctx = {
+    fillStyle: "",
+    fillRect(x, y, w, h) {
+      painted.push({ x, y, w, h, fill: this.fillStyle });
+    },
+  };
+  canvas.getContext = () => ctx;
+
+  const source = readFileSync(join(root, "examples", "ecran.lmc"), "utf8");
+  await p.send({ type: "setSource", source });
+  await p.click("assemble");
+  await p.click("load");
+  await p.click("run");
+  check("le programme va jusqu'au bout", p.text("status"), "halted");
+
+  // Chaque rendu repeint le fond d'abord — un rectangle de 32 de large —
+  // puis pose les points. Le dernier fond commence donc la dernière image.
+  const start = painted.map((r) => r.w).lastIndexOf(32);
+  const frame = painted.slice(start + 1);
+  check("le fond est repeint avant les points", start >= 0, true);
+  check("la dernière image allume 32 points", frame.length, 32);
+  check("un point est un pixel, pas un carré mis à l'échelle",
+    frame.every((r) => r.w === 1 && r.h === 1), true);
+  check("la diagonale part de l'origine",
+    `${frame[0].x},${frame[0].y}`, "0,0");
+  check("la ligne horizontale est posée en y = 20",
+    frame.filter((r) => r.y === 20).length, 16);
+  check("les deux traits ont deux couleurs",
+    new Set(frame.map((r) => r.fill)).size, 2);
+}
+
 // ── ─────────────────────────────────────────────────────────────────
 
 await pipeline();
 await frames();
 await annotations();
+await screen();
 
 console.log(
   failures === 0

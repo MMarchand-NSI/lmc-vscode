@@ -19,6 +19,27 @@ import lmc/semantic/pipeline
 // (FFI + rendering); this module never imports it, only the other way
 // around.
 
+/// L'écran : 32 colonnes, 32 lignes, 8 couleurs. **Ces trois nombres sont
+/// une décision de l'affichage, pas du langage.** `PLT` dit « allume ce
+/// point » et le runner émet `PixelPlotted(x, y, couleur)` sans vérifier
+/// aucune borne, exactement comme `OUT` ne vérifie pas la largeur du
+/// terminal (lmc_lsp, ARCHI.md, « Le runner ne peint rien »). L'écran est un
+/// périphérique, pas un organe du processeur — c'est donc ici qu'il a une
+/// taille, et ici seulement.
+///
+/// 32 × 32 parce qu'un dessin y est reconnaissable sans qu'un point descende
+/// sous le pixel, et parce qu'une machine sans multiplication, qui compte à
+/// peine jusqu'à 100, ne balaiera jamais beaucoup plus.
+pub const screen_width = 32
+
+pub const screen_height = 32
+
+/// Huit couleurs, index 0 à 7. **L'index 0 est le fond**, donc éteindre un
+/// point est une couleur comme une autre et ne demande aucune instruction de
+/// plus. Les couleurs elles-mêmes — leurs valeurs RVB — ne sont pas ici :
+/// elles sont dans app_ffi.mjs, le seul module qui peigne quoi que ce soit.
+pub const palette_size = 8
+
 pub type Model {
   Model(
     source: String,
@@ -75,6 +96,12 @@ pub type Model {
     // like Step regardless of which button was actually clicked (see
     // resume_after_input's doc comment for the bug this fixes).
     run_after_input: Bool,
+    // Les points allumés, indexés par `y * screen_width + x`. Ils vivent
+    // ici et pas dans la machine : la sortie d'`OUT` s'accumule dans
+    // `MachineState.output`, celle de `PLT` non — le runner la rapporte en
+    // événement et l'oublie. C'est le même partage, un cran plus loin :
+    // l'écran garde ce que le processeur a dit d'afficher.
+    screen: Dict(Int, Int),
   )
 }
 
@@ -93,6 +120,7 @@ pub fn init(source: String) -> Model {
     ram_error: None,
     last_events: [],
     run_after_input: False,
+    screen: dict.new(),
   )
   |> assemble_source(source)
 }
@@ -174,6 +202,7 @@ pub fn load_object_code(model: Model, content: String) -> Model {
         ram_error: None,
         last_events: [],
         run_after_input: False,
+        screen: dict.new(),
       )
     }
   }
@@ -254,7 +283,15 @@ fn machine_from_words(words: List(Int)) -> MachineState {
 /// réassemble pas et ne recharge pas : Reset est un bouton du panneau avant,
 /// pas une recompilation. Sans rien en RAM, il n'y a rien à remettre.
 pub fn reset(model: Model) -> Model {
-  Model(..model, machine: model.loaded, last_events: [], run_after_input: False)
+  Model(
+    ..model,
+    machine: model.loaded,
+    last_events: [],
+    run_after_input: False,
+    // L'écran s'efface avec le reste : sans ça, la seconde exécution
+    // dessinerait par-dessus les points de la première.
+    screen: dict.new(),
+  )
 }
 
 /// Advance exactly one instruction (fetch/decode/execute), unless the
@@ -270,6 +307,7 @@ pub fn step(model: Model) -> Model {
         machine: Some(next),
         last_events: accumulate_events(m, model, events),
         run_after_input: False,
+        screen: plot_events(model.screen, events),
       )
     }
   }
@@ -289,6 +327,7 @@ pub fn run_to_halt(model: Model) -> Model {
         machine: Some(next),
         last_events: accumulate_events(m, model, events),
         run_after_input: True,
+        screen: plot_events(model.screen, events),
       )
     }
   }
@@ -311,6 +350,53 @@ fn accumulate_events(
     state.Fetch -> new_events
     _ -> list.append(model.last_events, new_events)
   }
+}
+
+/// Allume les points de ce pas d'exécution. On plie `events` — ce que ce
+/// pas vient de produire — et jamais `last_events`, qui peut accumuler d'un
+/// appel à l'autre quand une entrée interrompt un cycle : un même point s'y
+/// retrouverait deux fois.
+///
+/// Un point hors écran ou hors palette n'est pas allumé, et ce n'est pas
+/// escamoté pour autant : la ligne Execute du cycle le dit, elle (voir
+/// `plotted_detail`).
+fn plot_events(screen: Dict(Int, Int), events: List(Event)) -> Dict(Int, Int) {
+  list.fold(events, screen, fn(acc, evt) {
+    case evt {
+      event.PixelPlotted(x, y, colour) ->
+        case on_screen(x, y) && in_palette(colour) {
+          False -> acc
+          True ->
+            case colour {
+              // 0 est le fond : allumer un point en 0, c'est l'éteindre.
+              0 -> dict.delete(acc, y * screen_width + x)
+              _ -> dict.insert(acc, y * screen_width + x, colour)
+            }
+        }
+      _ -> acc
+    }
+  })
+}
+
+fn on_screen(x: Int, y: Int) -> Bool {
+  x >= 0 && x < screen_width && y >= 0 && y < screen_height
+}
+
+fn in_palette(colour: Int) -> Bool {
+  colour >= 0 && colour < palette_size
+}
+
+/// Les points allumés, en `#(x, y, couleur)`, dans l'ordre de balayage de
+/// l'écran. Le fond n'y figure pas : il n'y a que ce qui est allumé, donc
+/// l'affichage repeint le fond puis pose ces points-là.
+pub fn screen_points(model: Model) -> List(#(Int, Int, Int)) {
+  model.screen
+  |> dict.to_list
+  |> list.sort(fn(a, b) { int.compare(a.0, b.0) })
+  |> list.map(fn(entry) {
+    let #(index, colour) = entry
+    #(index % screen_width, index / screen_width, colour)
+  })
 }
 
 pub fn provide_input(model: Model, value: Int) -> Model {
@@ -574,6 +660,13 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
       "Execute",
       "sortie ← ACC (" <> int.to_string(v) <> ")",
     )
+    // PLT n'écrit rien en mémoire : c'est une sortie, comme OUT, vers un
+    // périphérique dont le processeur ignore tout — ni la taille de l'écran
+    // ni la palette ne remontent jusqu'ici.
+    event.PixelPlotted(x, y, colour) -> #(
+      "Execute",
+      plotted_detail(x, y, colour),
+    )
     event.MemoryWritten(address, v) -> #(
       "Execute",
       "mem[" <> int.to_string(address) <> "] ← ACC (" <> int.to_string(v) <> ")",
@@ -584,7 +677,7 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
     )
     event.IndexChanged(old, new) -> #(
       "Execute",
-      "X " <> int.to_string(old) <> " → " <> int.to_string(new),
+      "IX " <> int.to_string(old) <> " → " <> int.to_string(new),
     )
     event.LinkChanged(old, new) -> #(
       "Execute",
@@ -611,6 +704,36 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
     event.Halted -> #("Execute", "HLT")
     event.InputRequested -> #("Execute", "en attente d'une entrée…")
     event.ErrorOccurred(message) -> #("Erreur", message)
+  }
+}
+
+/// Le processeur a demandé un point ; l'écran, lui, a une taille et une
+/// palette qu'il ignore. Quand le point tombe dehors, on le dit sur la ligne
+/// Execute plutôt que de laisser l'écran rester vide sans explication — le
+/// programme a bien fait ce qu'il a fait, c'est l'affichage qui n'a pas
+/// suivi, et c'est précisément la leçon.
+fn plotted_detail(x: Int, y: Int, colour: Int) -> String {
+  let point =
+    "écran ← point ("
+    <> int.to_string(x)
+    <> ", "
+    <> int.to_string(y)
+    <> "), couleur "
+    <> int.to_string(colour)
+  case on_screen(x, y), in_palette(colour) {
+    True, True -> point
+    False, _ ->
+      point
+      <> " — hors écran ("
+      <> int.to_string(screen_width)
+      <> " × "
+      <> int.to_string(screen_height)
+      <> ") : rien n'est allumé"
+    _, False ->
+      point
+      <> " — hors palette (0 à "
+      <> int.to_string(palette_size - 1)
+      <> ") : rien n'est allumé"
   }
 }
 
@@ -702,10 +825,40 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
         circuit_note("un transfert entre registres"),
       )
 
-    instruction.Push ->
-      raw <> " → PSH (" <> circuit_note("empilement de l'accumulateur") <> ")"
-    instruction.Pop ->
-      raw <> " → POP (" <> circuit_note("dépilement vers l'accumulateur") <> ")"
+    // `PSH` et `POP` portent maintenant un registre. Le mot machine, lui,
+    // l'a toujours nommé : 9100 est « empile le registre n° 0 ». `PSH` écrit
+    // sans registre vaut `PSH ACC`, du même raccourci que `LDA n` pour
+    // `MOV ACC, n` — et le raccourci disparaît au décodage, comme tous les
+    // autres.
+    instruction.Push(register) ->
+      raw
+      <> " → PSH "
+      <> register_name(register)
+      <> " ("
+      <> circuit_note("empilement d'un registre")
+      <> ")"
+    instruction.Pop(register) ->
+      raw
+      <> " → POP "
+      <> register_name(register)
+      <> " ("
+      <> circuit_note("dépilement vers un registre")
+      <> ")"
+
+    // PLT ne calcule rien : il lit trois cases consécutives — x, y, couleur —
+    // et les envoie à l'écran. Les trois adresses sont écrites en clair parce
+    // que l'opérande unique du mot machine n'en désigne que la première.
+    instruction.Plot(a) ->
+      raw
+      <> " → PLT, mem["
+      <> int.to_string(a)
+      <> "] mem["
+      <> int.to_string(a + 1)
+      <> "] mem["
+      <> int.to_string(a + 2)
+      <> "] → x, y, couleur ("
+      <> circuit_note("l'envoi d'un point à l'écran")
+      <> ")"
     instruction.Jsr(a) ->
       decoded_with_address(
         raw,
@@ -744,7 +897,7 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
 fn register_name(register: instruction.Register) -> String {
   case register {
     instruction.Acc -> "ACC"
-    instruction.X -> "X"
+    instruction.Ix -> "IX"
     instruction.Lr -> "LR"
     instruction.Sp -> "SP"
     instruction.Pc -> "PC"
@@ -756,7 +909,7 @@ fn register_name(register: instruction.Register) -> String {
 fn memory_text(address: Int, mode: instruction.Addressing) -> String {
   case mode {
     instruction.Direct -> "mem[" <> int.to_string(address) <> "]"
-    instruction.Indexed -> "mem[" <> int.to_string(address) <> "+X]"
+    instruction.Indexed -> "mem[" <> int.to_string(address) <> "+IX]"
   }
 }
 

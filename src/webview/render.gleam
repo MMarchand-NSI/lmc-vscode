@@ -24,6 +24,10 @@ pub fn to_json(mdl: Model) -> String {
       "output",
       json_or_null(mdl.machine, fn(m) { json.array(m.output, json.int) }),
     ),
+    // Seulement les points allumés, pas les 1024 cases : l'affichage repeint
+    // le fond puis pose ceux-ci. Un écran vide est donc un tableau vide,
+    // pas mille zéros.
+    #("screen", json_screen(mdl)),
     #("currentLine", json_option_int(model.current_line(mdl))),
     #("currentAddress", json_option_int(model.current_address(mdl))),
     #("cursorAddress", json_option_int(model.cursor_address(mdl))),
@@ -43,6 +47,17 @@ pub fn to_json(mdl: Model) -> String {
     #("assembled", json.bool(option.is_some(mdl.assembled))),
   ])
   |> json.to_string
+}
+
+fn json_screen(mdl: Model) -> Json {
+  json.array(model.screen_points(mdl), fn(point) {
+    let #(x, y, colour) = point
+    json.object([
+      #("x", json.int(x)),
+      #("y", json.int(y)),
+      #("c", json.int(colour)),
+    ])
+  })
 }
 
 fn json_cycle(mdl: Model) -> Json {

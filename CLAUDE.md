@@ -162,10 +162,20 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   line in the editor. `Halted` was missed when `WaitingForInput`
   was fixed; the reverse case — execution falling *into* a `DAT`, which halts because opcode 0 is
   `HLT` — is what makes `pc - 1` the right correction rather than blanking the highlight, and has
-  its own test.
+  its own test. It also owns **the screen** (`screen_width`/`screen_height`/`palette_size` = 32, 32,
+  8, and the lit points): `lmc_lsp`'s runner emits `PixelPlotted(x, y, colour)` and checks no bound
+  at all, deliberately — a screen is a device, so its size is the display's business, exactly as
+  `OUT` does not check the width of the terminal. A point outside the screen or outside the palette
+  is not drawn, and the Execute line of the cycle panel says so rather than leaving an unexplained
+  blank; colour 0 is the background, so lighting a point in 0 erases it, no extra instruction
+  needed. The points live in the `Model` and not in `MachineState` because the runner does not keep
+  them — `OUT`'s output accumulates in the machine, `PLT`'s does not. Reset and load clear the
+  screen; the RGB values themselves are in `app_ffi.mjs`, the only module that paints.
 - **`webview/render.gleam`** — `Model` -> single JSON payload (`gleam_json`), also `gleam test`-covered.
   One `ffi.render(json)` call re-renders the whole memory grid each time; 100 cells is cheap enough
-  that a diffing renderer isn't worth the complexity.
+  that a diffing renderer isn't worth the complexity. The screen is the one thing sent
+  *sparsely* — only the lit points, not 1024 cells — because the canvas repaints its own
+  background first; an unlit screen is an empty array, not a thousand zeroes.
 - **`webview/app.gleam`** — entry point, wires `model`+`render` to `ffi.gleam`. Not unit-tested itself
   (pure FFI wiring), same reasoning as `lmc_lsp`'s `lsp/server.gleam` `serve` loop vs. its testable
   handlers.
@@ -271,7 +281,7 @@ never just code review):
 - Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
   Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
   session-style current-line decoration).
-- All five registers are shown (`ACC`, `PC`, then `X`, `LR`, `SP` more discreetly, since they only
+- All five registers are shown (`ACC`, `PC`, then `IX`, `LR`, `SP` more discreetly, since they only
   come into play with arrays, subroutines and the stack), and the memory grid marks four things —
   the stack above `SP` (dashed orange), the cells a `DAT` reserved (dotted blue), the unused middle
   dimmed, and code left unmarked as the default case. Watching the stack grow cell by cell during a
@@ -299,6 +309,18 @@ never just code review):
   "rien ne distingue une case de code d'une case de données" (LANGAGE.md), so it never changes when
   a `STA` writes into code or a `PC` runs into a `DAT` and halts on it. That gap is the lesson, not
   a bug to fix by making the marking follow execution.
+- **The `lmc_lsp` v0.4.0 migration**, taken in one block: the double pin, `X` -> `IX` everywhere
+  (TextMate grammar, register tooltip, `tableau.lmc`/`chaine.lmc`, README), `PSH`/`POP` carrying a
+  register in the Decode line, and `PLT` — a seventeenth mnemonic the grammar was missing. The three
+  `.lmcobj` files sitting in `examples/` were re-checked rather than assumed: reassembling every
+  example under v0.4.0 produces them byte for byte (none contained `9003`/`9004`, `PSH`/`POP`'s old
+  machine words). They are **gitignored artefacts of the Assembler button**, not tracked files —
+  `git ls-files examples/` lists no `.lmcobj` at all — so a stale one on someone's disk is a local
+  matter, and re-clicking Assembler is the whole fix.
+- **A screen, 32 x 32, eight colours** (`examples/ecran.lmc` draws a diagonal and a line on it).
+  Size and palette were `lmc_lsp`'s two deliberately-unmade decisions — the runner emits
+  `PixelPlotted` and paints nothing — and they were made here, where a device belongs. See the
+  `model.gleam` bullet above for what follows from that.
 - A long list of real bugs caught by actually exercising the extension/webview, not by guessing:
   hover-on-operand, missing HLT/length diagnostics, a confusing mnemonic error message, blank lines
   silently becoming an implicit HLT (`lmc_lsp`, the most serious one), a stale `TextEditor` reference
@@ -318,9 +340,12 @@ Still open, roughly in the order it's worth tackling them:
 2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
-   variable that starts `null`, which is what makes "load before assembling" testable at all. 26
-   checks over the assemble/load/execute pipeline, the von Neumann frame grouping, and the tooltips
-   and legend. It fails and exits non-zero when any of it breaks — verified by breaking it.
+   variable that starts `null`, which is what makes "load before assembling" testable at all. 38
+   checks over the assemble/load/execute pipeline, the von Neumann frame grouping, the tooltips
+   and legend, and the screen. jsdom has no 2d context, so the script installs one of its own that
+   records what it is asked to paint — which is how the screen's rendering gets covered at all, and
+   it is exactly the impure boundary this script exists for. It fails and exits non-zero when any
+   of it breaks — verified by breaking it.
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
@@ -332,20 +357,15 @@ Still open, roughly in the order it's worth tackling them:
    VS Code client using it.
 5. **The VS Code extension itself isn't packaged/published anywhere** — `npx vsce package` works
    locally, but there's no CI job building a `.vsix`, let alone a Marketplace listing.
-6. **Four language changes are planned in `lmc_lsp`, three of them decided** — the plan, the
-   reasoning and the order live in that repo's CLAUDE.md under "Envisagé, pas fait"; it is not
-   repeated here, the language is its business. What lands in *this* repo when they happen:
-   - **`X` becomes `IX`** (decided, do it first while nothing else is in flight) — the TextMate
-     grammar's register rule, the register tooltip in `webview/index.html`, the `lst[X]` suffix in
-     the grammar comment, and every example that indexes.
-   - **Opcode 9 becomes polymorphic, and `PSH`/`POP` gain a register operand** — nothing here
-     changes except the pinned version, but note `PSH`/`POP` change machine word, so any committed
-     `.lmcobj` is stale (they regenerate on a click).
-   - **`PIX`, a screen instruction** — a small canvas under "Sortie (OUT)" in the I/O frame, fed by
-     a new `PixelPlotted` runner event, rendered by the webview. This repo owns that rendering.
-   - **Renaming the language itself** (`LMC` → ?) is undecided and independent. Only its ordering
-     concerns this repo: the **file extension goes first or never**, since every `.lmc` written
-     meanwhile is one more file to rename, and this repo owns `.lmc`, `.lmcobj`, the `lmc` language
-     id, the `source.lmc` grammar scope and nine example programs.
-   Each of these ends with a `lmc_lsp` release and the **double pin** here — `gleam.toml` and
+6. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
+   three that were planned — `X` → `IX`, opcode 9 in families with `PSH`/`POP` on a register, and
+   the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
+   data be called what it likes, the same split as `STA total`) — landed in `lmc_lsp` `v0.4.0` and
+   are taken up here; see the done list above. The rename is undecided and independent; the plan
+   and the reasoning live in `lmc_lsp`'s CLAUDE.md, the language being its business. Only the
+   ordering concerns this repo: the **file extension goes first or never**, since every `.lmc`
+   written meanwhile is one more file to rename, and this repo owns `.lmc`, `.lmcobj`, the `lmc`
+   language id, the `source.lmc` grammar scope and twelve example programs (the count here said
+   nine, and had been wrong for a while — `ls examples/*.lmc | wc -l` settles it). It ends, like every
+   language change, with an `lmc_lsp` release and the **double pin** here — `gleam.toml` and
    `scripts/fetch-lsp-bundle.mjs`, always together.

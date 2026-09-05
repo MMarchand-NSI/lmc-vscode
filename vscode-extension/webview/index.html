@@ -69,13 +69,13 @@
             <span class="tip" role="tooltip"><strong>Program Counter</strong> — le compteur ordinal : l'adresse de la prochaine instruction à lire. Écrire dedans, c'est sauter, et c'est tout ce que font BRA, BRZ, BRP et RET. Il est incrémenté dès la phase Fetch, comme sur un vrai processeur — à l'arrêt, il pointe donc déjà après la dernière instruction exécutée.</span>
             <span id="pc" class="value">—</span>
           </div>
-          <!-- X, LR et SP n'apparaissent qu'avec les tableaux, les
+          <!-- IX, LR et SP n'apparaissent qu'avec les tableaux, les
                sous-programmes et la pile. Ils sont affichés plus discrètement
                qu'ACC et PC pour que les premières séances ne soient pas
                encombrées par des registres dont on ne parle pas encore. -->
           <div class="register secondary">
-            <span class="label" tabindex="0">X</span>
-            <span class="tip" role="tooltip"><strong>Registre d'index</strong> — X n'est pas un acronyme : c'est le nom traditionnel d'un registre d'index, hérité du 6800 et du 6502. Le suffixe [X] ajoute son contenu à l'adresse écrite — lst[X] désigne la case lst + X, ce qui permet de parcourir un tableau ou une chaîne.</span>
+            <span class="label" tabindex="0">IX</span>
+            <span class="tip" role="tooltip"><strong>Index Register</strong> — le registre d'index. Le suffixe [IX] ajoute son contenu à l'adresse écrite — lst[IX] désigne la case lst + IX, ce qui permet de parcourir un tableau ou une chaîne avec une seule instruction, quel que soit le rang lu.</span>
             <span id="x" class="value">—</span>
           </div>
           <div class="register secondary">
@@ -85,7 +85,7 @@
           </div>
           <div class="register secondary">
             <span class="label" tabindex="0">SP</span>
-            <span class="tip" role="tooltip"><strong>Stack Pointer</strong> — le pointeur de pile : il désigne la prochaine case libre. La pile descend depuis la case 99 ; PSH y range ACC, POP l'en retire.</span>
+            <span class="tip" role="tooltip"><strong>Stack Pointer</strong> — le pointeur de pile : il désigne la prochaine case libre. La pile descend depuis la case 99 ; PSH y range un registre, POP l'en retire. Écrits sans registre, ils travaillent sur ACC.</span>
             <span id="sp" class="value">—</span>
           </div>
 
@@ -104,6 +104,20 @@
           <div class="io-part output-tray">
             <h3>Sortie (OUT)</h3>
             <ul id="output"></ul>
+          </div>
+          <!-- L'écran est une sortie, au même titre qu'OUT, et il est dans le
+               même cadre pour cette raison : c'est un périphérique, pas un
+               organe du processeur. Le canvas fait 32 × 32 pixels réels,
+               agrandis par le CSS — un point du programme est donc un pixel
+               du canvas, sans arithmétique nulle part. -->
+          <div class="io-part screen-part">
+            <h3 tabindex="0">Écran (PLT)</h3>
+            <span class="tip" role="tooltip"><strong>PLT adr</strong> — allumer un point. L'instruction lit trois cases consécutives à partir de adr : x, y, puis la couleur, un index de palette. Le processeur ne connaît ni la taille de l'écran ni les couleurs : il dit « allume ce point », l'affichage décide du reste. Ici, 32 × 32 points et huit couleurs.</span>
+            <canvas id="screen" width="32" height="32" role="img" aria-label="Écran, 32 sur 32 points"></canvas>
+            <!-- Les pastilles sont construites par app_ffi.mjs à partir de sa
+                 propre palette : une seule liste de couleurs, sinon la
+                 légende finit par mentir sur ce qui est peint. -->
+            <ul id="palette" class="palette"></ul>
           </div>
         </section>
       </div>

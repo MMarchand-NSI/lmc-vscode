@@ -457,3 +457,104 @@ pub fn object_code_none_when_the_program_does_not_assemble_test() {
   assert m.machine == None
   assert model.object_code(m) == None
 }
+
+// ── Écran (PLT) ───────────────────────────────────────────────────
+
+/// Un point unique, allumé puis la machine s'arrête. `pt` est en case 2,
+/// donc `PLT pt` s'assemble en 9202.
+const one_point = "PLT pt\nHLT\npt: DAT 20, 25, 7\n"
+
+pub fn nothing_is_lit_before_anything_runs_test() {
+  // La RAM est chargée, rien n'a été exécuté : l'écran est vide. Ce n'est
+  // pas le programme qui allume des points, c'est son exécution.
+  let m = loaded(one_point)
+  assert model.screen_points(m) == []
+}
+
+pub fn plt_lights_one_point_test() {
+  let m = loaded(one_point) |> model.step
+  assert model.screen_points(m) == [#(20, 25, 7)]
+}
+
+pub fn points_accumulate_across_steps_test() {
+  // L'écran garde ce qui a été allumé : le runner, lui, émet l'événement et
+  // l'oublie. C'est ce qui distingue l'écran de `last_events`.
+  let m = loaded("PLT a\nPLT b\nHLT\na: DAT 1, 2, 3\nb: DAT 4, 5, 6\n")
+  let m = m |> model.step |> model.step
+  assert model.screen_points(m) == [#(1, 2, 3), #(4, 5, 6)]
+}
+
+pub fn colour_zero_erases_a_point_test() {
+  // 0 est le fond : rallumer un point en 0, c'est l'éteindre, et aucune
+  // instruction supplémentaire n'est nécessaire pour effacer.
+  let source =
+    "PLT a\nLDA zero\nSTA c\nPLT a\nHLT\n"
+    <> "a: DAT 3, 4\nc: DAT 5\nzero: DAT 0\n"
+  // `a` est en case 5, donc a+2 est `c` : c'est bien la couleur du même
+  // point qu'on remet à 0. Le voir allumé d'abord est indispensable — sans
+  // cette première assertion, le test passerait aussi si `PLT` n'allumait
+  // jamais rien.
+  let lit = loaded(source) |> model.step
+  assert model.screen_points(lit) == [#(3, 4, 5)]
+  assert model.screen_points(model.run_to_halt(lit)) == []
+}
+
+pub fn a_point_outside_the_screen_is_not_lit_test() {
+  // Le processeur ne connaît pas la taille de l'écran et n'a donc rien fait
+  // de mal ; c'est l'affichage qui ne suit pas. Il le dit, plutôt que de
+  // laisser un écran vide sans explication.
+  let m = loaded("PLT pt\nHLT\npt: DAT 40, 3, 5\n") |> model.step
+  assert model.screen_points(m) == []
+  assert m
+    |> model.last_cycle
+    |> list.any(fn(phase) {
+      list.any(phase.details, string.contains(_, "hors écran"))
+    })
+}
+
+pub fn a_colour_outside_the_palette_is_not_lit_test() {
+  let m = loaded("PLT pt\nHLT\npt: DAT 3, 4, 9\n") |> model.step
+  assert model.screen_points(m) == []
+  assert m
+    |> model.last_cycle
+    |> list.any(fn(phase) {
+      list.any(phase.details, string.contains(_, "hors palette"))
+    })
+}
+
+pub fn reset_clears_the_screen_test() {
+  // Sans ça, la seconde exécution dessinerait par-dessus les points de la
+  // première, et un écran ne se lirait plus.
+  let m = loaded(one_point) |> model.step
+  assert model.screen_points(m) == [#(20, 25, 7)]
+  assert model.screen_points(model.reset(m)) == []
+}
+
+pub fn loading_clears_the_screen_test() {
+  let m = loaded(one_point) |> model.step
+  let assert Some(code) = model.object_code(m)
+  assert model.screen_points(model.load_object_code(m, code)) == []
+}
+
+pub fn points_are_returned_in_screen_order_test() {
+  // L'ordre est celui du balayage — ligne par ligne, de gauche à droite —
+  // et pas celui dans lequel le programme les a allumés : l'écran est un
+  // état, pas un journal.
+  let m =
+    loaded("PLT a\nPLT b\nHLT\na: DAT 9, 9, 1\nb: DAT 0, 0, 2\n")
+    |> model.run_to_halt
+  assert model.screen_points(m) == [#(0, 0, 2), #(9, 9, 1)]
+}
+
+pub fn a_point_survives_an_input_pause_test() {
+  // Une entrée coupe l'exécution en deux appels, et `last_events`
+  // s'accumule de l'un à l'autre. L'écran, lui, doit rester intact : ni
+  // perdu ni remis à zéro par la reprise. (Il ne peut pas être *dupliqué* :
+  // les points sont un dictionnaire, réallumer le même point au même
+  // endroit ne se voit pas — ce n'est donc pas ce que ce test montre.)
+  let m =
+    loaded("PLT pt\nINP\nHLT\npt: DAT 2, 3, 4\n")
+    |> model.run_to_halt
+    |> model.resume_after_input(7)
+  assert model.screen_points(m) == [#(2, 3, 4)]
+}

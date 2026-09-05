@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "LMC",
   "scopeName": "source.lmc",
-  "comment": "Vérifié contre ../lmc_lsp/LANGAGE.md et src/lmc/parse/lexer.gleam (v0.3.0). La liste des mnémoniques et des registres existe donc à deux endroits : ici et dans le lexer du serveur, qui reste la référence. Une évolution du langage doit passer par les deux — c'est ce genre de duplication qui avait laissé le README de ce dépôt affirmer des choses fausses.",
+  "comment": "Vérifié contre ../lmc_lsp/LANGAGE.md et src/lmc/parse/lexer.gleam (v0.4.0). La liste des mnémoniques et des registres existe donc à deux endroits : ici et dans le lexer du serveur, qui reste la référence. Une évolution du langage doit passer par les deux — c'est ce genre de duplication qui avait laissé le README de ce dépôt affirmer des choses fausses.",
   "patterns": [
     {
       "include": "#comments"
@@ -53,18 +53,18 @@
     "keywords": {
       "patterns": [
         {
-          "comment": "Les seize mnémoniques, insensibles à la casse.",
+          "comment": "Les dix-sept mnémoniques, insensibles à la casse.",
           "name": "keyword.control.lmc",
-          "match": "(?i)\\b(ADD|SUB|STA|LDA|MOV|BRA|BRZ|BRP|JSR|RET|HLT|PSH|POP|INP|OUT|DAT)\\b"
+          "match": "(?i)\\b(ADD|SUB|STA|LDA|MOV|BRA|BRZ|BRP|JSR|RET|HLT|PSH|POP|PLT|INP|OUT|DAT)\\b"
         }
       ]
     },
     "registers": {
       "patterns": [
         {
-          "comment": "Les cinq registres sont des mots réservés, reconnus par le lexer au même titre que les mnémoniques — un label ne peut pas s'appeler X ni SP.",
+          "comment": "Les cinq registres sont des mots réservés, reconnus par le lexer au même titre que les mnémoniques — un label ne peut pas s'appeler IX ni SP.",
           "name": "variable.language.register.lmc",
-          "match": "(?i)\\b(ACC|X|LR|SP|PC)\\b"
+          "match": "(?i)\\b(ACC|IX|LR|SP|PC)\\b"
         }
       ]
     },
@@ -105,7 +105,7 @@
           "match": ","
         },
         {
-          "comment": "Crochets de l'adressage indexé : dans lst[X], le X est coloré par la règle des registres, comme partout ailleurs.",
+          "comment": "Crochets de l'adressage indexé : dans lst[IX], le IX est coloré par la règle des registres, comme partout ailleurs.",
           "name": "punctuation.section.brackets.lmc",
           "match": "[\\[\\]]"
         }

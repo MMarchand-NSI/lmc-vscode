@@ -110,3 +110,18 @@ pub fn data_addresses_is_an_empty_array_not_null_without_dat_test() {
   let json = loaded("INP\nOUT\nHLT\n") |> render.to_json
   assert string.contains(json, "\"dataAddresses\":[]")
 }
+
+pub fn an_unlit_screen_renders_as_an_empty_array_test() {
+  // Un tableau vide, et non mille zéros : le payload ne porte que les points
+  // allumés, l'affichage repeint le fond lui-même.
+  let json = loaded("PLT pt\nHLT\npt: DAT 20, 25, 7\n") |> render.to_json
+  assert string.contains(json, "\"screen\":[]")
+}
+
+pub fn a_lit_point_renders_with_its_colour_test() {
+  let json =
+    loaded("PLT pt\nHLT\npt: DAT 20, 25, 7\n")
+    |> model.step
+    |> render.to_json
+  assert string.contains(json, "\"screen\":[{\"x\":20,\"y\":25,\"c\":7}]")
+}

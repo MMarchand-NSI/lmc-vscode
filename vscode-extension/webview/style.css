@@ -201,6 +201,21 @@ h2 {
   visibility: visible;
 }
 
+/* Troisième ancre : le titre « Écran (PLT) ». Même règle .tip, même
+   déclencheur, mais en bloc — la partie écran occupe toute la largeur du
+   cadre, contrairement au bouton ci-dessous. */
+.screen-part {
+  position: relative;
+}
+.screen-part h3 {
+  cursor: help;
+}
+.screen-part h3:hover ~ .tip,
+.screen-part h3:focus-visible ~ .tip {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* Deuxième ancre d'infobulle, pour un élément qui n'est pas une ligne de
    registre — le bouton « Assembler ». Même règle .tip, même déclencheur. */
 .tip-anchor {
@@ -289,6 +304,46 @@ button:disabled {
   padding: 2px 8px;
   border-radius: 3px;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Écran (PLT) ───────────────────────────────────────────────── */
+
+/* Le canvas fait 32 × 32 pixels réels et c'est le CSS qui l'agrandit :
+   image-rendering: pixelated garde les points carrés au lieu de les
+   interpoler en taches floues. Sans lui, un point isolé devient un halo et
+   la grille de coordonnées disparaît — or c'est elle qu'on enseigne. */
+#screen {
+  display: block;
+  width: 100%;
+  max-width: 192px;
+  aspect-ratio: 1 / 1;
+  image-rendering: pixelated;
+  border: 1px solid var(--vscode-panel-border, #3c3c3c);
+  border-radius: 2px;
+  background: #12121a;
+}
+
+.palette {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px 8px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.palette li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.pal-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--vscode-panel-border, #3c3c3c);
+  flex: none;
 }
 
 /* ── Memory grid ───────────────────────────────────────────────── */
