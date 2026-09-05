@@ -43,6 +43,7 @@ are in French, like the language reference.
 | `test-pgm.lmc`, `fibo.lmc` | integer division and Fibonacci — the eleven classic mnemonics only |
 | `broken.lmc` | deliberately invalid, to see the diagnostics |
 | `tableau.lmc` | an array walked with `lst[IX]` |
+| `affiche_tab.lmc` | the same walk, one instruction shorter: `MOV IX, i` loads a cell straight into `IX` |
 | `chaine.lmc` | a string walked to its terminal zero |
 | `double-boucle.lmc` | nested loops: a multiplication table, since the language has no multiply |
 | `ecran.lmc` | `PLT` — a diagonal and a line, on the 32 × 32 screen |
@@ -70,6 +71,7 @@ examples/              # Opened automatically by the "Run LMC Extension" launch
   fibo.lmc
   broken.lmc
   tableau.lmc
+  affiche_tab.lmc
   chaine.lmc
   double-boucle.lmc
   sous-programme.lmc
