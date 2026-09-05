@@ -178,7 +178,16 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   line in the editor. `Halted` was missed when `WaitingForInput`
   was fixed; the reverse case — execution falling *into* a `DAT`, which halts because opcode 0 is
   `HLT` — is what makes `pc - 1` the right correction rather than blanking the highlight, and has
-  its own test. It also owns **the screen** (`screen_width`/`screen_height`/`palette_size` = 32, 32,
+  its own test. **The Fetch phase of the cycle panel says that increment out loud**, as a second
+  line under Fetch (`"PC 0 → 1 (incrémenté pendant la lecture, avant le décodage)"`, rendered as a
+  sub-list exactly as Execute already is when it carries several actions): reading the word and
+  advancing the counter are two acts of one phase, and naming the second is what makes the register
+  panel's off-by-one legible instead of mysterious. That line is *derived*, not reported: the runner
+  emits no event for the increment, so `event_phase_details` computes `address + 1` from
+  `Fetched(address, raw)`. Safe because `do_fetch` in `lmc_lsp`'s `runner/step_phase.gleam` is the
+  only place that emits `Fetched`, and it always sets `program_counter + 1`; if that ever stops
+  being 1, this is the single place to fix. It also owns **the screen**
+  (`screen_width`/`screen_height`/`palette_size` = 32, 32,
   8, and the lit points): `lmc_lsp`'s runner emits `PixelPlotted(x, y, colour)` and checks no bound
   at all, deliberately — a screen is a device, so its size is the display's business, exactly as
   `OUT` does not check the width of the terminal. A point outside the screen or outside the palette
@@ -366,9 +375,10 @@ Still open, roughly in the order it's worth tackling them:
 2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
-   variable that starts `null`, which is what makes "load before assembling" testable at all. 38
+   variable that starts `null`, which is what makes "load before assembling" testable at all. 44
    checks over the assemble/load/execute pipeline, the von Neumann frame grouping, the tooltips
-   and legend, and the screen. jsdom has no 2d context, so the script installs one of its own that
+   and legend, the screen, and the Fetch/Decode/Execute panel (that the three phases are three,
+   and that Fetch carries both the read and the PC increment). jsdom has no 2d context, so the script installs one of its own that
    records what it is asked to paint — which is how the screen's rendering gets covered at all, and
    it is exactly the impure boundary this script exists for. It fails and exits non-zero when any
    of it breaks — verified by breaking it.

@@ -571,8 +571,38 @@ fn data_addresses_of_source(model: Model) -> List(Int) {
 pub fn last_cycle(model: Model) -> List(CyclePhase) {
   model.last_events
   |> dedupe_input_accumulator_change
-  |> list.map(event_phase_and_detail)
+  |> list.flat_map(event_phase_details)
   |> group_consecutive_by_phase
+}
+
+/// Un événement donne une ligne, sauf `Fetched` qui en donne deux : lire le
+/// mot *et* avancer le compteur ordinal sont deux actes distincts de la même
+/// phase, et le second n'était pas montré du tout. Il faut qu'il le soit :
+/// c'est lui qui explique pourquoi une machine arrêtée affiche un `PC` d'un
+/// cran au-delà de l'instruction qui l'a arrêtée, et pourquoi `JSR` sauve
+/// l'adresse de retour en recopiant `PC` sans aucun calcul.
+///
+/// Le nouveau `PC` est déduit, pas rapporté : le runner n'émet pas
+/// d'événement pour cet incrément. La déduction est sûre et vérifiée, pas
+/// supposée — `Fetched` n'est émis qu'à un seul endroit (`do_fetch` dans
+/// `lmc_lsp`, `runner/step_phase.gleam`), qui pose toujours
+/// `program_counter + 1` en émettant `Fetched(program_counter, raw)`. Si un
+/// jour l'incrément cesse d'être de 1, c'est ici que ça se corrige.
+fn event_phase_details(evt: Event) -> List(#(String, String)) {
+  case evt {
+    event.Fetched(address, _) -> [
+      event_phase_and_detail(evt),
+      #(
+        "Fetch",
+        "PC "
+          <> int.to_string(address)
+          <> " → "
+          <> int.to_string(address + 1)
+          <> " (incrémenté pendant la lecture, avant le décodage)",
+      ),
+    ]
+    _ -> [event_phase_and_detail(evt)]
+  }
 }
 
 /// INP with input available is the only case where the runner emits two

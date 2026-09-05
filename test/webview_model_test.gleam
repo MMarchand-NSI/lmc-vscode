@@ -253,6 +253,39 @@ pub fn step_produces_one_entry_per_phase_test() {
   assert execute.details == ["sortie ← ACC (9)"]
 }
 
+pub fn fetch_shows_the_program_counter_moving_test() {
+  // Lire le mot et avancer le compteur ordinal sont deux actes de la phase
+  // Fetch, et le second manquait. C'est pourtant lui qui explique le décalage
+  // que le panneau des registres affiche sans le justifier : une machine
+  // arrêtée montre un PC déjà passé à l'instruction suivante.
+  let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step
+  let assert [fetch, _decode, _execute] = model.last_cycle(m)
+  assert fetch.details
+    == [
+      "lire mem[0] → 5003",
+      "PC 0 → 1 (incrémenté pendant la lecture, avant le décodage)",
+    ]
+}
+
+pub fn the_program_counter_line_follows_the_instruction_test() {
+  // Deuxième instruction : la ligne suit l'adresse lue, elle n'est pas figée
+  // sur 0 → 1.
+  let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step |> model.step
+  let assert [fetch, ..] = model.last_cycle(m)
+  assert list.contains(
+    fetch.details,
+    "PC 1 → 2 (incrémenté pendant la lecture, avant le décodage)",
+  )
+}
+
+pub fn the_program_counter_line_stays_inside_the_fetch_phase_test() {
+  // Deux détails sous Fetch, pas une quatrième phase : le cycle reste
+  // Fetch → Decode → Execute, ce qui est tout l'intérêt du panneau.
+  let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step
+  let cycle = model.last_cycle(m)
+  assert list.map(cycle, fn(p) { p.name }) == ["Fetch", "Decode", "Execute"]
+}
+
 pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
   // "STA, adresse 21" alone would read exactly like a line of source code
   // (STA 21 is valid LMC) and invite the false idea that decode

@@ -285,12 +285,44 @@ async function screen() {
     new Set(frame.map((r) => r.fill)).size, 2);
 }
 
+// ── Le cycle Fetch / Decode / Execute ──────────────────────────────
+
+// Le panneau du cycle est la seule chose qui explique le décalage du PC que
+// le panneau des registres affiche sans le justifier. Ce test regarde le DOM
+// réel, pas le modèle : `model.gleam` a déjà ses propres tests, ce qui n'est
+// vérifié nulle part ailleurs c'est que la phase Fetch, devenue une liste de
+// deux actions, se peint bien en sous-liste comme le fait Execute.
+async function cycle() {
+  console.log("\nCycle Fetch / Decode / Execute");
+  const p = openPanel();
+  await p.send({ type: "setSource", source: "LDA n\nADD n\nHLT\nn: DAT 5\n" });
+  await p.click("assemble");
+  await p.click("load");
+  await p.click("step");
+
+  const phases = [...p.document.querySelectorAll("#cycle-events > li")];
+  check("le cycle a exactement trois phases", phases.length, 3);
+  check("dans l'ordre", phases.map((li) => li.querySelector("strong").textContent).join(","),
+    "Fetch,Decode,Execute");
+
+  const fetchLines = [...phases[0].querySelectorAll("li")].map((li) => li.textContent);
+  check("Fetch montre deux actions, pas une", fetchLines.length, 2);
+  check("la lecture du mot", fetchLines[0], "lire mem[0] → 5003");
+  check("et l'avancée du compteur ordinal", fetchLines[1],
+    "PC 0 → 1 (incrémenté pendant la lecture, avant le décodage)");
+
+  // Le registre affiche 1 alors que l'instruction exécutée est celle de la
+  // case 0 : c'est exactement ce décalage que la ligne ci-dessus explique.
+  check("et le registre PC le confirme", p.text("pc"), "1");
+}
+
 // ── ─────────────────────────────────────────────────────────────────
 
 await pipeline();
 await frames();
 await annotations();
 await screen();
+await cycle();
 
 console.log(
   failures === 0
