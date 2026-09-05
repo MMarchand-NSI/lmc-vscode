@@ -413,7 +413,11 @@ Still open, roughly in the order it's worth tackling them:
    substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
    `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
    independent of how solid the model/render logic underneath now is.
-2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+2. **The integer-literal fix is written but not published.** `lmc_lsp` refuses an integer too
+   large to be represented, but that commit sits unpushed in the local `../lmc_lsp` clone —
+   `origin/master` is exactly `v0.6.0`. Nothing here can pin it. Push and tag it there, then
+   the usual **double pin** is the whole of the work on this side.
+3. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 44
@@ -426,15 +430,15 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-3. **`lmc_lsp` is still private**, so `fetch-lsp-bundle.mjs` and `gleam deps download` both need `gh
+4. **`lmc_lsp` is still private**, so `fetch-lsp-bundle.mjs` and `gleam deps download` both need `gh
    auth`/the deploy key — fine for solo development, but blocks any real distribution. No public-
    release work (Marketplace listing, making `lmc_lsp` public) has started.
-4. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+5. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it.
-5. **The VS Code extension itself isn't packaged/published anywhere** — `npx vsce package` works
+6. **The VS Code extension itself isn't packaged/published anywhere** — `npx vsce package` works
    locally, but there's no CI job building a `.vsix`, let alone a Marketplace listing.
-6. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
+7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX`, opcode 9 in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
    data be called what it likes, the same split as `STA total`) — landed in `lmc_lsp` `v0.4.0` and
