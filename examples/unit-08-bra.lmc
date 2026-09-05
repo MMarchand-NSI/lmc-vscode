@@ -1,0 +1,22 @@
+// 8. Sauter : BRA.
+//
+// Jusqu'ici le programme se déroulait en ligne droite, de haut en bas.
+// BRA écrit une adresse dans le compteur ordinal : l'instruction suivante
+// ne sera pas celle d'en dessous, mais celle qui porte l'étiquette.
+//
+// Ici le saut passe par-dessus une instruction, qui n'est donc jamais
+// exécutée. Retire la ligne BRA et relance : la sortie change.
+//
+// Une étiquette est un nom collé à une case, comme pour DAT. La différence
+// n'est pas dans l'étiquette, elle est dans ce qu'on en fait : une adresse
+// où sauter plutôt qu'une case où lire.
+//
+// Entrée : 7            Sortie : 7      (sans le BRA : 17)
+
+        INP
+        BRA saute
+        ADD dix
+saute:  OUT
+        HLT
+
+dix:    DAT 10

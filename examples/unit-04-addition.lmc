@@ -1,0 +1,16 @@
+// 4. Additionner : ADD.
+//
+// ADD 50 ajoute le contenu de la case 50 à ACC.
+//
+// Attention, c'est le point qui surprend le plus au début : l'opérande
+// d'ADD n'est pas un nombre, c'est une adresse. ADD 50 n'ajoute pas 50, il
+// ajoute ce qu'il y a dans la case 50.
+//
+// Entrée : 3 8          Sortie : 11
+
+        INP
+        STA 50
+        INP
+        ADD 50
+        OUT
+        HLT

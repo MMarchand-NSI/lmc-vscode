@@ -1,0 +1,44 @@
+// 12. Répéter : la boucle « pour ».
+//
+// Afficher tous les nombres de 1 jusqu'à n.
+//
+// Une boucle « pour » tient en quatre morceaux, toujours les mêmes, et
+// c'est ce squelette qu'il faut retenir :
+//   1. préparer le compteur avant d'entrer
+//   2. tester s'il faut continuer, exactement comme au fichier 11
+//   3. faire le travail
+//   4. avancer le compteur, puis revenir au test
+//
+// Le test mérite un mot. On voudrait « sauter si négatif » pour sortir
+// quand i a dépassé n, mais cette instruction n'existe pas : il n'y a que
+// BRP, « sauter si positif ou nul ». On saute donc vers le corps de la
+// boucle quand il reste du travail, et la sortie se met juste derrière.
+// C'est une gymnastique à laquelle on s'habitue vite.
+//
+// Entrée : 4            Sortie : 1 2 3 4
+// Entrée : 1            Sortie : 1
+// Entrée : 0            Sortie :        (rien, et c'est correct)
+
+        INP             // 1. préparer
+        STA n
+        LDA un
+        STA i
+
+boucle: LDA n           // 2. tester : reste-t-il au moins une valeur ?
+        SUB i
+        BRP corps       // n - i >= 0 : oui, on continue
+        BRA fin         // sinon : i a dépassé n, la boucle est finie
+
+corps:  LDA i           // 3. le travail
+        OUT
+
+        LDA i           // 4. avancer le compteur, puis revenir au test
+        ADD un
+        STA i
+        BRA boucle
+
+fin:    HLT
+
+un:     DAT 1
+n:      DAT
+i:      DAT

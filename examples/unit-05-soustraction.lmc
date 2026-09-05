@@ -1,0 +1,21 @@
+// 5. Soustraire : SUB.
+//
+// SUB 51 retire le contenu de la case 51 à ACC. L'ordre compte : c'est
+// toujours ACC moins la case, jamais l'inverse. Il faut donc charger le
+// premier nombre dans ACC avant de retirer le second.
+//
+// Ne fais pas descendre le résultat sous zéro : la machine sait calculer
+// avec des nombres négatifs, mais elle ne sait pas les afficher, et OUT
+// écrirait 9997 au lieu de -3. Le fichier 10 s'en sert justement pour
+// comparer deux nombres sans jamais afficher la différence.
+//
+// Entrée : 10 4         Sortie : 6
+
+        INP
+        STA 50
+        INP
+        STA 51
+        LDA 50
+        SUB 51
+        OUT
+        HLT

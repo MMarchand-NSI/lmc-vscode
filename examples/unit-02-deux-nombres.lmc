@@ -1,0 +1,16 @@
+// 2. Deux nombres : l'entrée est une file.
+//
+// Chaque INP prend le nombre suivant, dans l'ordre où ils ont été fournis.
+//
+// L'ordre des instructions compte : ACC ne retient qu'une valeur à la fois,
+// donc le second INP écrase le premier nombre. Il faut l'avoir affiché
+// avant. Déplace le premier OUT après le second INP et tu verras le premier
+// nombre disparaître.
+//
+// Entrée : 3 8          Sortie : 3 8
+
+        INP
+        OUT
+        INP
+        OUT
+        HLT

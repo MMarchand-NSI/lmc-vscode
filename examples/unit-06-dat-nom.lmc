@@ -1,0 +1,26 @@
+// 6. Donner un nom aux cases : DAT.
+//
+// C'est le programme du fichier 5, aux noms près. DAT réserve une case et
+// lui donne un nom ; c'est l'assembleur qui choisit son adresse, et on n'a
+// plus à retenir de numéros.
+//
+// Le processeur, lui, ne voit aucune différence : il reçoit les mêmes
+// instructions avec des adresses. DAT est un confort pour qui écrit, pas
+// une instruction de plus pour la machine. Clique sur Assembler et regarde
+// le fichier objet : il n'y a ni noms ni DAT dedans.
+//
+// Entrée : 10 4         Sortie : 6
+
+        INP
+        STA premier
+        INP
+        STA second
+        LDA premier
+        SUB second
+        OUT
+        HLT
+
+// Deux cases réservées sans valeur de départ : le programme les remplit
+// lui-même avant de les lire.
+premier: DAT
+second: DAT

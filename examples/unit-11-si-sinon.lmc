@@ -1,0 +1,34 @@
+// 11. Si ... sinon : afficher le plus grand de deux nombres.
+//
+// Un « si ... sinon » complet, où les deux branches font un vrai travail
+// avant de se rejoindre.
+//
+// La ligne à ne pas oublier est le BRA de la fin de la première branche.
+// Sans lui, la machine continuerait tout droit et exécuterait la seconde
+// branche à la suite de la première. Retire-le et relance avec 3 8 : tu
+// verras 8 puis 3.
+//
+// Entrée : 3 8          Sortie : 8
+// Entrée : 9 2          Sortie : 9
+// Entrée : 4 4          Sortie : 4
+
+        INP
+        STA a
+        INP
+        STA b
+
+        LDA a
+        SUB b
+        BRP agrand
+
+        LDA b           // sinon : b est le plus grand
+        OUT
+        BRA fin
+
+agrand: LDA a           // si a - b >= 0 : a est le plus grand, ou ils sont égaux
+        OUT
+
+fin:    HLT
+
+a:      DAT
+b:      DAT

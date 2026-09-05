@@ -1,0 +1,47 @@
+// 13. Une boucle qui calcule : la somme de 1 à n.
+//
+// Le squelette du fichier 12, sans une virgule de changement, avec une
+// seule chose en plus : une case total, mise à zéro avant la boucle et
+// augmentée à chaque tour. C'est le motif de l'accumulation, et c'est
+// celui dont on se sert le plus souvent.
+//
+// Remarque le LDA zero / STA total du début, alors que total est déjà une
+// case vide. Il ne sert à rien au premier chargement, mais il rend le
+// programme relançable : sans lui, un second Run repartirait du total
+// précédent. Un programme qui prépare ses variables au lieu de compter sur
+// leur valeur de départ marche à tous les coups.
+//
+// Entrée : 4            Sortie : 10
+// Entrée : 1            Sortie : 1
+// Entrée : 0            Sortie : 0
+
+        INP             // 1. préparer
+        STA n
+        LDA un
+        STA i
+        LDA zero
+        STA total
+
+boucle: LDA n           // 2. tester
+        SUB i
+        BRP corps
+        BRA fin
+
+corps:  LDA total       // 3. le travail : total = total + i
+        ADD i
+        STA total
+
+        LDA i           // 4. avancer le compteur
+        ADD un
+        STA i
+        BRA boucle
+
+fin:    LDA total
+        OUT
+        HLT
+
+zero:   DAT 0
+un:     DAT 1
+n:      DAT
+i:      DAT
+total:  DAT

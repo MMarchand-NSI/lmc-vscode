@@ -59,6 +59,10 @@ gleam build && node scripts/build-webview.mjs  # required before "LMC: Open Emul
 node scripts/smoke-webview.mjs           # drives that built bundle in a real DOM, playing the
                                           # host's half of the protocol — run it after touching
                                           # the webview, and after build-webview.mjs, not before
+node scripts/check-examples.mjs          # runs every examples/unit-*.lmc against the
+                                          # "Entrée : … Sortie : …" cases in its own header, and
+                                          # checks the formatter would leave the file alone
+                                          # (needs `gleam build` first, like build-webview.mjs)
 ```
 
 ```sh
@@ -317,6 +321,16 @@ never just code review):
   machine words). They are **gitignored artefacts of the Assembler button**, not tracked files —
   `git ls-files examples/` lists no `.lmcobj` at all — so a stale one on someone's disk is a local
   matter, and re-clicking Assembler is the whole fix.
+- **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
+  the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
+  use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
+  writer, and the machine never sees it), `DAT` with an initial value, `BRA`, `BRZ`, `BRP`, a full
+  if/else, and the two loops. Each header carries its own `Entrée : … Sortie : …` cases, and those
+  are not decoration: a scratch harness ran every one of them against the real dependency, 22 cases,
+  plus the three "remove this line and see" claims the comments make. The headers also avoid a
+  trailing comment on any `DAT` line, deliberately, until `lmc_lsp`'s formatter stops eating them
+  (see its CLAUDE.md, "À corriger en priorité"). What the series does *not* cover, and where the
+  older examples take over: `IX` and indexed addressing, `MOV`, `JSR`/`RET`, `PSH`/`POP`, `PLT`.
 - **A screen, 32 x 32, eight colours** (`examples/ecran.lmc` draws a diagonal and a line on it).
   Size and palette were `lmc_lsp`'s two deliberately-unmade decisions — the runner emits
   `PixelPlotted` and paints nothing — and they were made here, where a device belongs. See the
@@ -365,7 +379,8 @@ Still open, roughly in the order it's worth tackling them:
    and the reasoning live in `lmc_lsp`'s CLAUDE.md, the language being its business. Only the
    ordering concerns this repo: the **file extension goes first or never**, since every `.lmc`
    written meanwhile is one more file to rename, and this repo owns `.lmc`, `.lmcobj`, the `lmc`
-   language id, the `source.lmc` grammar scope and twelve example programs (the count here said
-   nine, and had been wrong for a while — `ls examples/*.lmc | wc -l` settles it). It ends, like every
+   language id, the `source.lmc` grammar scope and 26 example programs (the count here has been
+   wrong twice already, first at nine and then at twelve — `ls examples/*.lmc | wc -l` settles it,
+   and the `unit-*` series doubled it). It ends, like every
    language change, with an `lmc_lsp` release and the **double pin** here — `gleam.toml` and
    `scripts/fetch-lsp-bundle.mjs`, always together.

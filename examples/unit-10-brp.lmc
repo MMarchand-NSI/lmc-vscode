@@ -1,0 +1,33 @@
+// 10. Comparer : BRP, « sauter si positif ou nul ».
+//
+// Il n'existe pas d'instruction « est-ce que ACC est plus grand que cette
+// case ». On compare en soustrayant, puis en regardant le signe du
+// résultat. C'est pour cela que la machine n'a pas besoin de plus.
+//
+// Deux pièges :
+//   - « positif OU NUL » : BRP saute aussi quand ACC vaut exactement zéro,
+//     donc le cas d'égalité part avec la branche « plus grand » ;
+//   - on ne fait qu'examiner le signe de la différence, on ne l'affiche
+//     jamais, parce qu'elle peut être négative (voir le fichier 5).
+//
+// Affiche 1 si le nombre lu vaut 10 ou plus, 0 sinon.
+//
+// Entrée : 12           Sortie : 1
+// Entrée : 10           Sortie : 1
+// Entrée : 3            Sortie : 0
+
+        INP
+        SUB dix
+        BRP grand
+
+        LDA zero
+        OUT
+        HLT
+
+grand:  LDA un
+        OUT
+        HLT
+
+dix:    DAT 10
+zero:   DAT 0
+un:     DAT 1

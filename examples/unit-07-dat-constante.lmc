@@ -1,0 +1,18 @@
+// 7. Une case peut avoir une valeur de départ : DAT 10.
+//
+// Jusqu'ici les DAT étaient vides et le programme les remplissait. Une case
+// peut aussi arriver déjà remplie, dès le chargement.
+//
+// C'est ainsi qu'on écrit une constante : le programme lit dix, il ne
+// l'écrit jamais. Rien ne l'en empêcherait pourtant, rien ne distingue une
+// case de code d'une case de données ni une constante d'une variable.
+//
+// Entrée : 5            Sortie : 15
+
+        INP
+        ADD dix
+        OUT
+        HLT
+
+// Une case qui vaut 10 dès le chargement.
+dix:    DAT 10

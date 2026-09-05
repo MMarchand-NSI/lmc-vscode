@@ -1,0 +1,23 @@
+// 3. Garder une valeur : STA et LDA.
+//
+// Pour ne pas perdre un nombre quand ACC est réutilisé, on l'écrit en
+// mémoire, et on le relit plus tard :
+//   STA 50   écrit ACC dans la case 50
+//   LDA 50   relit la case 50 dans ACC
+//
+// La mémoire est faite de cent cases numérotées de 0 à 99. On peut donc
+// désigner la case 50 par son numéro, sans rien déclarer. Le fichier 6
+// montrera comment lui donner un nom.
+//
+// Ici les deux nombres ressortent dans l'ordre inverse, ce qui serait
+// impossible sans mémoire.
+//
+// Entrée : 3 8          Sortie : 8 3
+
+        INP
+        STA 50
+        INP
+        OUT
+        LDA 50
+        OUT
+        HLT

@@ -1,0 +1,18 @@
+// 1. Lire un nombre, l'afficher.
+//
+// Trois instructions, et c'est déjà un programme complet :
+//   INP   prend le nombre suivant dans la file d'entrée et le met dans ACC
+//   OUT   écrit ACC dans la sortie
+//   HLT   arrête la machine
+//
+// ACC, l'accumulateur, est le registre par lequel tout passe. Il n'y a pas
+// d'instruction qui aille de l'entrée à la sortie directement.
+//
+// Ce programme n'a aucune case de données : il occupe les cases 0, 1 et 2,
+// et rien d'autre.
+//
+// Entrée : 7            Sortie : 7
+
+        INP
+        OUT
+        HLT

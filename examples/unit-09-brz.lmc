@@ -1,0 +1,29 @@
+// 9. Un premier test : BRZ, « sauter si zéro ».
+//
+// BRZ saute si ACC vaut zéro, et continue en dessous sinon. C'est le
+// premier « si » : à partir d'un même point, deux chemins.
+//
+// Le dessin est celui de tous les tests qui suivront :
+//   1. mettre dans ACC ce qu'on veut tester
+//   2. un saut conditionnel vers la branche « oui »
+//   3. la branche « non », juste en dessous, qui finit par HLT ou par un BRA
+//   4. la branche « oui », plus loin, à l'étiquette
+//
+// Affiche 1 si le nombre lu est nul, 0 sinon.
+//
+// Entrée : 0            Sortie : 1
+// Entrée : 5            Sortie : 0
+
+        INP
+        BRZ estnul
+
+        LDA zero
+        OUT
+        HLT
+
+estnul: LDA un
+        OUT
+        HLT
+
+zero:   DAT 0
+un:     DAT 1
