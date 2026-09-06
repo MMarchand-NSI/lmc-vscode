@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- **Fix: the Fetch / Decode / Execute lines could render in a serif font.** They use the editor's
+  font, and a font stack naming only fonts that are missing from the machine, with no generic
+  family at the end, falls back to the browser default — which is serif. The stack now ends in
+  `monospace`, so no font setting can do that again. Same fix for the inline code in tooltips.
+
 ## 0.1.0
 
 First public release.
