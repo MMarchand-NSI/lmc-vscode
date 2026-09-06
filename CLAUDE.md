@@ -719,7 +719,13 @@ never just code review):
     from the **Marketplace publisher portal** (`marketplace.visualstudio.com/manage` → Security →
     Personal Access Tokens) with one account used consistently — Azure DevOps also accepts a
     **GitHub** sign-in, which avoids the tenant question entirely.
-  **How the first release actually goes out: by hand, and that is not a workaround to fix.**
+  **It is published: `mmarchand.lmc-vscode` 0.1.0, 2026-09-06T15:44Z**, uploaded by hand from the
+  publisher page. Confirmed from outside rather than taken on trust — the gallery API
+  (`extensionquery`) answers with flags `validated, public`, the categories and keywords took, and
+  the public item page returns 200. One consequence worth knowing: the tag `__ext_lmc` is
+  registered, so VS Code offers the extension on its own to anyone opening a `.lmc` file without
+  it.
+  **How it went out: by hand, and that is not a workaround to fix.**
   The token path is blocked, and the reason was measured rather than guessed on 2026-09-06:
   `az login --allow-no-subscriptions` returns `[]` — the author's personal Microsoft account
   belongs to **no Entra tenant at all** (`azureProfile.json` records zero subscriptions; the MSAL

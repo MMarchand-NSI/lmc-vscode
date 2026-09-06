@@ -2,6 +2,12 @@
 
 A Visual Studio Code extension for the **Little Man Computer (LMC)** assembly language, providing a full language server with syntax-aware editing features.
 
+**Published on the Marketplace:**
+[`mmarchand.lmc-vscode`](https://marketplace.visualstudio.com/items?itemName=mmarchand.lmc-vscode)
+— install from the extensions view, or with `code --install-extension mmarchand.lmc-vscode`.
+This README is developer documentation; the extension's own page is
+[`vscode-extension/README.md`](vscode-extension/README.md).
+
 ## Features
 
 - **Diagnostics** — real-time error and warning highlighting:
