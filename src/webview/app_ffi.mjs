@@ -230,9 +230,11 @@ function renderOutput(state) {
 
 // La palette, et le seul endroit où elle existe. model.gleam sait qu'il y a
 // huit couleurs et que la 0 est le fond ; ce qu'elles valent en RVB ne le
-// regarde pas — un écran est un périphérique. La légende sous le canvas est
-// construite à partir de ce même tableau, sinon elle finirait par annoncer
-// des couleurs qui ne sont plus peintes.
+// regarde pas — un écran est un périphérique.
+//
+// Il y avait sous le canvas une légende qui nommait les huit couleurs. Elle
+// a été retirée : l'écran se lit sans, et elle nommait ses couleurs en
+// français seulement, dans un panneau qui parle cinq langues.
 const PALETTE = [
   "#12121a", // 0 — le fond : allumer un point en 0, c'est l'éteindre
   "#e05252", // 1 — rouge
@@ -244,26 +246,14 @@ const PALETTE = [
   "#eceff4", // 7 — blanc
 ];
 
-const PALETTE_NAMES = [
-  "fond",
-  "rouge",
-  "vert",
-  "bleu",
-  "jaune",
-  "magenta",
-  "cyan",
-  "blanc",
-];
-
-let paletteBuilt = false;
-
 function renderScreen(state) {
   const canvas = document.getElementById("screen");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   // jsdom n'a pas de canvas 2d sans dépendance native : le reste de la page
   // doit continuer à se rendre pour que smoke-webview.mjs serve à quelque
-  // chose. La légende, elle, est du vrai DOM et reste vérifiable.
+  // chose. Le test s'en pose un faux, qui note ce qu'on lui demande de
+  // peindre.
   if (ctx) {
     ctx.fillStyle = PALETTE[0];
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -275,22 +265,6 @@ function renderScreen(state) {
     }
   }
 
-  if (!paletteBuilt) {
-    const legend = document.getElementById("palette");
-    if (legend) {
-      legend.innerHTML = "";
-      PALETTE.forEach((colour, index) => {
-        const li = document.createElement("li");
-        const swatch = document.createElement("span");
-        swatch.className = "pal-swatch";
-        swatch.style.background = colour;
-        li.appendChild(swatch);
-        li.appendChild(document.createTextNode(`${index} ${PALETTE_NAMES[index]}`));
-        legend.appendChild(li);
-      });
-      paletteBuilt = true;
-    }
-  }
 }
 
 function renderStatus(state) {

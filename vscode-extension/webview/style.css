@@ -346,29 +346,6 @@ button:disabled {
   background: #12121a;
 }
 
-.palette {
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 2px 8px;
-  font-size: 11px;
-  opacity: 0.85;
-}
-.palette li {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.pal-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  border: 1px solid var(--vscode-panel-border, #3c3c3c);
-  flex: none;
-}
-
 /* ── Memory grid ───────────────────────────────────────────────── */
 
 .memory-wrap {

@@ -620,6 +620,9 @@ never just code review):
   Size and palette were `lmc_lsp`'s two deliberately-unmade decisions — the runner emits
   `PixelPlotted` and paints nothing — and they were made here, where a device belongs. See the
   `model.gleam` bullet above for what follows from that.
+  There was a legend of the eight colours under the canvas; it is gone. The screen reads without
+  it, and it named its colours in French only, in a panel that speaks five languages. `PALETTE`
+  itself stays in `app_ffi.mjs` — it is what paints.
 - A long list of real bugs caught by actually exercising the extension/webview, not by guessing:
   hover-on-operand, missing HLT/length diagnostics, a confusing mnemonic error message, blank lines
   silently becoming an implicit HLT (`lmc_lsp`, the most serious one), a stale `TextEditor` reference

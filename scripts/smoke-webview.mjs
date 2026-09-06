@@ -251,10 +251,10 @@ async function screen() {
   // sans que model.screen_width suive, l'écran se met à mentir.
   check("32 pixels réels de côté",
     `${canvas.width}x${canvas.height}`, "32x32");
-  check("la palette annonce ses huit couleurs",
-    p.document.querySelectorAll("#palette li").length, 8);
-  check("et dit que l'index 0 est le fond",
-    p.document.querySelector("#palette li").textContent, "0 fond");
+  // La légende des huit couleurs a été retirée : l'écran se lit sans, et
+  // elle ne parlait que français.
+  check("plus de légende de couleurs sous l'écran",
+    p.document.querySelector("#palette") === null, true);
   check("l'écran a son infobulle",
     !!p.document.querySelector(".screen-part .tip strong"), true);
 
