@@ -424,9 +424,16 @@ never just code review):
   `hoverProvider` renamed fails one assertion and exits non-zero. Measured, for the record: 77 440
   bytes locally against 77 829 for the published asset, same flags, and both answer `initialize`,
   diagnostics and hover identically.
-- Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
-  Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
-  session-style current-line decoration).
+- Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, an always-open
+  Fetch/Decode/Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal
+  line, debug-session-style current-line decoration).
+  That panel was a collapsed `<details>` at first, on the argument that it should not compete with
+  the step-by-step highlight. Use settled the opposite way: what the processor does at each step is
+  what the panel is *for*, and folding it hid the lesson. It is a plain section now, holding the
+  bottom of the window and scrolling inside itself — the page does not scroll, the panel does, so a
+  trace that grows from one step to the next cannot push the memory grid off screen.
+  **The layout itself is unverified**: jsdom does no layout, so the smoke test can only assert that
+  nothing is collapsible any more. Heights and scrollbars need a real panel — open item 1.
 - **La case touchée pulse : teal si elle a été lue, rose si elle a été écrite.** Deux couleurs et
   non une, parce que c'est la distinction que la grille doit enseigner — lire ne change rien,
   écrire change la machine — et la couleur chaude va au geste qui modifie.

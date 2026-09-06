@@ -309,6 +309,12 @@ async function cycle() {
   await p.click("load");
   await p.click("step");
 
+  // Le panneau n'est plus repliable : il ne doit y avoir ni <details> ni
+  // <summary> à ouvrir avant de lire la trace.
+  check("le panneau du cycle est toujours déplié",
+    p.document.querySelector(".cycle-panel") !== null
+      && p.document.querySelector("details") === null, true);
+
   const phases = [...p.document.querySelectorAll("#cycle-events > li")];
   check("le cycle a exactement trois phases", phases.length, 3);
   check("dans l'ordre", phases.map((li) => li.querySelector("strong").textContent).join(","),

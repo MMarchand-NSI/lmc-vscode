@@ -5,12 +5,28 @@
   color-scheme: light dark;
 }
 
+/* La page tient dans la hauteur de la fenêtre et ne défile pas elle-même :
+   c'est le panneau du cycle, en bas, qui prend la place restante et défile
+   à l'intérieur. Sans ça, la trace du dernier pas repoussait la grille hors
+   de l'écran à mesure qu'elle grandissait. */
 body {
   font-family: var(--vscode-font-family, sans-serif);
   color: var(--vscode-foreground);
   background: var(--vscode-editor-background);
   margin: 0;
   padding: 12px;
+  box-sizing: border-box;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Le bandeau d'erreur et la barre de conduite gardent leur taille : on ne
+   comprime pas les boutons pour faire de la place à une trace. */
+.error-banner,
+.toolbar {
+  flex: 0 0 auto;
 }
 
 h2 {
@@ -37,6 +53,13 @@ h2 {
 }
 
 .layout {
+  /* Peut rétrécir et défiler en lui-même quand la fenêtre est courte.
+     `min-height: 0` n'est pas décoratif : sans lui un enfant flex refuse de
+     descendre sous la hauteur de son contenu, et la grille mémoire pousserait
+     le panneau du cycle hors de l'écran au lieu de défiler. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
   display: flex;
   gap: 16px;
   align-items: flex-start;
@@ -526,26 +549,22 @@ button:disabled {
 }
 
 /* ── Fetch/Decode/Execute panel ───────────────────────────────────
-   Collapsed by default (native <details>, no JS needed for the fold) —
-   the point is that it's available for the lesson on "what a CPU cycle
-   actually is", not that it competes with the step-by-step highlight for
-   attention on every click. */
+   Toujours ouvert. C'était un <details> replié par défaut, au motif qu'il
+   ne devait pas concurrencer le surlignage du pas à pas ; l'usage a tranché
+   l'inverse — ce que fait le processeur à chaque pas est ce que le panneau
+   doit montrer, et le replier revenait à cacher la leçon.
 
-.cycle-details {
+   Il occupe toute la hauteur restante et défile en lui-même : la trace
+   grandit d'un pas à l'autre, et sans ce cadre elle poussait la grille
+   mémoire hors de l'écran. */
+
+.cycle-panel {
+  flex: 1 1 auto;
+  min-height: 6em;
+  overflow-y: auto;
   margin-top: 16px;
   padding-top: 10px;
   border-top: 1px solid var(--vscode-widget-border, #444);
-}
-
-.cycle-details summary {
-  cursor: pointer;
-  font-size: 0.85em;
-  opacity: 0.8;
-  user-select: none;
-}
-.cycle-details[open] summary {
-  opacity: 1;
-  margin-bottom: 8px;
 }
 
 .cycle-hint {
