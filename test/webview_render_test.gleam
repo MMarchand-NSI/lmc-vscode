@@ -16,7 +16,7 @@ pub fn nothing_loaded_renders_an_empty_machine_test() {
   // À l'ouverture, la RAM est vide : pas de registres, pas de programme,
   // aucune zone marquée dans la grille. L'assemblage, lui, a eu lieu.
   let json = model.init("INP\nOUT\nHLT\n") |> render.to_json
-  assert string.contains(json, "\"status\":\"vide\"")
+  assert string.contains(json, "\"status\":\"empty\"")
   assert string.contains(json, "\"memory\":null")
   assert string.contains(json, "\"pc\":null")
   assert string.contains(json, "\"programLength\":0")
@@ -43,7 +43,7 @@ pub fn valid_program_renders_expected_fields_test() {
 
 pub fn program_with_error_renders_null_machine_fields_test() {
   let json = model.init("XXX\n") |> render.to_json
-  assert string.contains(json, "\"status\":\"vide\"")
+  assert string.contains(json, "\"status\":\"empty\"")
   assert string.contains(json, "\"assembled\":false")
   assert string.contains(json, "\"pc\":null")
   assert string.contains(json, "\"sp\":null")

@@ -107,7 +107,7 @@ fn json_memory(mdl: Model) -> Json {
 
 fn json_status(mdl: Model) -> Json {
   case mdl.machine {
-    None -> json.string("vide")
+    None -> json.string("empty")
     // Rien en RAM : la machine n'est pas « en cours », elle n'existe pas
     // encore. Un état à part, pour que la grille vide s'explique d'elle-même.
     Some(m) ->

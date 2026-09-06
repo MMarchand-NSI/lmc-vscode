@@ -16,6 +16,7 @@ import lmc/text/locale as server
 import webview/text/english
 import webview/text/french
 import webview/text/message.{type Label, type Phase, type Text}
+import webview/text/spanish
 
 pub type Locale =
   server.Locale
@@ -31,21 +32,19 @@ pub fn from_tag(tag: String) -> Locale {
   server.from_tag(tag)
 }
 
-/// L'espagnol est arrivé côté serveur en v0.8.1 et le panneau ne le parle
-/// pas encore : il retombe sur l'anglais, message par message, plutôt que de
-/// rendre du vide. Un fichier `spanish.gleam` et trois bras suffiront — c'est
-/// tout l'intérêt de ce découpage.
 pub fn render(text: Text, language: Locale) -> String {
   case language {
     server.French -> french.render(text)
-    server.English | server.Spanish -> english.render(text)
+    server.English -> english.render(text)
+    server.Spanish -> spanish.render(text)
   }
 }
 
 pub fn label(label: Label, language: Locale) -> String {
   case language {
     server.French -> french.label(label)
-    server.English | server.Spanish -> english.label(label)
+    server.English -> english.label(label)
+    server.Spanish -> spanish.label(label)
   }
 }
 
@@ -59,7 +58,8 @@ pub fn phase_label(phase: Phase, language: Locale) -> String {
     message.Failure ->
       case language {
         server.French -> "Erreur"
-        server.English | server.Spanish -> "Error"
+        server.English -> "Error"
+        server.Spanish -> "Error"
       }
   }
 }

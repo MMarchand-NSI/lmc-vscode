@@ -277,7 +277,7 @@ function renderStatus(state) {
   document.getElementById("step").disabled = !canStep;
   document.getElementById("run").disabled = !canStep;
   // Rien en RAM : rien à remettre à zéro non plus.
-  document.getElementById("reset").disabled = state.status === "vide";
+  document.getElementById("reset").disabled = state.status === "empty";
   // Pas d'assemblage, pas de fichier objet à produire — et rien à charger.
   document.getElementById("assemble").disabled = !state.assembled;
 }

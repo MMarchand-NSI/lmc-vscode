@@ -235,7 +235,11 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
     attributes and no prose at all. It also holds the fragments that are **not** prose
     (`shortcut`, `three_cells`): machine words and addresses, written once so two languages cannot
     drift on a fact.
-  - `french.gleam`, `english.gleam` — one language per file, `render` and `label`, nothing else.
+  - `french.gleam`, `english.gleam`, `spanish.gleam` — one language per file, `render` and
+    `label`, nothing else. The Spanish follows the server's own vocabulary (`celda`, `dirección`,
+    `etiqueta`, `pila`, `acumulador`, `contador de programa`) rather than picking its own: two
+    translations of the same term would have a student reading about two different machines. It
+    has **not been read by a native speaker**, and for course material it should be.
   - `locale.gleam` — the dispatch, and the only place to touch to add a language. It does **not**
     redefine `Locale`: that is `lmc_lsp`'s, imported `as server`, so the panel and the diagnostics
     cannot answer the same setting differently and a runner error (`message.Message`) renders in
@@ -244,6 +248,10 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   language. What that bought, exactly as upstream: the model tests compare values
   (`message.FetchRead(0, 5003)`), so rephrasing breaks none of them — and the per-language tests
   loop over every locale the server knows, so Spanish is already covered the day it gets its file.
+  One thing the translation made visible: the panel's status was `vide` among `running`,
+  `waiting_input`, `halted` and `error`. That word is a **machine token**, not prose —
+  `app_ffi.mjs` branches on it — so it is not translated and never should be; it is now `empty`,
+  like its four siblings.
   **The next step is data files**, and this split is what makes it cheap: only the language modules
   get replaced, the types and every caller stay put. See the open list.
 - **`webview/render.gleam`** — `Model` -> single JSON payload (`gleam_json`), also `gleam test`-covered.

@@ -148,19 +148,19 @@ async function pipeline() {
   const source = readFileSync(join(root, "examples", "tableau.lmc"), "utf8");
   await p.send({ type: "setSource", source });
 
-  check("à l'ouverture, la RAM est vide", p.text("status"), "vide");
+  check("à l'ouverture, la RAM est vide", p.text("status"), "empty");
   check("aucune case marquée comme programme", p.cellsWithClass("unused"), 100);
   check("Step est désactivé", p.id("step").disabled, true);
 
   await p.click("load");
   check("charger sans assembler échoue", p.bannerVisible(), true);
-  check("et ne remplit rien", p.text("status"), "vide");
+  check("et ne remplit rien", p.text("status"), "empty");
 
   await p.click("assemble");
   const words = p.objectFile.split("\n").filter(Boolean);
   check("assembler écrit le fichier objet", words.length, 28);
   check("quatre chiffres par ligne", words.every((x) => /^\d{4}$/.test(x)), true);
-  check("mais ne charge toujours rien", p.text("status"), "vide");
+  check("mais ne charge toujours rien", p.text("status"), "empty");
 
   await p.click("load");
   check("charger remplit la RAM", p.text("status"), "running");
@@ -356,6 +356,12 @@ async function language() {
   check("les infobulles", p.document.querySelector("[data-ui=tipSpBody]").textContent.slice(0, 16),
     "points at the ne");
   check("et l'attribut lang", p.document.documentElement.lang, "en");
+
+  await p.send({ type: "setLocale", locale: "es-ES" });
+  check("l'espagnol aussi", p.document.getElementById("assemble").textContent,
+    "Ensamblar .lmc");
+  check("jusqu'aux infobulles", p.document.querySelector("[data-ui=tipSpTitle]").textContent,
+    "Puntero de pila");
 
   await p.send({ type: "setLocale", locale: "de-DE" });
   check("une langue non traduite retombe sur le français",

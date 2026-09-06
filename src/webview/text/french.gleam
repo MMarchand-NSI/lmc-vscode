@@ -154,7 +154,7 @@ pub fn label(label: Label) -> String {
     message.StatusLabel -> "État"
     message.TipStatusTitle -> "État du processeur"
     message.TipStatusBody ->
-      "vide (rien n'est chargé en RAM : assemblez, puis chargez), running (prêt à exécuter), waiting_input (arrêté sur un INP, en attente d'une valeur), halted (arrêté par HLT), error."
+      "empty (rien n'est chargé en RAM : assemblez, puis chargez), running (prêt à exécuter), waiting_input (arrêté sur un INP, en attente d'une valeur), halted (arrêté par HLT), error."
     message.HeadingProcessor -> "Processeur"
     message.TipAccTitle -> "Accumulator"
     message.TipAccBody ->
