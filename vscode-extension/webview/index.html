@@ -69,13 +69,13 @@
             <span class="tip" role="tooltip"><strong>Program Counter</strong> — le compteur ordinal : l'adresse de la prochaine instruction à lire. Écrire dedans, c'est sauter, et c'est tout ce que font BRA, BRZ, BRP et RET. Il est incrémenté dès la phase Fetch, comme sur un vrai processeur — à l'arrêt, il pointe donc déjà après la dernière instruction exécutée.</span>
             <span id="pc" class="value">—</span>
           </div>
-          <!-- IX, LR et SP n'apparaissent qu'avec les tableaux, les
+          <!-- SI, LR et SP n'apparaissent qu'avec les tableaux, les
                sous-programmes et la pile. Ils sont affichés plus discrètement
                qu'ACC et PC pour que les premières séances ne soient pas
                encombrées par des registres dont on ne parle pas encore. -->
           <div class="register secondary">
-            <span class="label" tabindex="0">IX</span>
-            <span class="tip" role="tooltip"><strong>Index Register</strong> — le registre d'index. Le suffixe [IX] ajoute son contenu à l'adresse écrite — lst[IX] désigne la case lst + IX, ce qui permet de parcourir un tableau ou une chaîne avec une seule instruction, quel que soit le rang lu.</span>
+            <span class="label" tabindex="0">SI</span>
+            <span class="tip" role="tooltip"><strong>Source Index</strong> — le registre d'index, nommé comme le SI du x86, où il joue le même rôle. Le suffixe [SI] ajoute son contenu à l'adresse écrite — lst[SI] désigne la case lst + SI, ce qui permet de parcourir un tableau ou une chaîne avec une seule instruction, quel que soit le rang lu.</span>
             <span id="x" class="value">—</span>
           </div>
           <div class="register secondary">

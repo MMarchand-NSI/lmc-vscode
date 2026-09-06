@@ -1,8 +1,8 @@
-// Parcours d'un tableau, l'indice chargé directement dans IX.
+// Parcours d'un tableau, l'indice chargé directement dans SI.
 //
 // Même programme que tableau.lmc à une instruction près, et c'est là tout
-// son intérêt : tableau.lmc écrit « LDA i » puis « MOV IX, ACC », deux
-// instructions, parce que LDA ne sait charger que ACC. « MOV IX, i » fait
+// son intérêt : tableau.lmc écrit « LDA i » puis « MOV SI, ACC », deux
+// instructions, parce que LDA ne sait charger que ACC. « MOV SI, i » fait
 // les deux d'un coup — MOV suivi d'une case est un chargement, comme LDA,
 // mais vers le registre qu'on nomme. Les mots machine le disent :
 // 5102 ici, contre 5003 puis 4100 là-bas.
@@ -16,8 +16,8 @@ boucle: LDA lenlst      // reste-t-il des éléments ?
         SUB i
         BRZ fin
 
-        MOV IX, i       // IX <- i, sans passer par ACC
-        LDA lst[IX]     // ACC <- mem[lst + i]
+        MOV SI, i       // SI <- i, sans passer par ACC
+        LDA lst[SI]     // ACC <- mem[lst + i]
         OUT
 
         LDA i           // i = i + 1

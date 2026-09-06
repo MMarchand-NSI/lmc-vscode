@@ -29,7 +29,7 @@ that table drifted into claiming things that were false — that labels were cas
 that `;` opened a comment. One source of truth is worth the extra click.
 
 In short: this variant extends the classic LMC. The machine word is four digits rather than three,
-there are five registers (`ACC`, `IX`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`,
+there are five registers (`ACC`, `SI`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`,
 subroutines (`JSR`/`RET`), a stack (`PSH`/`POP`) and a screen (`PLT`). Programs written for a stock LMC emulator will
 not run here, and the reverse is also true.
 
@@ -42,8 +42,8 @@ are in French, like the language reference.
 |---|---|
 | `test-pgm.lmc`, `fibo.lmc` | integer division and Fibonacci — the eleven classic mnemonics only |
 | `broken.lmc` | deliberately invalid, to see the diagnostics |
-| `tableau.lmc` | an array walked with `lst[IX]` |
-| `affiche_tab.lmc` | the same walk, one instruction shorter: `MOV IX, i` loads a cell straight into `IX` |
+| `tableau.lmc` | an array walked with `lst[SI]` |
+| `affiche_tab.lmc` | the same walk, one instruction shorter: `MOV SI, i` loads a cell straight into `SI` |
 | `chaine.lmc` | a string walked to its terminal zero |
 | `double-boucle.lmc` | nested loops: a multiplication table, since the language has no multiply |
 | `ecran.lmc` | `PLT` — a diagonal and a line, on the 32 × 32 screen |
@@ -144,7 +144,7 @@ Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for pro
 ### Fetch the language server
 
 ```sh
-node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.6.1) into
+node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.7.0) into
                                          #   vscode-extension/vendor/
 node scripts/fetch-lsp-bundle.mjs v0.5.0 # or a specific version
 ```

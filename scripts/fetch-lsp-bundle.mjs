@@ -6,7 +6,7 @@
 // Usage:
 //   node scripts/fetch-lsp-bundle.mjs [version]
 //
-// `version` defaults to the LMC_LSP_VERSION env var, or v0.6.1 if unset.
+// `version` defaults to the LMC_LSP_VERSION env var, or v0.7.0 if unset.
 // The result is written to vscode-extension/vendor/lmc-lsp.bundle.mjs
 // (gitignored — re-run
 // this script to pick it up, it is not committed).
@@ -27,7 +27,7 @@ const run = promisify(execFile);
 const REPO = "MMarchand-NSI/lmc_lsp";
 const ASSET = "lmc-lsp.bundle.mjs";
 
-const version = process.argv[2] ?? process.env.LMC_LSP_VERSION ?? "v0.6.1";
+const version = process.argv[2] ?? process.env.LMC_LSP_VERSION ?? "v0.7.0";
 const here = dirname(fileURLToPath(import.meta.url));
 // Dans l'extension, pas à la racine : le .vsix doit embarquer le serveur,
 // sinon l'extension installée n'en a aucun. Voir client.ts.

@@ -1,7 +1,7 @@
 // Parcours d'un tableau avec l'adressage indexé.
 //
-// Le suffixe [IX] ajoute le contenu du registre IX à l'adresse écrite :
-// lst[IX] désigne la case lst + IX. C'est ce qui permet d'écrire une seule
+// Le suffixe [SI] ajoute le contenu du registre SI à l'adresse écrite :
+// lst[SI] désigne la case lst + SI. C'est ce qui permet d'écrire une seule
 // instruction pour lire n'importe quelle case du tableau.
 //
 // Affiche chaque élément, puis leur somme.
@@ -15,8 +15,8 @@ boucle: LDA i
         BRZ fin
 
         LDA i
-        MOV IX, ACC     // IX <- i ; LDA ne sait pas nommer IX, MOV si
-        LDA lst[IX]     // ACC <- mem[lst + i]
+        MOV SI, ACC     // SI <- i ; LDA ne sait pas nommer SI, MOV oui
+        LDA lst[SI]     // ACC <- mem[lst + i]
         OUT
 
         ADD total       // total = total + lst[i]

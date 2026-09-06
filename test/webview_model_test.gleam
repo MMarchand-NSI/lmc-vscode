@@ -303,6 +303,24 @@ pub fn the_program_counter_line_stays_inside_the_fetch_phase_test() {
   assert list.map(cycle, fn(p) { p.name }) == ["Fetch", "Decode", "Execute"]
 }
 
+pub fn the_index_register_is_named_si_test() {
+  // Deuxième renommage de ce registre : X devenu IX en v0.4.0, IX devenu
+  // SI en v0.7.0. Le nom
+  // apparaît dans deux phrases différentes du panneau du cycle, décodage et
+  // exécution, et rien ne les reliait au type `Register` de `lmc_lsp` : un
+  // renommage pouvait donc n'être fait qu'à moitié sans que rien n'échoue.
+  let m =
+    loaded("        MOV SI, n\n        HLT\nn:      DAT 5\n")
+    |> model.step
+  let assert [_fetch, decode, execute] = model.last_cycle(m)
+
+  assert decode.details
+    == [
+      "5102 → MOV SI, mem[2] (configuration des circuits du processeur pour chargement depuis la mémoire)",
+    ]
+  assert execute.details == ["SI 0 → 5"]
+}
+
 pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
   // "STA, adresse 21" alone would read exactly like a line of source code
   // (STA 21 is valid LMC) and invite the false idea that decode

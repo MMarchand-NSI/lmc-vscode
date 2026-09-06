@@ -32,7 +32,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the fetch script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.6.1" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.7.0" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -148,7 +148,7 @@ VS Code ←—LSP (stdio)—→ vscode-extension/lsp-server.mjs → vendor/lmc-l
   `scripts/fetch-lsp-bundle.mjs` first.
 - **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
   download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
-  `vscode-extension/vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.6.1`; pass a version to pin a
+  `vscode-extension/vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.7.0`; pass a version to pin a
   different tag.
   That default and `gleam.toml`'s `ref` are the two pins that must always move together.
 
@@ -314,7 +314,7 @@ never just code review):
 - Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
   Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
   session-style current-line decoration).
-- All five registers are shown (`ACC`, `PC`, then `IX`, `LR`, `SP` more discreetly, since they only
+- All five registers are shown (`ACC`, `PC`, then `SI`, `LR`, `SP` more discreetly, since they only
   come into play with arrays, subroutines and the stack), and the memory grid marks four things —
   the stack above `SP` (dashed orange), the cells a `DAT` reserved (dotted blue), the unused middle
   dimmed, and code left unmarked as the default case. Watching the stack grow cell by cell during a
@@ -382,7 +382,7 @@ never just code review):
   (300 outputs in 10 ms). The whole path was driven for real: `lsp-server.mjs` started over stdio
   with a hand-written client, `initialize` answered, diagnostics and hover came back. All 26
   tracked examples still parse clean except `broken.lmc`, which is broken on purpose.
-  **`v0.6.1` followed the same day** and is what the double pin now names. No API moved, so it was
+  **`v0.6.1` followed the same day**, and `v0.7.0` after it (see the entry below). No API moved, so it was
   a pin bump and a re-run of the suite, not a migration: `Int` is a JS float, so beyond fifteen
   digits `int.parse` rounded and beyond about three hundred it returned `Infinity` — a `DAT` of
   four hundred `9`s stored `NaN` and the program died further on with "instruction illégale: NaN",
@@ -394,6 +394,21 @@ never just code review):
   its `window`; a Chromium-based VS Code webview always has it, so the gap was the harness's, and
   `scripts/smoke-webview.mjs` now fills it rather than the page working around it. Nothing else in
   the suite noticed — the gap only exists where a browser is being faked.
+- **`lmc_lsp` v0.7.0: the index register is `SI`.** Second rename of the same register (`X` in
+  v0.4.0, `IX` until now); `SI` is *source index*, the name it carries on x86 where it plays the
+  same role. **The encoding does not move** — `register_number(Si)` is still 1 — so no `.lmcobj`
+  changes and no machine word does either; what changes is every place the name is written.
+  Here that was: `model.gleam` (`register_name`, the `IndexChanged` line, and `mem[n+SI]`), the
+  grammar's register rule, the register panel's label and tooltip in `index.html`, four examples
+  (`tableau`, `chaine`, `affiche_tab`, `ecran`), and the README. The internal `id="x"` and JSON key
+  `"x"` were left alone, as in v0.4.0: they are never displayed.
+  Two things are worth keeping in mind for the next rename, because both were near-misses.
+  `scripts/check-grammar.mjs` **hardcoded** `["ACC", "IX", "LR", "SP", "PC"]`, so it would have
+  gone green with the old name on both sides — exactly the failure it exists to prevent. It now
+  reads the register names out of `features/completion.gleam`, the one place in `lmc_lsp` that
+  names them as a set, the way it already read the mnemonics out of `lexer.gleam`. And nothing
+  covered `register_name` at all, so half a rename would have compiled and passed: a model test now
+  pins both sentences the cycle panel builds from it.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
@@ -405,7 +420,7 @@ never just code review):
   longer does (v0.6.0, checked by running the formatter on `n: DAT 5  // cinq`), so the constraint
   is lifted — the files were left as they are because nothing in them wants such a comment, not
   because one would be destroyed. What the series does *not* cover, and where the older examples
-  take over: `IX` and indexed addressing, `MOV`, `JSR`/`RET`, `PSH`/`POP`, `PLT`.
+  take over: `SI` and indexed addressing, `MOV`, `JSR`/`RET`, `PSH`/`POP`, `PLT`.
 - **A screen, 32 x 32, eight colours** (`examples/ecran.lmc` draws a diagonal and a line on it).
   Size and palette were `lmc_lsp`'s two deliberately-unmade decisions — the runner emits
   `PixelPlotted` and paints nothing — and they were made here, where a device belongs. See the
@@ -465,7 +480,8 @@ Still open, roughly in the order it's worth tackling them:
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `fetch-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
 6. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
-   three that were planned — `X` → `IX`, opcode 9 in families with `PSH`/`POP` on a register, and
+   three that were planned — `X` → `IX` (and `IX` → `SI` in v0.7.0, see the done list), opcode 9
+   in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
    data be called what it likes, the same split as `STA total`) — landed in `lmc_lsp` `v0.4.0` and
    are taken up here; see the done list above. The rename is undecided and independent; the plan

@@ -11,8 +11,8 @@
         STA i
 
 boucle: LDA i
-        MOV IX, ACC
-        LDA mot[IX]     // ACC <- le caractère de rang i
+        MOV SI, ACC
+        LDA mot[SI]     // ACC <- le caractère de rang i
         BRZ fin         // 0 : fin de chaîne
         OUT
 

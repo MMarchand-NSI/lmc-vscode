@@ -707,7 +707,7 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
     )
     event.IndexChanged(old, new) -> #(
       "Execute",
-      "IX " <> int.to_string(old) <> " → " <> int.to_string(new),
+      "SI " <> int.to_string(old) <> " → " <> int.to_string(new),
     )
     event.LinkChanged(old, new) -> #(
       "Execute",
@@ -927,7 +927,7 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
 fn register_name(register: instruction.Register) -> String {
   case register {
     instruction.Acc -> "ACC"
-    instruction.Ix -> "IX"
+    instruction.Si -> "SI"
     instruction.Lr -> "LR"
     instruction.Sp -> "SP"
     instruction.Pc -> "PC"
@@ -939,7 +939,7 @@ fn register_name(register: instruction.Register) -> String {
 fn memory_text(address: Int, mode: instruction.Addressing) -> String {
   case mode {
     instruction.Direct -> "mem[" <> int.to_string(address) <> "]"
-    instruction.Indexed -> "mem[" <> int.to_string(address) <> "+IX]"
+    instruction.Indexed -> "mem[" <> int.to_string(address) <> "+SI]"
   }
 }
 

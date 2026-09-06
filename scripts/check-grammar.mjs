@@ -23,10 +23,12 @@ import { createRequire } from "node:module";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const grammarPath = join(root, "vscode-extension", "syntaxes", "lmc.tmLanguage.json");
 const lexerPath = join(root, "build", "packages", "lmc_lsp", "src", "lmc", "parse", "lexer.gleam");
+const completionPath = join(root, "build", "packages", "lmc_lsp", "src", "lmc", "features", "completion.gleam");
 const js = join(root, "build", "dev", "javascript");
 
 for (const [path, remede] of [
   [lexerPath, "lance `gleam deps download` d'abord"],
+  [completionPath, "lance `gleam deps download` d'abord"],
   [js, "lance `gleam build` d'abord"],
 ]) {
   if (!existsSync(path)) {
@@ -89,10 +91,21 @@ if (words.length === 0) {
   console.error(`Aucune entrée « "XXX" -> Kw » dans ${lexerPath} : la table a changé de forme, ce script ne vérifie plus rien.`);
   process.exit(1);
 }
-const registers = ["ACC", "IX", "LR", "SP", "PC"];
+// Les registres se lisent eux aussi dans la dépendance, et non ici : c'est un
+// nom de registre qui vient de changer (IX -> SI en v0.7.0), et une liste
+// écrite à la main dans ce fichier aurait fait passer le contrôle au vert
+// avec l'ancien nom des deux côtés. `features/completion.gleam` est le seul
+// endroit de `lmc_lsp` qui nomme les registres comme un ensemble.
+const registers = [
+  ...readFileSync(completionPath, "utf8").matchAll(/CompletionItem\("([A-Z]{2,3})", CompletionRegister/g),
+].map((m) => m[1]);
+if (registers.length === 0) {
+  console.error(`Aucune entrée « CompletionItem("XX", CompletionRegister » dans ${completionPath} : ce script ne vérifie plus rien.`);
+  process.exit(1);
+}
 const mnemonics = words.filter((w) => !registers.includes(w));
 
-console.log(`\nMots réservés (${mnemonics.length} mnémoniques, ${registers.length} registres, lus dans lexer.gleam)`);
+console.log(`\nMots réservés (${mnemonics.length} mnémoniques lus dans lexer.gleam, ${registers.length} registres dans completion.gleam)`);
 for (const m of mnemonics) {
   check(`${m} est un mnémonique`, scopeOf(`        ${m}`, m), "keyword.control.lmc");
 }
@@ -117,6 +130,10 @@ console.log("\nCe que le serveur accepte comme nom, la grammaire le colore");
 const candidates = [
   "boucle", "n", "total2", "compteur_1", "_x", "numéro", "numéro",
   "Ç", "2ecart", "INP",
+  // Les deux côtés du renommage de la v0.7.0 : SI est réservé, IX ne l'est
+  // plus et redevient un nom ordinaire. Une grammaire restée à IX échoue
+  // deux fois ici.
+  "SI", "IX",
 ];
 for (const name of candidates) {
   const source = `${name}: DAT 1\n        HLT\n`;
@@ -129,7 +146,7 @@ for (const name of candidates) {
 
 console.log("\nLe reste");
 check("l'adressage indexé garde ses crochets",
-  scopes("        LDA lst[IX]").map(([, s]) => s).join(" "),
+  scopes("        LDA lst[SI]").map(([, s]) => s).join(" "),
   "keyword.control.lmc variable.other.lmc punctuation.section.brackets.lmc variable.language.register.lmc punctuation.section.brackets.lmc");
 check("une chaîne est une chaîne", scopeOf('        DAT "ABCD"', '"ABCD"'), "string.quoted.double.lmc");
 check("un guillemet non fermé est signalé", scopeOf('        DAT "ABCD', '"ABCD'), "invalid.illegal.unterminated-string.lmc");

@@ -8,14 +8,14 @@
 //
 // Les trois cases tiennent en un seul DAT, comme le tableau de tableau.lmc :
 // DAT 0, 0, 3 réserve trois cases à la file. Le nom pixel ne désigne donc
-// que la première, et c'est le suffixe [IX] qui atteint les deux autres —
-// pixel[IX] avec IX à 1 désigne y, avec IX à 2 la couleur.
+// que la première, et c'est le suffixe [SI] qui atteint les deux autres —
+// pixel[SI] avec SI à 1 désigne y, avec SI à 2 la couleur.
 //
 // Trace une diagonale de seize points, puis une ligne horizontale d'une
 // autre couleur. Le compteur de boucle est la coordonnée elle-même — x est
 // déjà en mémoire, il serait inutile d'en tenir un second à côté.
 
-        MOV IX, un      // IX reste à 1 toute la diagonale : il ne sert qu'à
+        MOV SI, un      // SI reste à 1 toute la diagonale : il ne sert qu'à
                         // atteindre y, la deuxième des trois cases
 
 // --- La diagonale : x et y avancent ensemble.
@@ -23,7 +23,7 @@ diag:   PLT pixel
         LDA pixel       // ACC <- x
         ADD un
         STA pixel       // x <- x + 1
-        STA pixel[IX]   // y <- x : c'est ce qui fait la diagonale
+        STA pixel[SI]   // y <- x : c'est ce qui fait la diagonale
         SUB seize
         BRZ ligne
         BRA diag
@@ -32,10 +32,10 @@ diag:   PLT pixel
 ligne:  LDA zero
         STA pixel       // x <- 0
         LDA vingt
-        STA pixel[IX]   // y <- 20, et il n'en bougera plus
-        MOV IX, deux    // IX passe à 2 : pixel[IX] désigne maintenant la couleur
+        STA pixel[SI]   // y <- 20, et il n'en bougera plus
+        MOV SI, deux    // SI passe à 2 : pixel[SI] désigne maintenant la couleur
         LDA six
-        STA pixel[IX]   // une autre couleur, pour distinguer les deux traits
+        STA pixel[SI]   // une autre couleur, pour distinguer les deux traits
 
 trait:  PLT pixel
         LDA pixel
