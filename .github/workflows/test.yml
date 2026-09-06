@@ -85,7 +85,11 @@ jobs:
           npm run compile
           npx vsce package
         working-directory: vscode-extension
-      - name: Check the .vsix carries the language server
+      # Ce que l'archive doit contenir : le serveur, son bundle, et la page
+      # que le Marketplace affichera. Cette dernière manquait sans que rien
+      # ne le dise — vsce l'y range en minuscules, d'où le -i.
+      - name: Check the .vsix carries the server and its marketplace page
         run: |
           unzip -l vscode-extension/*.vsix | grep -q "extension/lsp-server.mjs"
           unzip -l vscode-extension/*.vsix | grep -q "extension/vendor/lmc-lsp.bundle.mjs"
+          unzip -l vscode-extension/*.vsix | grep -qi "extension/readme.md"

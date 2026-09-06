@@ -1,7 +1,7 @@
 {
   "name": "lmc-vscode",
-  "displayName": "LMC Language Support",
-  "description": "Little Man Computer (LMC) assembly language support for VS Code",
+  "displayName": "LMC — assembleur pédagogique",
+  "description": "Le langage d'assemblage LMC : diagnostics, complétion, formatage et un émulateur pas à pas. Outil de cours, en français.",
   "version": "0.1.0",
   "publisher": "lmc-vscode",
   "repository": {
@@ -39,7 +39,7 @@
     "commands": [
       {
         "command": "lmc.openEmulator",
-        "title": "LMC: Open Emulator",
+        "title": "LMC : ouvrir l'émulateur",
         "icon": "$(debug-start)"
       }
     ],

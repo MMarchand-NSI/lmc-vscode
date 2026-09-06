@@ -233,6 +233,12 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   `ref`/`deref`/`setRef` mutable-cell pattern `lmc_lsp`'s `lsp/ffi.gleam` uses for server state
   (reimplemented here, not shared — the two repos stay independent). Browser FFI, not Node FFI —
   don't reach for `node:*` imports in this file.
+- **`vscode-extension/README.md`** — the **Marketplace page**, and the reason it is a second README:
+  the one at the repo root is developer documentation and stays in English, this one is what someone
+  installing the extension reads. It is in **French**, like everything the extension says, with an
+  English paragraph at the top so a visitor who does not read French knows that in one line rather
+  than after installing. `vsce` renames it to `extension/readme.md` in the archive; CI asserts it is
+  there, because it was missing at first with nothing to say so.
 - **`vscode-extension/webviewPanel.ts`** — creates the panel (`retainContextWhenHidden: true`, so
   stepping progress survives switching tabs), fills in `webview/index.html`'s `{{cspSource}}` /
   `{{styleUri}}` / `{{scriptUri}}` / `{{nonce}}` placeholders, and relays messages both ways:
