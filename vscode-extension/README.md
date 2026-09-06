@@ -10,8 +10,16 @@ people whatever their country, so it is a poor guess at the language of a classr
 
 This is not the original LMC. The machine word is four digits, there are five registers (`ACC`,
 `SI`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`, subroutines (`JSR`/`RET`), a stack
-(`PSH`/`POP`) and a screen (`PLT`). A program written for a stock LMC emulator will not run here,
-and the reverse is true too. The language reference is
+(`PSH`/`POP`) and a screen (`PLT`).
+
+**Bringing a program in from a stock LMC emulator usually costs one edit**: a colon after each
+label, `FIRST DAT` becoming `FIRST: DAT`. Checked by running the classic two-input adder and a
+classic countdown loop, which both work with nothing else changed. Two things still bite: textbooks
+that spell the mnemonics `STO`, `BR` or `COB` (here they are `STA`, `BRA` and `HLT`), and a label
+named after a register, since `ACC`, `SI`, `LR`, `SP` and `PC` are reserved words. Going the other
+way is another matter: anything using `MOV`, `JSR`, `PSH` or `PLT` has nowhere to run but here.
+
+The language reference is
 [LANGAGE.md](https://github.com/MMarchand-NSI/lmc_lsp/blob/master/LANGAGE.md) — in French, like the
 example programs that ship with the extension.
 

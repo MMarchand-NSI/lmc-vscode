@@ -30,8 +30,13 @@ that `;` opened a comment. One source of truth is worth the extra click.
 
 In short: this variant extends the classic LMC. The machine word is four digits rather than three,
 there are five registers (`ACC`, `SI`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`,
-subroutines (`JSR`/`RET`), a stack (`PSH`/`POP`) and a screen (`PLT`). Programs written for a stock LMC emulator will
-not run here, and the reverse is also true.
+subroutines (`JSR`/`RET`), a stack (`PSH`/`POP`) and a screen (`PLT`).
+
+Bringing a classic program in usually costs **one edit: a colon after each label** (`FIRST DAT`
+becomes `FIRST: DAT`). Verified by running the classic two-input adder and a classic countdown loop
+with nothing else changed. What still fails: the `STO`/`BR`/`COB` spellings some textbooks use, and
+a label named after one of the five registers, which are reserved words. The reverse direction is
+not a matter of syntax at all — `MOV`, `JSR`, `PSH` and `PLT` have nowhere else to run.
 
 ## Examples
 
