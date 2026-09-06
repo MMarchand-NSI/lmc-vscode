@@ -322,9 +322,9 @@ async function cycle() {
 
   const fetchLines = [...phases[0].querySelectorAll("li")].map((li) => li.textContent);
   check("Fetch montre deux actions, pas une", fetchLines.length, 2);
-  check("la lecture du mot", fetchLines[0], "lire mem[0] → 5003");
+  check("la lecture du mot", fetchLines[0], "read mem[0] → 5003");
   check("et l'avancée du compteur ordinal", fetchLines[1],
-    "PC 0 → 1 (incrémenté pendant la lecture, avant le décodage)");
+    "PC 0 → 1 (incremented during the read, before decoding)");
 
   // Le registre affiche 1 alors que l'instruction exécutée est celle de la
   // case 0 : c'est exactement ce décalage que la ligne ci-dessus explique.
@@ -383,19 +383,26 @@ async function language() {
   check("et le rendu les remplit tous", empty.map((el) => el.dataset.ui).join(",") || "aucun vide",
     "aucun vide");
 
-  check("le défaut est le français", p.document.getElementById("assemble").textContent,
+  // La première image, avant tout `setLocale` : l'anglais, parce que c'est ce
+  // que l'hôte enverra une milliseconde plus tard (`lmc.locale` vaut `auto`,
+  // donc la langue d'affichage de VS Code). Peindre autre chose ferait
+  // clignoter le panneau. Ce n'est pas un avis sur la langue du cours : la
+  // bascule vers le français est vérifiée juste en dessous.
+  check("le défaut est l'anglais", p.document.getElementById("assemble").textContent,
+    "Assemble .lmc");
+  check("y compris l'attribut lang du document", p.document.documentElement.lang, "en");
+  check("et l'étiquette du canvas", p.document.getElementById("screen").getAttribute("aria-label"),
+    "Screen, 32 by 32 pixels");
+
+  await p.send({ type: "setLocale", locale: "fr-FR" });
+  check("setLocale bascule les boutons", p.document.getElementById("assemble").textContent,
     "Assembler .lmc");
-  check("y compris l'attribut lang du document", p.document.documentElement.lang, "fr");
+  check("les titres", p.document.querySelector("[data-ui=headingMemory]").textContent, "Mémoire");
+  check("les infobulles", p.document.querySelector("[data-ui=tipSpBody]").textContent.slice(0, 16),
+    "le pointeur de p");
+  check("et l'attribut lang", p.document.documentElement.lang, "fr");
   check("et l'étiquette du canvas", p.document.getElementById("screen").getAttribute("aria-label"),
     "Écran, 32 sur 32 points");
-
-  await p.send({ type: "setLocale", locale: "en-GB" });
-  check("setLocale bascule les boutons", p.document.getElementById("assemble").textContent,
-    "Assemble .lmc");
-  check("les titres", p.document.querySelector("[data-ui=headingMemory]").textContent, "Memory");
-  check("les infobulles", p.document.querySelector("[data-ui=tipSpBody]").textContent.slice(0, 16),
-    "points at the ne");
-  check("et l'attribut lang", p.document.documentElement.lang, "en");
 
   await p.send({ type: "setLocale", locale: "es-ES" });
   check("l'espagnol aussi", p.document.getElementById("assemble").textContent,

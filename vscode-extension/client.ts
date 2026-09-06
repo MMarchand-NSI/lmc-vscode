@@ -13,13 +13,18 @@ let client: LmcLanguageClient;
 /// La langue que le serveur doit parler, telle que le réglage `lmc.locale`
 /// la demande.
 ///
-/// Le défaut est le français, et « auto » n'est *pas* le défaut : la langue
-/// d'affichage de VS Code reste l'anglais chez la plupart des gens, quel que
-/// soit leur pays, parce qu'on ne la change pas. La prendre pour la langue de
-/// la classe rendrait des diagnostics anglais à un cours français, ce qui est
-/// précisément le contraire du service rendu.
+/// Le défaut est « auto », c'est-à-dire la langue d'affichage de VS Code.
+/// Ce fut longtemps le français, et l'argument tenait tant que le public
+/// était une classe française : la langue d'affichage reste l'anglais chez
+/// la plupart des gens quel que soit leur pays, parce qu'on ne la change
+/// pas, donc la suivre aurait rendu des diagnostics anglais à un cours
+/// français. La publication sur le Marketplace (2026-09-06) retourne
+/// l'argument sans l'annuler : imposer le français à qui installe depuis
+/// Osaka est le même tort, en plus fréquent. Un défaut ne peut pas deviner
+/// une classe ; il peut suivre l'éditeur, et le réglage est là pour le
+/// contredire en un clic — ce que le README dit dès son deuxième paragraphe.
 function configuredLocale(): string {
-  const choice = workspace.getConfiguration("lmc").get<string>("locale", "fr");
+  const choice = workspace.getConfiguration("lmc").get<string>("locale", "auto");
   return choice === "auto" ? env.language : choice;
 }
 

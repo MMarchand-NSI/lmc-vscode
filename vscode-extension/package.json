@@ -3,7 +3,7 @@
   "displayName": "LMC — teaching assembly language",
   "description": "The LMC assembly language: diagnostics, completion, formatting and a step-through emulator. A teaching tool, in French, English, Spanish, Japanese or Korean.",
   "version": "0.1.0",
-  "publisher": "lmc-vscode",
+  "publisher": "mmarchand",
   "repository": {
     "type": "git",
     "url": "https://github.com/MMarchand-NSI/lmc-vscode.git"
@@ -12,7 +12,8 @@
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Education"
   ],
   "main": "./out/client.js",
   "contributes": {
@@ -71,10 +72,10 @@
             "Spanish.",
             "Japanese.",
             "Korean.",
-            "Follow VS Code's display language. Only useful if you have actually set it: it stays English for most people whatever their country."
+            "Follow VS Code's display language, and fall back to English when the extension does not speak it. This is the default. Note that VS Code's display language stays English for most people whatever their country, so pick a language explicitly if you teach in one."
           ],
-          "default": "fr",
-          "description": "Language of the diagnostics, hover, completion and the emulator panel. French by default, because VS Code's display language is a poor guess at the language of a classroom. The server restarts when this changes, since the language is announced when it starts."
+          "default": "auto",
+          "description": "Language of the diagnostics, hover, completion and the emulator panel. \"auto\" follows VS Code's display language, which is what a first install gets; set it explicitly to teach in a language other than the one your editor is in, which is the common case in a classroom. The server restarts when this changes, since the language is announced when it starts."
         }
       }
     }
@@ -97,5 +98,25 @@
     "typescript": "^5.9.3",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
+  "keywords": [
+    "lmc",
+    "little man computer",
+    "assembly",
+    "education",
+    "teaching",
+    "emulator",
+    "nsi",
+    "assembler"
+  ],
+  "bugs": {
+    "url": "https://github.com/MMarchand-NSI/lmc-vscode/issues"
+  },
+  "homepage": "https://github.com/MMarchand-NSI/lmc-vscode#readme",
+  "galleryBanner": {
+    "color": "#12121a",
+    "theme": "dark"
   }
 }

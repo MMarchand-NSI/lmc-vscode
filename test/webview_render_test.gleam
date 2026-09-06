@@ -94,7 +94,7 @@ pub fn cycle_reflected_after_step_test() {
     |> render.to_json
   assert string.contains(json, "\"cycle\":[{\"phase\":\"Fetch\"")
   assert string.contains(json, "\"phase\":\"Execute\",\"details\":[")
-  assert string.contains(json, "\"ACC ← entrée (1)\"")
+  assert string.contains(json, "\"ACC ← input (1)\"")
 }
 
 pub fn cycle_empty_before_any_step_test() {
@@ -130,13 +130,29 @@ pub fn a_lit_point_renders_with_its_colour_test() {
 
 // ── La langue ───────────────────────────────────────────────────────
 
-pub fn the_panel_speaks_french_by_default_test() {
-  // Le défaut n'est pas la langue de l'éditeur : un panneau muet est plus
-  // probablement une classe qu'un anglophone. C'est le même défaut que
-  // celui du serveur, et le réglage `lmc.locale` de l'extension le règle
-  // pour les deux à la fois.
+pub fn the_panel_speaks_english_before_the_host_says_anything_test() {
+  // Ce que peint la toute première image, avant le premier `setLocale`.
+  // Ce n'est pas un avis sur la langue du cours : c'est ce que l'hôte va
+  // envoyer une milliseconde plus tard, et peindre autre chose ferait
+  // clignoter le panneau. Le réglage `lmc.locale` vaut `auto` depuis la
+  // publication, donc c'est la langue d'affichage de VS Code, anglaise pour
+  // la plupart des installations. Le français reste à un clic, et le
+  // serveur répond dans la même langue puisque c'est le même réglage.
   let json = loaded("INP\nOUT\nHLT\n") |> model.step |> render.to_json
+  assert string.contains(json, "read mem[0]")
+}
+
+pub fn asking_for_french_renders_french_test() {
+  // Le pendant du test ci-dessus : la langue du cours n'est plus le défaut,
+  // elle est un choix, et ce test est ce qui garantit qu'elle reste servie
+  // entière quand on la demande.
+  let m =
+    loaded("INP\nOUT\nHLT\n")
+    |> model.set_locale(language.from_tag("fr-FR"))
+    |> model.step
+  let json = render.to_json(m)
   assert string.contains(json, "lire mem[0]")
+  assert !string.contains(json, "read mem[0]")
 }
 
 pub fn asking_for_english_renders_english_test() {

@@ -26,16 +26,22 @@ pub type Locale =
 /// La langue du tout premier affichage, avant que l'hôte n'ait dit laquelle
 /// il veut.
 ///
-/// **Un défaut et un repli sont deux choses**, et depuis la v0.8.2 du
-/// serveur elles ne coïncident plus. Le repli répond « je ne parle pas ce
-/// que tu demandes » et vaut l'anglais, la langue qu'un lecteur venu
-/// d'ailleurs a le plus de chances de comprendre : c'est
+/// **Un défaut et un repli restent deux choses**, même quand ils tombent sur
+/// la même valeur, ce qui est de nouveau le cas. Le repli répond « je ne
+/// parle pas ce que tu demandes » et vaut l'anglais, la langue qu'un lecteur
+/// venu d'ailleurs a le plus de chances de comprendre : c'est
 /// `server.default_locale`, et `from_tag` s'en sert. Le défaut répond « tu
-/// n'as rien demandé » et vaut le français, parce que c'est ce que le
-/// réglage `lmc.locale` enverra une milliseconde plus tard. Prendre le
-/// repli ici ferait clignoter le panneau en anglais avant le premier
-/// `setLocale`.
-pub const default_locale = server.French
+/// n'as rien demandé », et la seule chose qui le décide est **ce que
+/// `lmc.locale` enverra une milliseconde plus tard** : peindre autre chose
+/// ferait clignoter le panneau avant le premier `setLocale`.
+///
+/// Il valait le français tant que le réglage valait `fr`. Le réglage est
+/// passé à `auto` pour la publication sur le Marketplace (2026-09-06), donc
+/// ce que l'hôte enverra est la langue d'affichage de VS Code, l'anglais
+/// pour la plupart des installations. Le défaut suit, et les deux constantes
+/// restent séparées : elles répondent à deux questions différentes, et le
+/// jour où le réglage rechange, c'est celle-ci seule qui bouge.
+pub const default_locale = server.English
 
 /// Le repli, tel que le serveur le définit. Distinct du défaut ci-dessus.
 pub const fallback_locale = server.default_locale

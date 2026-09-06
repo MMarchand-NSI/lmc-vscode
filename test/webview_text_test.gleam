@@ -123,12 +123,14 @@ pub fn a_locale_tag_is_read_like_the_server_reads_it_test() {
   // différentes.
   assert language.from_tag("fr-FR") == server.French
   assert language.from_tag("en") == server.English
-  // L'allemand n'est pas parlé : c'est le *repli* qui répond, l'anglais, et
-  // non le défaut du panneau, qui est le français. Les deux ont divergé à
-  // la v0.8.2 du serveur et ce test est ce qui empêche de les confondre.
+  // L'allemand n'est pas parlé : c'est le *repli* qui répond, l'anglais.
+  // Le défaut du panneau vaut la même chose depuis que `lmc.locale` est
+  // passé à `auto`, mais les deux restent deux questions : le repli suit le
+  // serveur, le défaut suit ce que l'hôte va envoyer. Ce test les nomme
+  // séparément pour que changer l'un n'emporte pas l'autre en silence.
   assert language.from_tag("de-DE") == language.fallback_locale
   assert language.fallback_locale == server.English
-  assert language.default_locale == server.French
+  assert language.default_locale == server.English
 }
 
 /// Les trois langues que le serveur connaît. Ajouter un fichier de langue

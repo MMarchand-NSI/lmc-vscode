@@ -289,8 +289,11 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   language the server speaks, and the primary-subtag lookup matches the server's own. A
   VS Code notification and a tab title do not go through the webview's rendering, and the object
   file's name only exists host-side, so they live in `webviewPanel.ts`'s `hostText` — the one other
-  place in this repo where a language is chosen. Its fallback copies the server's rule: `en` gets
-  English, everything else French.
+  place in this repo where a language is chosen. Its fallback copies the server's rule: a language
+  it does not speak gets **English** (`locale.fallback_locale`, since the server's v0.8.2). It said
+  French until 2026-09-06, which cost nothing while `lmc.locale` defaulted to `fr`; the default is
+  `auto` now, so a German or Italian VS Code reaches that fallback routinely, and would have had an
+  English panel under a French tab title. Exactly the Spanish bug again, caught before shipping.
   **What `lmc.locale` cannot reach at all**: the manifest strings — the extension's name, its
   description, the command title, the setting's own description. VS Code localizes `package.json`
   only through `package.nls.json`, keyed on **its** display language, which is the very thing this
@@ -300,15 +303,30 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   `hostText` languages quote it under that name rather than sending someone after an entry that
   does not exist.
 - **The `lmc.locale` setting** (`package.json`'s `contributes.configuration`, read by `client.ts`)
-  — `fr` (default), `en`, or `auto`. `client.ts` subclasses `LanguageClient` to override
-  `getLocale()`, which is what the library sends as `initialize`'s `locale` and the only entry
-  point: the field is not exposed in the options, and the server reads `params.locale`, not
-  `initializationOptions`. **`auto` is deliberately not the default.** Its value is
-  `vscode.env.language`, and that stays English for most people whatever their country, because
-  nobody changes it; taking it for the language of the classroom would hand English diagnostics to
-  a French course, which is the opposite of the service. The client restarts the server when the
-  setting changes, since the language is announced once at startup — without that, changing the
-  setting would silently do nothing and read as a broken feature.
+  — `fr`, `en`, `es`, `ja`, `ko`, or `auto`, and **`auto` is the default since 2026-09-06**.
+  `client.ts` subclasses `LanguageClient` to override `getLocale()`, which is what the library
+  sends as `initialize`'s `locale` and the only entry point: the field is not exposed in the
+  options, and the server reads `params.locale`, not `initializationOptions`. The client restarts
+  the server when the setting changes, since the language is announced once at startup — without
+  that, changing the setting would silently do nothing and read as a broken feature.
+  **The default was `fr`, and the reason it moved is worth keeping, because the old reason was
+  right too.** `auto` is `vscode.env.language`, which stays English for most people whatever their
+  country, because nobody changes it; while the only audience was a French classroom, defaulting to
+  it would have handed English diagnostics to a French course, the opposite of the service. The
+  Marketplace release flips the population, not the argument: the same reasoning now says that
+  imposing French on someone installing from Osaka is the same wrong, and more often. A default
+  cannot guess a classroom. It can follow the editor, and the setting is what contradicts it in one
+  click — which the README says in its second paragraph, in bold, since that is the case that
+  matters. **The author's own machine is in that population**: working on this repo now needs
+  `"lmc.locale": "fr"` in user settings, or the diagnostics come back English.
+  Three things had to follow, and each was a place where French was written down as *the* default
+  rather than as *the setting's* default: `hostText`'s fallback (above), the panel's first-frame
+  `default_locale` (`src/webview/text/locale.gleam`, now English, so the first paint matches what
+  the host sends a millisecond later instead of flashing), and the tests that pinned French in
+  `webview_render_test.gleam` and `scripts/smoke-webview.mjs`. Those tests are why the cascade was
+  found at all: two of them failed the moment the constant moved, and the smoke test named the
+  other three. They now assert the English default *and* that asking for French still renders
+  French, which is the half that actually matters to the classroom.
   This is the one piece of *logic* in a file otherwise described as mechanical wiring, and it is
   not covered by any test: it needs a real VS Code. Same gap as open item 1.
 - **`vscode-extension/README.md`** — the **Marketplace page**, and the reason it is a second README:
@@ -636,6 +654,39 @@ never just code review):
   one, Step behaving like Run, Run collapsing into Step after providing input, PC/ACC resetting on
   refocus, Fetch/Decode/Execute events splitting across an input pause, a redundant post-INP
   accumulator-changed event, and the Decode line reading like reconstructed source code.
+- **The first public release, 2026-09-06.** The priority changed that day: publish something on the
+  Marketplace that looks solid, rather than keep polishing. What that took, beyond what was already
+  built, and what each thing is for rather than merely that it exists:
+  - **`publisher: "mmarchand"`** (it was the placeholder `lmc-vscode`). The published identity is
+    `<publisher>.<name>`, and it does not change afterwards.
+  - **MIT**, at the repo root and in `vscode-extension/` so it ships. `vsce` warned about its
+    absence on every package, and "License: none" on the store page is the single cheapest thing to
+    fix.
+  - **`icon.png`, 128 × 128, produced by `scripts/build-icon.py`** and not drawn by hand. It is the
+    memory grid with two cells lit, in the panel's own two colours (teal for a read, pink for a
+    write, the values read off `style.css`), so the icon cannot drift away from the product: if the
+    palette moves there, it moves here. No lettering, because three letters at 42 px, the size of a
+    row in the extensions list, is a smudge. Checked at both sizes, by looking at it.
+  - **`CHANGELOG.md`**, the store's second tab, and `categories`/`keywords`/`galleryBanner`.
+    `Education` was added; **`Debuggers` was considered and dropped** — the extension registers no
+    debug adapter, and a category is a claim.
+  - **`MMarchand-NSI/lmc-vscode` is now a public GitHub repo.** It had to be: the manifest's
+    `repository` and the README's links pointed at it, and a store page whose every link 404s is
+    the opposite of solid. Scanned all 104 commits for key material before flipping it; the deploy
+    key lives in Actions secrets, not in the tree. `lmc_lsp` stays private, see open item 5.
+  - **The Marketplace page lost its two dead links and gained the instruction table.** It pointed
+    at `lmc_lsp`'s `LANGAGE.md` for the language reference, which no reader can open. The
+    seventeen mnemonics are now in the page, and their one-line descriptions are **the server's
+    own** (`text/english.gleam`'s `mnemonic_doc_en`, the same text hover shows), copied from the
+    dependency rather than rewritten, so the page and the editor cannot say two different things.
+  - **`lmc.locale` defaults to `auto`**, with the cascade that followed; see the setting's own
+    entry above, which is where the reasoning lives.
+  Verified by running, not by reading a file list: the `.vsix` was unzipped and its
+  `extension/lsp-server.mjs` driven over stdio — `initialize` answers, `hoverProvider` is true, and
+  `STA nulle_part` comes back as « label non défini : nulle_part ». The five check scripts and
+  `gleam test` (87) pass.
+  **What is not done and needs the author**: creating the `mmarchand` publisher, a PAT, and
+  `vsce publish`. An agent cannot and should not do that part.
 
 Still open, roughly in the order it's worth tackling them. As of 2026-09-06 that list is
 **short**, and nothing on it is a missing feature: item 1 is a gap in *automation*, not in
@@ -659,8 +710,11 @@ checking (the author checks by hand constantly), item 9 is deferred by choice, a
      difference from the rest of the suite, and the reason this item stays on the list rather than
      being struck through.
    What would close it is an automated check in a real VS Code (`@vscode/test-electron` drives an
-   Extension Development Host headlessly), not another manual pass. Nobody has decided that is
-   worth its cost; it is the only thing left to decide here.
+   Extension Development Host headlessly). **Decided 2026-09-06: envisagé, pas fait.** The author's
+   call, taken while shipping the first public release: the panel is looked at constantly, and a
+   headless VS Code in CI is a dependency, a runner and minutes of CI time to automate what is
+   already being done. It stays written down here so that the day a regression does slip through,
+   the answer is already designed rather than improvised.
 2. ~~**`// @locale fr-FR` at the top of a file.**~~ **Settled, 2026-09-06: it will not be done.**
    The author's decision, and the reason is that the case it was meant to cover is already
    covered: `lmc.locale` is a setting now, with five languages and `es`/`ja`/`ko` in the enum, so
@@ -707,10 +761,15 @@ checking (the author checks by hand constantly), item 9 is deferred by choice, a
 5. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
-   removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
-   distribution" as a problem: there is no audience to distribute to. The passage under
-   "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
-   answered — no public release is planned.
+   removed, they are the arrangement. Do not re-propose making it public.
+   **One half of the reasoning did expire the same day, and only that half.** This entry used to
+   add "there is no audience to distribute to" and "no public release is planned"; the extension is
+   now published on the Marketplace and `lmc-vscode` itself is a public GitHub repo. It changed
+   nothing about the dependency, because the `.vsix` ships the **built bundle**, not the source: a
+   private server can be distributed publicly in compiled form, and is. What it does change is that
+   the passage under "Relationship to `lmc_lsp`" about revisiting this if a public release makes a
+   private dependency impractical is now live rather than hypothetical, and the answer, tested by
+   actually publishing, is that it does not.
 6. **No Zed extension exists yet, and it is not work for this repo.** Settled, 2026-09-06: it is
    a separate chantier, in its own repo, consuming `lmc_lsp` the way this one does. Editor
    independence was the explicit reason to keep the two repos separate (see "Relationship to

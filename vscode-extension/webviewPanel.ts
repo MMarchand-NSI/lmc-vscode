@@ -189,7 +189,7 @@ function findOpenTabGroupColumn(): vscode.ViewColumn | undefined {
 /// même façon : le panneau et les diagnostics doivent parler la même langue,
 /// et deux lectures différentes du même réglage les feraient diverger.
 function configuredLocale(): string {
-  const choice = vscode.workspace.getConfiguration("lmc").get<string>("locale", "fr");
+  const choice = vscode.workspace.getConfiguration("lmc").get<string>("locale", "auto");
   return choice === "auto" ? vscode.env.language : choice;
 }
 
@@ -200,8 +200,13 @@ function configuredLocale(): string {
 /// C'est donc le seul autre endroit du dépôt où une langue se choisit, et
 /// c'est assumé plutôt que contourné.
 ///
-/// Le repli suit la règle du serveur (`message.from_tag`) : « en » donne
-/// l'anglais, tout le reste le français.
+/// Le repli suit la règle du serveur, qui a changé en v0.8.2 : une langue
+/// qu'on ne parle pas donne **l'anglais** (`locale.fallback_locale`), et non
+/// le français. Cette table disait encore le français, ce qui ne se voyait
+/// pas tant que le défaut du réglage était `fr` ; il est passé à `auto` pour
+/// la publication, donc un VS Code allemand ou italien passe maintenant par
+/// ce repli couramment, et aurait eu un panneau anglais sous un titre
+/// d'onglet français.
 const hostText = {
   fr: {
     openFileFirst:
@@ -242,16 +247,16 @@ const hostText = {
 };
 
 /// La sous-étiquette primaire, comme le serveur la lit (`fr-FR` → `fr`), et
-/// le même repli : une langue qu'on ne parle pas ici donne le français.
+/// le même repli : une langue qu'on ne parle pas ici donne l'anglais.
 ///
 /// Ce fut un bogue et pas une omission théorique : `hostText` n'avait que
 /// `fr` et `en` quand l'espagnol est arrivé, et un utilisateur réglé sur
 /// `es` a eu un panneau espagnol avec un titre d'onglet français.
 /// `scripts/check-manifest.mjs` exige désormais que cette table couvre
 /// toutes les langues du serveur.
-function t(): (typeof hostText)["fr"] {
+function t(): (typeof hostText)["en"] {
   const tag = configuredLocale().toLowerCase().split("-")[0];
-  return hostText[tag as keyof typeof hostText] ?? hostText.fr;
+  return hostText[tag as keyof typeof hostText] ?? hostText.en;
 }
 
 function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {

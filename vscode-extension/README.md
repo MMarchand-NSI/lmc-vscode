@@ -4,10 +4,11 @@ The **LMC** assembly language in VS Code: everything you need to write, understa
 for a machine with a hundred memory cells, in class.
 
 **Available in French, English, Spanish, Japanese and Korean.** Diagnostics, hover, completion and
-the emulator panel all follow the `lmc.locale` setting (`fr`, `en`, `es`, `ja`, `ko`, or `auto` to
-follow VS Code's display language). French is the default, deliberately: VS Code's display language
-stays English for most people whatever their country, so it is a poor guess at the language of a
-classroom. A language nobody here speaks falls back to English rather than to blanks.
+the emulator panel all follow one setting, `lmc.locale` (`fr`, `en`, `es`, `ja`, `ko`, or `auto`).
+It is `auto` by default, which follows VS Code's display language. **Set it explicitly if you teach
+in a language other than the one your editor is in**, which is the common case: a display language
+stays English for most people whatever their country, because nobody changes it. A language this
+extension does not speak falls back to English rather than to blanks.
 
 The Spanish, Japanese and Korean have not been read by anyone who speaks them. Corrections are very
 welcome — an awkward turn of phrase in a teaching tool costs more than in most software.
@@ -23,9 +24,33 @@ that spell the mnemonics `STO`, `BR` or `COB` (here they are `STA`, `BRA` and `H
 named after a register, since `ACC`, `SI`, `LR`, `SP` and `PC` are reserved words. Going the other
 way is another matter: anything using `MOV`, `JSR`, `PSH` or `PLT` has nowhere to run but here.
 
-The language reference is
-[LANGAGE.md](https://github.com/MMarchand-NSI/lmc_lsp/blob/master/LANGAGE.md) — in French, like the
-example programs that ship with the extension.
+## The instruction set
+
+Seventeen mnemonics. Hovering over any of them in the editor gives this same text, in your language,
+with the details this table leaves out.
+
+| | |
+|---|---|
+| `INP` | read a value from the input into the accumulator |
+| `OUT` | write the accumulator to the output |
+| `HLT` | stop the program |
+| `ADD addr` | add the value at the address to the accumulator |
+| `SUB addr` | subtract the value at the address from the accumulator |
+| `LDA addr` | load the value at the address into the accumulator |
+| `STA addr` | store the accumulator at the address |
+| `MOV dst, src` | the general form of both: `LDA n` is `MOV ACC, n`, `STA n` is `MOV n, ACC` |
+| `BRA addr` | unconditional jump |
+| `BRZ addr` | jump if accumulator = 0 |
+| `BRP addr` | jump if accumulator >= 0 |
+| `JSR sub` | call a subroutine, recording the return address in `LR` |
+| `RET` | return to the last caller: jumps to `LR`, also written `MOV PC, LR` |
+| `PSH reg` | push a register onto the stack; with none written, `ACC` |
+| `POP reg` | pop the top of the stack into a register; with none written, `ACC` |
+| `PLT addr` | light a pixel, reading `x`, `y` and the colour from three cells at `addr` |
+| `DAT n, ...` | reserve one or more memory cells |
+
+A label ends with a colon (`total: DAT 0`), and `lst[SI]` addresses the cell `lst + SI`, which is
+what lets one instruction walk an array. Branches and `PLT` cannot be indexed.
 
 ## What the extension gives you
 
@@ -72,6 +97,8 @@ panel says so instead of leaving an unexplained blank.
 ## The code
 
 Written for teaching *Numérique et Sciences Informatiques*, the French high-school computer science
-curriculum. The language server lives in a separate repository,
-[lmc_lsp](https://github.com/MMarchand-NSI/lmc_lsp), so that it stays editor-independent; the
-extension itself is in [lmc-vscode](https://github.com/MMarchand-NSI/lmc-vscode).
+curriculum. The extension is open source, MIT, at
+[lmc-vscode](https://github.com/MMarchand-NSI/lmc-vscode); issues and corrections are welcome there,
+including on the translations. The language server it drives is a separate, private repository, kept
+apart so that it stays editor-independent rather than tied to VS Code; it ships inside this
+extension, so nothing else is needed to install and use it.
