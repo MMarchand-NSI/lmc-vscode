@@ -252,6 +252,18 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   The host sends **facts, not prose**: `objectLoadFailed` carries the file's `name`, and the panel
   writes the sentence. A shell that phrased it would be choosing the language where it is not
   known.
+  **Three sentences escape that rule and it is assumed, not worked around**: the "open an .lmc
+  file first" warning, the emulator tab's title, and the "code assembled into X" notification. A
+  VS Code notification and a tab title do not go through the webview's rendering, and the object
+  file's name only exists host-side, so they live in `webviewPanel.ts`'s `hostText` — the one other
+  place in this repo where a language is chosen. Its fallback copies the server's rule: `en` gets
+  English, everything else French.
+  **What `lmc.locale` cannot reach at all**: the manifest strings — the extension's name, its
+  description, the command title, the setting's own description. VS Code localizes `package.json`
+  only through `package.nls.json`, keyed on **its** display language, which is the very thing this
+  setting exists to stop deferring to. So the command palette says `LMC : ouvrir l'émulateur`
+  whatever the setting, and the English warning above quotes it under that name rather than
+  sending someone to look for an entry that does not exist.
 - **The `lmc.locale` setting** (`package.json`'s `contributes.configuration`, read by `client.ts`)
   — `fr` (default), `en`, or `auto`. `client.ts` subclasses `LanguageClient` to override
   `getLocale()`, which is what the library sends as `initialize`'s `locale` and the only entry

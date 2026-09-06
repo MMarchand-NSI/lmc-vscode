@@ -51,9 +51,7 @@ let lastCurrentLine: number | null = null;
 export function openEmulatorPanel(context: vscode.ExtensionContext): void {
   const editor = vscode.window.activeTextEditor;
   if (!editor || editor.document.languageId !== "lmc") {
-    vscode.window.showWarningMessage(
-      "Open an .lmc file first, then run “LMC: Open Emulator”.",
-    );
+    vscode.window.showWarningMessage(t().openFileFirst);
     return;
   }
 
@@ -69,7 +67,7 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
 
   currentPanel = vscode.window.createWebviewPanel(
     "lmcEmulator",
-    "LMC — Émulateur",
+    t().panelTitle,
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
@@ -93,6 +91,9 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
           type: "setLocale",
           locale: configuredLocale(),
         });
+        // Le titre de l'onglet est posé par l'hôte, pas peint par le
+        // webview : il ne suivrait pas tout seul.
+        if (currentPanel) currentPanel.title = t().panelTitle;
       }
     }),
   );
@@ -192,6 +193,42 @@ function configuredLocale(): string {
   return choice === "auto" ? vscode.env.language : choice;
 }
 
+/// Les trois phrases que l'hôte prononce lui-même. Elles ne peuvent pas
+/// venir du catalogue Gleam (`src/webview/text.gleam`) comme tout le reste :
+/// une notification VS Code et le titre d'un onglet ne passent pas par le
+/// rendu du webview, et le nom du fichier objet n'existe que de ce côté-ci.
+/// C'est donc le seul autre endroit du dépôt où une langue se choisit, et
+/// c'est assumé plutôt que contourné.
+///
+/// Le repli suit la règle du serveur (`message.from_tag`) : « en » donne
+/// l'anglais, tout le reste le français.
+const hostText = {
+  fr: {
+    openFileFirst:
+      "Ouvrez d'abord un fichier .lmc, puis lancez « LMC : ouvrir l'émulateur ».",
+    panelTitle: "LMC — Émulateur",
+    assembledInto: (name: string) => `Code assemblé dans ${name}`,
+  },
+  en: {
+    // La commande est citée sous le nom qu'elle porte réellement dans la
+    // palette. Les titres de commandes viennent du manifeste, que
+    // `lmc.locale` ne peut pas traduire (VS Code ne localise `package.json`
+    // que par `package.nls.json`, et selon *sa* langue d'affichage) :
+    // écrire ici un nom anglais enverrait chercher une entrée qui n'existe
+    // pas.
+    openFileFirst:
+      "Open an .lmc file first, then run « LMC : ouvrir l'émulateur ».",
+    panelTitle: "LMC — Emulator",
+    assembledInto: (name: string) => `Code assembled into ${name}`,
+  },
+};
+
+function t(): (typeof hostText)["fr"] {
+  return configuredLocale().toLowerCase().startsWith("en")
+    ? hostText.en
+    : hostText.fr;
+}
+
 function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {
   switch (message?.type) {
     case "ready":
@@ -276,7 +313,7 @@ async function writeObjectFile(content: unknown): Promise<void> {
   // strip — the point is that the file now exists, not that you must read
   // it. Open it yourself when you want to look inside.
   vscode.window.showInformationMessage(
-    "Code assemblé dans " + path.basename(target.fsPath),
+    t().assembledInto(path.basename(target.fsPath)),
   );
 }
 
