@@ -24,13 +24,15 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   event-sourced runner. It builds to a self-contained esbuild bundle published as a downloadable
   asset on tagged GitHub releases (`.github/workflows/release.yml` there).
 - **The LSP integration is done, with no fallback.** `vscode-extension/lsp-server.mjs` loads the
-  bundle from `vscode-extension/vendor/lmc-lsp.bundle.mjs`, fetched by `scripts/fetch-lsp-bundle.mjs` via the `gh` CLI (needed
-  because `lmc_lsp` is private). A fallback to the legacy in-tree server existed briefly during the
+  bundle from `vscode-extension/vendor/lmc-lsp.bundle.mjs`, **built** by
+  `scripts/build-lsp-bundle.mjs` out of the Gleam dependency below. It used to be *downloaded* from
+  a tagged release instead, which is what made this repo carry the same version twice; see the
+  "one dependency, one pin" entry in the done list. A fallback to the legacy in-tree server existed briefly during the
   migration ("keep it until manually validated"); once validated — and after it turned out to be
   broken anyway, see the git history around "Fix broken Result import in the legacy LSP's FFI layer"
   for a bug that had gone undetected for the fallback's entire existence — it was removed as pure
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
-  worse than failing loudly and telling you to run the fetch script.
+  worse than failing loudly and telling you to run the build script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
   `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.7.0" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
@@ -43,8 +45,9 @@ Code today, Zed planned) — folding it back in would recreate the coupling it w
 New LSP/language-core features (diagnostics, definition/references logic, etc.) belong in `lmc_lsp`,
 not here.
 
-`lmc_lsp` being private means both `scripts/fetch-lsp-bundle.mjs` and `gleam deps download` need
-authenticated access to it — locally via `gh auth login`, in CI via the deploy key described below.
+`lmc_lsp` being private means `gleam deps download` needs authenticated access to it — locally via
+`gh auth login` (its git-credential helper), in CI via the deploy key described below. That single
+clone is now the only thing this repo takes from that one.
 Revisit this whole arrangement if/when a public release (VS Code Marketplace, a Zed extension) makes
 a private dependency impractical — the fix at that point is just making `lmc_lsp` public, everything
 else keeps working as-is.
@@ -52,8 +55,11 @@ else keeps working as-is.
 ## Commands
 
 ```sh
-node scripts/fetch-lsp-bundle.mjs        # required before the extension will run at all —
-                                          # fetches vscode-extension/vendor/lmc-lsp.bundle.mjs
+gleam build && node scripts/build-lsp-bundle.mjs  # required before the extension will run at all
+                                          # — bundles the lmc_lsp dependency into
+                                          # vscode-extension/vendor/lmc-lsp.bundle.mjs
+node scripts/check-lsp.mjs               # runs lmc_lsp's own 48-assertion LSP integration suite
+                                          # against that bundle (needs `gleam deps download`)
 gleam build && node scripts/build-webview.mjs  # required before "LMC: Open Emulator" shows
                                                 # anything — bundles src/webview/ for the browser
 node scripts/smoke-webview.mjs           # drives that built bundle in a real DOM, playing the
@@ -93,7 +99,7 @@ npm run compile      # compiles client.ts to out/client.js — prefer this over 
 npx vsce package      # package as .vsix
 ```
 
-To manually try the extension in VS Code: run `node scripts/fetch-lsp-bundle.mjs` first, then launch
+To manually try the extension in VS Code: run `node scripts/build-lsp-bundle.mjs` first, then launch
 the "Run LMC Extension" debug config (`.vscode/launch.json`, `F5`) — it starts an Extension
 Development Host with `vscode-extension` as the dev path, with `examples/` (a valid program and a
 deliberately broken one) opened automatically so there's always something to test against without
@@ -118,8 +124,8 @@ gleam binary is standalone and this project targets JavaScript): it first config
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites
 `https://github.com/` git URLs to SSH via `git config --global url.insteadOf`), then runs `gleam deps
 download`, `gleam test`, `gleam format --check src test`. It doesn't touch the LSP bundle at all —
-`vscode-extension/vendor/`, `fetch-lsp-bundle.mjs`, and `LMC_LSP_DEPLOY_KEY` are three independent things that happen
-to depend on the same private repo for two different reasons (LSP bundle vs. Gleam library).
+the LSP bundle and the Gleam library both come out of the one clone that `gleam deps download`
+makes, so `LMC_LSP_DEPLOY_KEY` is what gives CI access to all of it.
 
 **`LMC_LSP_DEPLOY_KEY`** is a repo secret on `lmc-vscode` holding an ed25519 private key; the matching
 public key is registered as a **read-only** deploy key on `lmc_lsp` (`gh repo deploy-key list --repo
@@ -145,12 +151,17 @@ VS Code ←—LSP (stdio)—→ vscode-extension/lsp-server.mjs → vendor/lmc-l
   installed extension has no repo around it: `vsce package` archives `vscode-extension/` and
   nothing else, so a server one directory above would simply not be in the `.vsix`.
   Exits with a clear error (not a silent fallback) if that file is missing — run
-  `scripts/fetch-lsp-bundle.mjs` first.
-- **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
-  download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
-  `vscode-extension/vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.7.0`; pass a version to pin a
-  different tag.
-  That default and `gleam.toml`'s `ref` are the two pins that must always move together.
+  `scripts/build-lsp-bundle.mjs` first.
+- **`scripts/build-lsp-bundle.mjs`** — esbuild over `build/dev/javascript/lmc_lsp/main.mjs`, the
+  dependency as `gleam build` compiled it, into `vscode-extension/vendor/lmc-lsp.bundle.mjs`. It
+  does not repeat the esbuild options: it reads them out of the dependency's own `package.json`
+  (`build:minify`) and fails loudly if that script stops having the expected shape. **There is one
+  pin now, `gleam.toml`'s `ref`.**
+- **`scripts/check-lsp.mjs`** — runs `lmc_lsp`'s own `test_lsp.mjs --bundle` against that bundle,
+  48 assertions over the whole protocol surface. It exists because the bundle is no longer the
+  artefact upstream CI tested; making it face the same suite is what replaces that guarantee.
+  `test_lsp.mjs` loads `./dist/lmc-lsp.bundle.mjs` relative to the cwd, so the script builds a
+  throwaway directory with that symlink.
 
 None of the LSP protocol logic (diagnostics, hover, completion, formatting, etc.) lives in this repo
 any more — see `lmc_lsp`'s own `CLAUDE.md`/`ARCHI.md` for that.
@@ -309,8 +320,18 @@ never just code review):
 
 - LSP integration (`vscode-extension/lsp-server.mjs` → `vendor/lmc-lsp.bundle.mjs`), no fallback.
 - Emulator API as an `lmc_lsp` git dependency; CI pulls it over the `LMC_LSP_DEPLOY_KEY` deploy key.
-- `lmc_lsp`'s own release pipeline, publishing tagged bundles — this repo pins a tag in two places,
-  `gleam.toml` and `scripts/fetch-lsp-bundle.mjs`, and both must move together.
+- **One dependency, one pin.** The bundle is no longer downloaded from a tagged release: it is
+  built here, by `scripts/build-lsp-bundle.mjs`, out of the very clone `gleam deps download`
+  already makes. So the version lives in `gleam.toml` and nowhere else, and the "double pin that
+  must always move together" — the standing hazard of every bump above — is gone rather than
+  merely documented. Two things make the substitution honest rather than assumed. The esbuild
+  options are not retyped: they are read out of `lmc_lsp`'s own `package.json` (`build:minify`),
+  and an unrecognised script is a loud failure. And the bundle no longer being the artefact
+  upstream CI tested, `scripts/check-lsp.mjs` runs upstream's **own** `test_lsp.mjs` against it,
+  48 assertions over the whole protocol surface. Verified by breaking it: a bundle with
+  `hoverProvider` renamed fails one assertion and exits non-zero. Measured, for the record: 77 440
+  bytes locally against 77 829 for the published asset, same flags, and both answer `initialize`,
+  diagnostics and hover identically.
 - Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
   Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
   session-style current-line decoration).
@@ -352,7 +373,8 @@ never just code review):
   matter, and re-clicking Assembler is the whole fix.
 - **The `lmc_lsp` v0.5.0 → v0.6.1 migration**, three releases in one step (v0.5.0 and v0.6.0 carry four
   full-layer reviews — `parse/`, `runner/`, `features/`, `semantic/`). The **double pin** moved as
-  always, `gleam.toml` and `scripts/fetch-lsp-bundle.mjs` together. What it cost here:
+  it then had to, `gleam.toml` and `scripts/fetch-lsp-bundle.mjs` together (that script is gone
+  now, see "One dependency, one pin" above). What it cost here:
   - `MachineState.output` became `output_reversed` (newest-first, so `OUT` costs a cons) and is
     read through `inspect.output_buffer`. Six call sites, not the two the plan had found:
     `render.gleam`, `model.gleam`'s `machine_from_words`, **both** test modules,
@@ -441,7 +463,12 @@ Still open, roughly in the order it's worth tackling them:
    substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
    `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
    independent of how solid the model/render logic underneath now is.
-2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+2. **CI runs none of the four scripts.** `.github/workflows/test.yml` stops at `gleam deps
+   download`, `gleam test` and `gleam format --check`, so `check-lsp.mjs`, `check-examples.mjs`,
+   `check-grammar.mjs` and `smoke-webview.mjs` only ever run when someone remembers to. Three of
+   them need `gleam build` and one needs `npm install` in `vscode-extension/` (jsdom, esbuild,
+   the TextMate engine), which is the only reason it has not been done.
+3. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 44
@@ -454,18 +481,18 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-3. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+4. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
    removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-4. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+5. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-5. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+6. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
@@ -478,8 +505,8 @@ Still open, roughly in the order it's worth tackling them:
    listed there, since `vsce` already ships production dependencies only (`vscode-languageclient`)
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
-   Rebuild order before packaging: `fetch-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-6. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
+   Rebuild order before packaging: `build-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
+7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX` (and `IX` → `SI` in v0.7.0, see the done list), opcode 9
    in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
@@ -491,5 +518,4 @@ Still open, roughly in the order it's worth tackling them:
    language id, the `source.lmc` grammar scope and 26 example programs (the count here has been
    wrong twice already, first at nine and then at twelve — `ls examples/*.lmc | wc -l` settles it,
    and the `unit-*` series doubled it). It ends, like every
-   language change, with an `lmc_lsp` release and the **double pin** here — `gleam.toml` and
-   `scripts/fetch-lsp-bundle.mjs`, always together.
+   language change, with an `lmc_lsp` release and, here, the single `ref` in `gleam.toml`.

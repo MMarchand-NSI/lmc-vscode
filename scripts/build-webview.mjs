@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Bundles the compiled webview/app.gleam (browser-side emulator UI) into a
 // single script the webview panel can load directly. Mirrors
-// fetch-lsp-bundle.mjs's role for the LSP bundle: turns a `gleam build`
+// build-lsp-bundle.mjs's role for the LSP bundle: turns a `gleam build`
 // output tree with relative imports into one self-contained file — except
 // this one is built locally (`gleam build` in this repo), not fetched from
 // a release, and targets the browser (--platform=browser / no Node

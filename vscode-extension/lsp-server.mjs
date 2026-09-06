@@ -1,8 +1,8 @@
 // Entry point for the LMC language server.
 //
 // Runs the standalone lmc_lsp server (github.com/MMarchand-NSI/lmc_lsp),
-// vendored by `node scripts/fetch-lsp-bundle.mjs` into vendor/lmc-lsp.bundle.mjs
-// next to this file (gitignored — run that script to fetch it).
+// built by `node scripts/build-lsp-bundle.mjs` into vendor/lmc-lsp.bundle.mjs
+// next to this file (gitignored — run that script to build it).
 //
 // This file and vendor/ live inside vscode-extension/ rather than at the
 // repo root so that `vsce package` puts them in the .vsix: an installed
@@ -14,7 +14,7 @@ try {
 } catch (err) {
   console.error(
     "Could not load vendor/lmc-lsp.bundle.mjs — run " +
-      "`node scripts/fetch-lsp-bundle.mjs` first to fetch it.\n" +
+      "`gleam build && node scripts/build-lsp-bundle.mjs` first to build it.\n" +
       String(err),
   );
   process.exit(1);

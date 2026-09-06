@@ -80,7 +80,8 @@ examples/              # Opened automatically by the "Run LMC Extension" launch
   ecran.lmc
   unit-01-inp-out.lmc … unit-13-boucle-somme.lmc
 scripts/
-  fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vscode-extension/vendor/
+  build-lsp-bundle.mjs # Bundles lmc_lsp into vscode-extension/vendor/ (needs gleam build)
+  check-lsp.mjs        # Runs lmc_lsp's own LSP integration suite against that bundle
   build-webview.mjs    # Bundles src/webview/ for the browser into vscode-extension/webview/
   smoke-webview.mjs    # Drives that bundle in jsdom, playing the extension host's half
   check-examples.mjs   # Runs every unit-*.lmc against the cases in its own header
@@ -95,7 +96,7 @@ src/
 vscode-extension/      # Everything in here ships in the .vsix
   lsp-server.mjs       # LSP entry point: loads vendor/lmc-lsp.bundle.mjs
   vendor/
-    lmc-lsp.bundle.mjs  # Fetched by fetch-lsp-bundle.mjs (gitignored)
+    lmc-lsp.bundle.mjs  # Built by build-lsp-bundle.mjs (gitignored)
   client.ts            # VS Code extension host
   webviewPanel.ts       # Creates/manages the emulator panel, editor <-> webview sync
   webview/
@@ -119,12 +120,12 @@ The extension runs two processes:
 2. **Language server** — [`lmc_lsp`](https://github.com/MMarchand-NSI/lmc_lsp), a standalone,
    editor-agnostic Gleam/Node.js LSP server that also targets other LSP clients (e.g. Zed). It lives
    in its own repo, not here: `vscode-extension/lsp-server.mjs` loads a tagged release fetched into
-   `vscode-extension/vendor/lmc-lsp.bundle.mjs` by `node scripts/fetch-lsp-bundle.mjs` (requires the `gh` CLI,
-   authenticated with access to that repo, which is currently private — run the script before first
-   use, there is no in-tree fallback).
+   `vscode-extension/vendor/lmc-lsp.bundle.mjs` by `node scripts/build-lsp-bundle.mjs`, out of the
+   same clone `gleam deps download` makes (requires the `gh` CLI, authenticated with access to that
+   repo, which is currently private — run both before first use, there is no in-tree fallback).
 
 ```
-VS Code ←—LSP (stdio)—→ vscode-extension/lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (from lmc_lsp releases)
+VS Code ←—LSP (stdio)—→ vscode-extension/lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (built from the lmc_lsp dep)
 ```
 
 The [Emulator API](#emulator-api) is unrelated to the above and to the extension at runtime — it's a
@@ -138,18 +139,24 @@ Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for pro
   not for running the extension
 - Node.js ≥ 18
 - [`gh`](https://cli.github.com) CLI, authenticated with access to `MMarchand-NSI/lmc_lsp` (currently
-  private) — needed both to fetch the language server below, and locally by `gleam deps download`
-  (via its git-credential helper) to pull `lmc_lsp` as a Gleam dependency for the Emulator API
+  private) — used by `gleam deps download`, via its git-credential helper, to clone `lmc_lsp` as a
+  Gleam dependency. That one clone is the whole of what this repo takes from it: the language
+  server, the emulator and the Gleam library all come out of it
 
-### Fetch the language server
+### Build the language server
 
 ```sh
-node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.7.0) into
-                                         #   vscode-extension/vendor/
-node scripts/fetch-lsp-bundle.mjs v0.5.0 # or a specific version
+gleam deps download                  # clones lmc_lsp at the tag in gleam.toml
+gleam build                          # compiles it (and this project) to build/dev/javascript/
+node scripts/build-lsp-bundle.mjs    # bundles it into vscode-extension/vendor/lmc-lsp.bundle.mjs
+node scripts/check-lsp.mjs           # runs lmc_lsp's own integration suite against that bundle
 ```
 
-Required before the extension will start — there is no in-tree fallback.
+Required before the extension will start — there is no in-tree fallback. The bundle used to be
+downloaded from a tagged release instead; it is built here now, so that the version lives in
+`gleam.toml` and nowhere else. `build-lsp-bundle.mjs` takes its esbuild options from `lmc_lsp`'s own
+`package.json` rather than repeating them, and `check-lsp.mjs` makes the artefact face the same
+48-assertion suite the upstream CI runs, which is what the published bundle had going for it.
 
 ### Build & test the Emulator API
 
@@ -173,7 +180,7 @@ npx vsce package  # Package as .vsix
 The `.vsix` is self-contained: `lsp-server.mjs` and `vendor/lmc-lsp.bundle.mjs` live inside
 `vscode-extension/` precisely so that they end up in the archive, along with the compiled
 `out/client.js`, the webview bundle and the one runtime dependency (`vscode-languageclient`). An
-installed extension has no repo around it. Run `node scripts/fetch-lsp-bundle.mjs`,
+installed extension has no repo around it. Run `node scripts/build-lsp-bundle.mjs`,
 `node scripts/build-webview.mjs` and `npm run compile` before packaging, or the archive will be
 missing one of the three.
 
