@@ -5,10 +5,10 @@
   color-scheme: light dark;
 }
 
-/* La page tient dans la hauteur de la fenêtre et ne défile pas elle-même :
-   c'est le panneau du cycle, en bas, qui prend la place restante et défile
-   à l'intérieur. Sans ça, la trace du dernier pas repoussait la grille hors
-   de l'écran à mesure qu'elle grandissait. */
+/* La page occupe au moins la hauteur de la fenêtre, pour que le panneau du
+   cycle puisse s'étirer jusqu'en bas ; `min-height` et non `height`, afin
+   qu'une fenêtre trop courte fasse défiler la page entière plutôt que de
+   comprimer quoi que ce soit. */
 body {
   font-family: var(--vscode-font-family, sans-serif);
   color: var(--vscode-foreground);
@@ -16,8 +16,7 @@ body {
   margin: 0;
   padding: 12px;
   box-sizing: border-box;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -53,13 +52,13 @@ h2 {
 }
 
 .layout {
-  /* Peut rétrécir et défiler en lui-même quand la fenêtre est courte.
-     `min-height: 0` n'est pas décoratif : sans lui un enfant flex refuse de
-     descendre sous la hauteur de son contenu, et la grille mémoire pousserait
-     le panneau du cycle hors de l'écran au lieu de défiler. */
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow: auto;
+  /* Exactement la hauteur de son contenu : ni étirement, ni rétrécissement,
+     ni défilement propre. Une boîte `overflow: auto` ici affichait une barre
+     de défilement alors qu'il n'y avait rien à faire défiler — le bloc était
+     plus haut que les trois cadres qu'il contient. Quand la fenêtre est trop
+     courte, c'est la page qui défile, une seule barre au lieu de deux
+     imbriquées. */
+  flex: 0 0 auto;
   display: flex;
   gap: 16px;
   align-items: flex-start;
@@ -536,6 +535,9 @@ button:disabled {
    mémoire hors de l'écran. */
 
 .cycle-panel {
+  /* Prend toute la place restante jusqu'en bas de la fenêtre, et défile en
+     lui-même : c'est le seul bloc dont le contenu grandit d'un pas à
+     l'autre. */
   flex: 1 1 auto;
   min-height: 6em;
   overflow-y: auto;
