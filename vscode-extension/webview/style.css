@@ -246,7 +246,7 @@ h2 {
 }
 
 .tip code {
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--vscode-editor-font-family, monospace), monospace;
   font-size: 0.95em;
 }
 
@@ -553,10 +553,19 @@ button:disabled {
   max-width: 60em;
 }
 
+/* Le `, monospace` final n'est pas une redondance du repli de `var()`.
+   Celui-ci ne joue que si la variable est *absente* ; elle ne l'est jamais,
+   VS Code l'injecte toujours (`webview/browser/themeing.ts`) avec la valeur
+   du réglage `editor.fontFamily`. Si ce réglage nomme une police absente de
+   la machine et ne finit pas par une famille générique — « JetBrains Mono »
+   tout court, le cas rencontré le 2026-09-06 dans l'extension installée —
+   le navigateur applique son défaut, qui est du **serif**, et le panneau
+   affiche ses phrases en Times. Ajouter le générique à la fin de la pile
+   rend ce réglage inoffensif : la dernière chance est toujours du monospace. */
 #cycle-events {
   margin: 0;
   padding-left: 1.4em;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--vscode-editor-font-family, monospace), monospace;
   font-size: 0.85em;
   display: flex;
   flex-direction: column;
