@@ -44,6 +44,10 @@ A grid of a hundred cells, the five registers, the input and output trays, and t
 incremented during the read, which is what explains why a stopped machine shows a `PC` one past the
 instruction that stopped it.
 
+At every step, the cells the instruction touched pulse: **teal for a cell that was read, pink for
+one that was written**. Reading changes nothing, writing changes the machine, and the grid says
+which just happened.
+
 The panel and the editor are synced both ways: moving the cursor outlines the matching cell,
 clicking a cell reveals its source line. That is the reason for a panel here rather than one of the
 many standalone LMC simulators on the web.

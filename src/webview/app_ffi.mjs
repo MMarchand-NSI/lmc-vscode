@@ -159,11 +159,10 @@ function renderMemory(state) {
   pulseAccesses(state, cells);
 }
 
-/// Fait pulser les cases que le dernier pas a lues ou écrites.
-///
-/// Deux classes et non une, alors que le rose est le même : le modèle
-/// distingue déjà la lecture de l'écriture, et les séparer ici coûte une
-/// ligne de CSS le jour où on voudra deux couleurs.
+/// Fait pulser les cases que le dernier pas a lues ou écrites, teal pour une
+/// lecture et rose pour une écriture (voir style.css : c'est la distinction
+/// que la grille doit enseigner, et la couleur chaude va au geste qui
+/// modifie la machine).
 ///
 /// Le retrait de la classe, la lecture d'`offsetWidth` puis sa remise sont
 /// la façon standard de **relancer** une animation CSS : sans ce passage par

@@ -427,8 +427,10 @@ never just code review):
 - Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
   Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
   session-style current-line decoration).
-- **La case touchée pulse en rose.** `model.memory_accesses` rend ce que le dernier pas a lu ou
-  écrit, `render.gleam` l'envoie sous `accesses`, et `app_ffi.mjs` pose une classe que le CSS
+- **La case touchée pulse : teal si elle a été lue, rose si elle a été écrite.** Deux couleurs et
+  non une, parce que c'est la distinction que la grille doit enseigner — lire ne change rien,
+  écrire change la machine — et la couleur chaude va au geste qui modifie.
+  `model.memory_accesses` rend ce que le dernier pas a lu ou écrit, `render.gleam` l'envoie sous `accesses`, et `app_ffi.mjs` pose une classe que le CSS
   anime — retirée puis reposée après un reflow, sans quoi une case lue deux fois de suite ne
   clignoterait qu'une fois, ce qui est précisément le cas du pas à pas.
   **Trois événements, tous rapportés par le runner** : `Fetched` (toute instruction lit sa propre
