@@ -123,7 +123,9 @@ language server is a separate forked process, plain JS, no native module). Why t
 is unknown, and the flag does not answer it, it only keeps it out of this window. If a development
 window dies again, `dmesg | grep CaptureCrash` says in one line whether it is the same cause.
 
-CI (`.github/workflows/test.yml`) runs on gleam 1.18.1 and node 20, with no Erlang at all (the
+CI is two workflows. `release.yml` publishes to the Marketplace on a `v*` tag; see the release
+entry under Status for what it guards against and why the token is a secret.
+`.github/workflows/test.yml` runs on gleam 1.18.1 and node 20, with no Erlang at all (the
 gleam binary is standalone and this project targets JavaScript): it first configures SSH access to
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites
 `https://github.com/` git URLs to SSH via `git config --global url.insteadOf`), then runs `gleam deps
@@ -685,8 +687,24 @@ never just code review):
   `extension/lsp-server.mjs` driven over stdio — `initialize` answers, `hoverProvider` is true, and
   `STA nulle_part` comes back as « label non défini : nulle_part ». The five check scripts and
   `gleam test` (87) pass.
-  **What is not done and needs the author**: creating the `mmarchand` publisher, a PAT, and
-  `vsce publish`. An agent cannot and should not do that part.
+  - **Publishing is a workflow, not a command on someone's laptop**
+    (`.github/workflows/release.yml`, added the same day at the author's request). Pushing a tag
+    `v*` runs the whole suite again, packages, and publishes with `vsce publish --packagePath` —
+    the archive that was just checked, not a second one built after the checks. It then attaches
+    the `.vsix` to a GitHub release. Two guards run before anything is spent: the tag must equal
+    `vscode-extension/package.json`'s `version` (the Marketplace believes the manifest, not the
+    tag, so `v0.2.0` on a manifest left at `0.1.0` would silently publish `0.1.0` and burn that
+    number for ever), and `VSCE_PAT` must be non-empty.
+    Why a secret rather than `vsce login`: **measured, not assumed** — `keytar` cannot open a
+    credential store under WSL here (`dbus-launch: No such file or directory`), so `vsce login`
+    falls back to writing the token in clear text to `~/.vsce`. A repo secret is not readable
+    back, is masked in logs, and is unavailable to pull requests from forks, which now matters
+    since the repo is public. The secret is passed through `env:` and never interpolated into a
+    `run:` line.
+  **What is not done and needs the author**: creating the `mmarchand` publisher on the
+  Marketplace, generating a PAT (Azure DevOps, *All accessible organizations* + *Marketplace →
+  Manage*, 30 days by default), and storing it as the `VSCE_PAT` repo secret. An agent cannot and
+  should not do that part. After that, releasing is `git tag v0.1.0 && git push origin v0.1.0`.
 
 Still open, roughly in the order it's worth tackling them. As of 2026-09-06 that list is
 **short**, and nothing on it is a missing feature: item 1 is a gap in *automation*, not in
