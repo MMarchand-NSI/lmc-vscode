@@ -438,8 +438,9 @@ never just code review):
   produced a scrollbar with nothing to scroll: the block came out taller than the three frames it
   holds. It keeps its content height, and a window too short for everything scrolls the page — one
   scrollbar rather than two nested.
-  **The layout itself is unverified**: jsdom does no layout, so the smoke test can only assert that
-  nothing is collapsible any more. Heights and scrollbars need a real panel — open item 1.
+  **No test covers the layout**: jsdom does no layout, so the smoke test can only assert that
+  nothing is collapsible any more. Heights and scrollbars are checked by the author in a real
+  panel, on `F5`, which is what open item 1 is about: hand-checked, not automated.
 - **La case touchée pulse : teal si elle a été lue, rose si elle a été écrite.** Deux couleurs et
   non une, parce que c'est la distinction que la grille doit enseigner — lire ne change rien,
   écrire change la machine — et la couleur chaude va au geste qui modifie.
@@ -637,15 +638,29 @@ never just code review):
   accumulator-changed event, and the Decode line reading like reconstructed source code.
 
 Still open, roughly in the order it's worth tackling them. As of 2026-09-06 that list is
-**short**: item 1 is the only thing genuinely left to build, item 9 is deferred by choice, and
-items 2, 3, 5, 6, 8 and 10 are decisions taken, kept here so they are not re-proposed:
+**short**, and nothing on it is a missing feature: item 1 is a gap in *automation*, not in
+checking (the author checks by hand constantly), item 9 is deferred by choice, and items 2, 3, 5,
+6, 8 and 10 are decisions taken, kept here so they are not re-proposed:
 
-1. **The webview has never been opened in a real Extension Development Host by an agent here.**
-   Every fix above was validated with `gleam test` plus a throwaway `node:vm`-stubbed-DOM script
-   driving the *built bundle*, never VS Code itself — so `webviewPanel.ts`'s placeholder
-   substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
-   `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
-   independent of how solid the model/render logic underneath now is.
+1. **Nothing automated covers the panel as VS Code actually renders it.** This item used to say the
+   webview had "never been opened in a real Extension Development Host", which was misleading, and
+   the author corrected it on 2026-09-06: **they press `F5` and look at the panel on essentially
+   every change, whether or not they mention it in the conversation.** So the panel is exercised
+   for real, continuously, and a blank panel, a broken CSP or a botched placeholder substitution
+   in `webviewPanel.ts` would not survive a session. What is true, and all that is true:
+   - **No agent working in this repo has ever seen the panel**, and none can: it needs a graphical
+     VS Code. So an agent must never write "verified" about a visual fact here, only "the author
+     confirmed it" or "unchecked". `gleam test` and `scripts/smoke-webview.mjs` say nothing about
+     CSP, about `webviewPanel.ts`'s `{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
+     `{{nonce}}` substitution, or about layout, since jsdom does no layout and stubs
+     `acquireVsCodeApi`.
+   - **No check in CI covers any of that either**, so the safety net is the author noticing, which
+     catches what they happen to look at that day and not what they do not. That is a real
+     difference from the rest of the suite, and the reason this item stays on the list rather than
+     being struck through.
+   What would close it is an automated check in a real VS Code (`@vscode/test-electron` drives an
+   Extension Development Host headlessly), not another manual pass. Nobody has decided that is
+   worth its cost; it is the only thing left to decide here.
 2. ~~**`// @locale fr-FR` at the top of a file.**~~ **Settled, 2026-09-06: it will not be done.**
    The author's decision, and the reason is that the case it was meant to cover is already
    covered: `lmc.locale` is a setting now, with five languages and `es`/`ja`/`ko` in the enum, so
