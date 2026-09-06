@@ -385,6 +385,37 @@ button:disabled {
   background: var(--vscode-editor-findMatchHighlightBackground, #515c6a);
   border-color: var(--vscode-focusBorder);
 }
+/* La case que le dernier pas a lue ou écrite pulse en rose.
+   Le rose n'appartient à aucun thème VS Code : il est écrit en clair, avec
+   une transparence qui le laisse fonctionner sur fond clair comme sur fond
+   sombre, et il ne remplace aucun marquage — il passe par-dessus, le temps
+   d'une animation, puis la case redevient ce qu'elle était.
+   `read` et `written` partagent la même couleur aujourd'hui ; les deux
+   classes existent pour que les séparer ne coûte qu'une ligne. */
+@keyframes mailbox-pulse {
+  from {
+    background-color: rgba(255, 92, 168, 0.85);
+    box-shadow: 0 0 0 2px rgba(255, 92, 168, 0.55);
+  }
+  to {
+    background-color: transparent;
+    box-shadow: 0 0 0 2px rgba(255, 92, 168, 0);
+  }
+}
+.mailbox.read,
+.mailbox.written {
+  animation: mailbox-pulse 600ms ease-out;
+}
+/* Une animation ne doit pas s'imposer à qui a demandé qu'on lui en épargne :
+   la case s'allume alors sans clignoter, l'information reste. */
+@media (prefers-reduced-motion: reduce) {
+  .mailbox.read,
+  .mailbox.written {
+    animation: none;
+    background-color: rgba(255, 92, 168, 0.35);
+  }
+}
+
 .mailbox.cursor:not(.current) {
   outline: 2px solid var(--vscode-focusBorder);
   outline-offset: -1px;

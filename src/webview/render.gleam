@@ -41,6 +41,9 @@ pub fn to_json(mdl: Model) -> String {
     // provenance du texte, pas une frontière que la machine connaîtrait.
     #("dataAddresses", json.array(model.data_addresses(mdl), json.int)),
     #("cycle", json_cycle(mdl)),
+    // Les cases que le dernier pas a lues ou écrites. L'affichage les fait
+    // pulser ; le modèle dit seulement lesquelles et dans quel sens.
+    #("accesses", json_accesses(mdl)),
     // Le texte fixe du panneau, dans la langue demandée. `index.html` ne
     // porte plus que des `data-ui` vides : une seule source pour les deux
     // langues, et le compilateur exige la traduction de chacune.
@@ -82,6 +85,22 @@ fn json_ui(mdl: Model) -> Json {
     locale.labels(mdl.locale)
     |> list.map(fn(pair) { #(pair.0, json.string(pair.1)) }),
   )
+}
+
+fn json_accesses(mdl: Model) -> Json {
+  json.array(model.memory_accesses(mdl), fn(access) {
+    let #(address, kind) = access
+    json.object([
+      #("address", json.int(address)),
+      #(
+        "kind",
+        json.string(case kind {
+          model.Read -> "read"
+          model.Written -> "write"
+        }),
+      ),
+    ])
+  })
 }
 
 fn json_cycle(mdl: Model) -> Json {

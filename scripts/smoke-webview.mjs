@@ -325,6 +325,37 @@ async function cycle() {
   check("et le registre PC le confirme", p.text("pc"), "1");
 }
 
+// ── Les cases touchées ─────────────────────────────────────────────
+
+// Le modèle dit quelles cases le dernier pas a lues ou écrites ; le DOM
+// doit porter la classe qui les fait pulser. Ce que ce test regarde, c'est
+// justement la moitié impure : `pulseAccesses` retire les classes avant de
+// les reposer, et un oubli de nettoyage laisserait toute la grille rose au
+// bout de quelques pas.
+async function accesses() {
+  console.log("\nLes cases lues et écrites");
+  const p = openPanel();
+  await p.send({ type: "setSource", source: "        LDA n\n        STA m\n        HLT\nn:      DAT 7\nm:      DAT\n" });
+  await p.click("assemble");
+  await p.click("load");
+
+  const marked = (cls) =>
+    [...p.document.querySelectorAll(".mailbox." + cls)]
+      .map((el) => el.dataset.address).join(",");
+
+  await p.click("step");
+  check("le premier pas lit sa propre case", marked("read"), "0");
+  check("et n'écrit rien", marked("written") || "aucune", "aucune");
+
+  await p.click("step");
+  check("le deuxième pas lit la case suivante", marked("read"), "1");
+  check("et écrit là où STA range", marked("written"), "4");
+
+  await p.click("reset");
+  check("après Reset, plus rien ne pulse",
+    (marked("read") + marked("written")) || "aucune", "aucune");
+}
+
 // ── La langue ──────────────────────────────────────────────────────
 
 // index.html ne porte plus une seule phrase : tout son texte vient de
@@ -390,6 +421,7 @@ await frames();
 await annotations();
 await screen();
 await cycle();
+await accesses();
 await language();
 
 console.log(

@@ -63,6 +63,33 @@ pub fn a_program_too_long_does_not_assemble_test() {
   assert m.assembly_error == Some(text.SourceHasErrors)
 }
 
+pub fn a_step_reports_the_cells_it_touched_test() {
+  // Le pas à pas fait pulser en rose la case touchée. Le modèle ne dit que
+  // ce que le runner a rapporté : la lecture de l'instruction elle-même, et
+  // l'écriture d'un STA.
+  let m =
+    loaded(
+      "        LDA n\n        STA m\n        HLT\nn:      DAT 7\nm:      DAT\n",
+    )
+  let first = model.step(m)
+  assert model.memory_accesses(first) == [#(0, model.Read)]
+
+  let second = model.step(first)
+  assert model.memory_accesses(second)
+    == [#(1, model.Read), #(4, model.Written)]
+}
+
+pub fn an_operand_read_is_not_reported_test() {
+  // `LDA n` lit mem[3], et cette lecture **n'apparaît pas** : le runner
+  // n'émet pas d'événement pour elle. On ne la reconstruit pas, on ne la
+  // devine pas, et ce test est là pour que personne ne prenne l'absence
+  // pour un oubli — la correction est un événement de plus côté `lmc_lsp`.
+  let m =
+    loaded("        LDA n\n        HLT\nn:      DAT 7\n")
+    |> model.step
+  assert list.map(model.memory_accesses(m), fn(pair) { pair.0 }) == [0]
+}
+
 pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
   // Regression: webviewPanel.ts resends the source on every editor
   // refocus (onDidChangeActiveTextEditor), not only on real edits —

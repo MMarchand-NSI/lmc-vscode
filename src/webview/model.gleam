@@ -628,6 +628,39 @@ fn dedupe_input_accumulator_change(events: List(Event)) -> List(Event) {
   }
 }
 
+/// Ce que le dernier pas a fait à une case mémoire.
+pub type Access {
+  Read
+  Written
+}
+
+/// Les cases que le dernier pas a touchées, telles que le runner les a
+/// **rapportées** — et rien de plus.
+///
+/// `Fetched` est une lecture : toute instruction commence par lire sa propre
+/// case, et c'est la lecture la plus instructive à voir clignoter, puisqu'elle
+/// a lieu à chaque pas sans exception.
+///
+/// **Les lectures d'opérande manquent, et c'est délibéré.** `LDA n` lit
+/// `mem[n]`, mais le runner n'émet aucun événement pour cette lecture (voir
+/// `runner/event.gleam` dans `lmc_lsp` : il y a `MemoryWritten`, pas de
+/// `MemoryRead`). Les reconstruire ici demanderait de recopier sa logique
+/// d'adressage, indexation comprise, et de deviner la valeur de `SI` au bon
+/// instant — exactement le genre de duplication qui a déjà menti dans ce
+/// dépôt (l'adresse déduite du numéro de ligne, bug v0.1.5 de `lmc_lsp`). La
+/// bonne correction est un événement de plus côté runner ; voir la liste
+/// ouverte de CLAUDE.md.
+pub fn memory_accesses(model: Model) -> List(#(Int, Access)) {
+  model.last_events
+  |> list.filter_map(fn(evt) {
+    case evt {
+      event.Fetched(address, _) -> Ok(#(address, Read))
+      event.MemoryWritten(address, _) -> Ok(#(address, Written))
+      _ -> Error(Nil)
+    }
+  })
+}
+
 pub type CyclePhase {
   CyclePhase(phase: message.Phase, details: List(Text))
 }

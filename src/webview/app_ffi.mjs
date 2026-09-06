@@ -155,6 +155,31 @@ function renderMemory(state) {
     // the handful that matter instead of all 100 looking equally relevant.
     cell.classList.toggle("unused", addr >= programLength && !stacked);
   }
+
+  pulseAccesses(state, cells);
+}
+
+/// Fait pulser les cases que le dernier pas a lues ou écrites.
+///
+/// Deux classes et non une, alors que le rose est le même : le modèle
+/// distingue déjà la lecture de l'écriture, et les séparer ici coûte une
+/// ligne de CSS le jour où on voudra deux couleurs.
+///
+/// Le retrait de la classe, la lecture d'`offsetWidth` puis sa remise sont
+/// la façon standard de **relancer** une animation CSS : sans ce passage par
+/// le reflow, une case lue deux fois de suite ne clignoterait qu'une fois,
+/// et le pas à pas — où l'on relit souvent la même case — perdrait
+/// justement ce qu'il doit montrer.
+function pulseAccesses(state, cells) {
+  for (const cell of cells) {
+    cell.classList.remove("read", "written");
+  }
+  for (const access of state.accesses ?? []) {
+    const cell = cells[access.address];
+    if (!cell) continue;
+    void cell.offsetWidth;
+    cell.classList.add(access.kind === "write" ? "written" : "read");
+  }
 }
 
 function renderRegisters(state) {

@@ -427,6 +427,18 @@ never just code review):
 - Emulator webview MVP: memory grid, registers, I/O tray, step/run/reset, a collapsible Fetch/Decode/
   Execute panel, bidirectional editor↔webview sync (cursor→highlight, click→reveal line, debug-
   session-style current-line decoration).
+- **La case touchée pulse en rose.** `model.memory_accesses` rend ce que le dernier pas a lu ou
+  écrit, `render.gleam` l'envoie sous `accesses`, et `app_ffi.mjs` pose une classe que le CSS
+  anime — retirée puis reposée après un reflow, sans quoi une case lue deux fois de suite ne
+  clignoterait qu'une fois, ce qui est précisément le cas du pas à pas.
+  **Seule la moitié rapportée est montrée, et c'est délibéré** : `Fetched` (toute instruction lit
+  sa propre case) et `MemoryWritten`. La lecture d'opérande de `LDA n` **n'apparaît pas**, parce
+  que le runner n'émet rien pour elle. La reconstruire demanderait de recopier ici sa logique
+  d'adressage, indexation comprise — la duplication qui a déjà menti dans ce dépôt. Un test
+  (`an_operand_read_is_not_reported_test`) épingle l'absence pour qu'on ne la prenne pas pour un
+  oubli ; la correction est un `MemoryRead` côté `lmc_lsp`, en liste ouverte.
+  `prefers-reduced-motion` désactive le clignotement et laisse la case allumée : l'information ne
+  dépend pas de l'animation.
 - All five registers are shown (`ACC`, `PC`, then `SI`, `LR`, `SP` more discreetly, since they only
   come into play with arrays, subroutines and the stack), and the memory grid marks four things —
   the stack above `SP` (dashed orange), the cells a `DAT` reserved (dotted blue), the unused middle
@@ -648,7 +660,14 @@ Still open, roughly in the order it's worth tackling them:
    Not covered by any of this, and the larger half of the actual load: the 26 examples carry French
    comments and `LANGAGE.md` is French. Diagnostics in Spanish with course material in French only
    removes part of what this is for.
-4. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+4. **Demander un événement `MemoryRead` à `lmc_lsp`.** La grille fait pulser en rose les cases
+   qu'un pas touche, mais seulement celles que le runner rapporte : la lecture de l'instruction
+   (`Fetched`) et l'écriture (`MemoryWritten`). `LDA n` lit `mem[n]` sans que rien ne le dise, donc
+   la case de la donnée ne pulse pas — ce qu'un élève attend justement de voir. Le calcul appartient
+   au runner, qui connaît l'adressage indexé et la valeur de `SI` au bon instant ; le refaire ici
+   serait la duplication qui a déjà produit le bug v0.1.5. Une fois l'événement publié, ce côté-ci
+   n'a qu'un bras à ajouter dans `model.memory_accesses`.
+5. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 55
@@ -665,18 +684,18 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-5. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+6. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
    removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-6. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+7. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-7. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+8. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
@@ -690,7 +709,7 @@ Still open, roughly in the order it's worth tackling them:
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `build-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-8. ~~**Renaming the language itself** (`LMC` → ?).~~ **Settled, 2026-09-06: it stays `LMC`.** The
+9. ~~**Renaming the language itself** (`LMC` → ?).~~ **Settled, 2026-09-06: it stays `LMC`.** The
    author's decision. So nothing changes here — `.lmc`, `.lmcobj`, the `lmc` language id, the
    `source.lmc` grammar scope and the 26 example programs all stand, and the "file extension goes
    first or never" ordering rule is moot: it is never.
