@@ -123,7 +123,12 @@ pub fn a_locale_tag_is_read_like_the_server_reads_it_test() {
   // différentes.
   assert language.from_tag("fr-FR") == server.French
   assert language.from_tag("en") == server.English
-  assert language.from_tag("de-DE") == language.default_locale
+  // L'allemand n'est pas parlé : c'est le *repli* qui répond, l'anglais, et
+  // non le défaut du panneau, qui est le français. Les deux ont divergé à
+  // la v0.8.2 du serveur et ce test est ce qui empêche de les confondre.
+  assert language.from_tag("de-DE") == language.fallback_locale
+  assert language.fallback_locale == server.English
+  assert language.default_locale == server.French
 }
 
 /// Les trois langues que le serveur connaît. Ajouter un fichier de langue
@@ -133,6 +138,8 @@ const languages: List(server.Locale) = [
   server.French,
   server.English,
   server.Spanish,
+  server.Japanese,
+  server.Korean,
 ]
 
 pub fn every_language_renders_every_message_test() {

@@ -3,10 +3,14 @@
 The **LMC** assembly language in VS Code: everything you need to write, understand and run programs
 for a machine with a hundred memory cells, in class.
 
-**Available in French, English and Spanish.** Diagnostics, hover, completion and the emulator panel
-all follow the `lmc.locale` setting (`fr`, `en`, `es`, or `auto` to follow VS Code's display
-language). French is the default, deliberately: VS Code's display language stays English for most
-people whatever their country, so it is a poor guess at the language of a classroom.
+**Available in French, English, Spanish, Japanese and Korean.** Diagnostics, hover, completion and
+the emulator panel all follow the `lmc.locale` setting (`fr`, `en`, `es`, `ja`, `ko`, or `auto` to
+follow VS Code's display language). French is the default, deliberately: VS Code's display language
+stays English for most people whatever their country, so it is a poor guess at the language of a
+classroom. A language nobody here speaks falls back to English rather than to blanks.
+
+Only French and English have been read by people who speak them. The other three were written with
+care, from the server's own vocabulary, but they have not been reviewed — corrections are welcome.
 
 This is not the original LMC. The machine word is four digits, there are five registers (`ACC`,
 `SI`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`, subroutines (`JSR`/`RET`), a stack

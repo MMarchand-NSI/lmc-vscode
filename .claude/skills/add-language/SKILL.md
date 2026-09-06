@@ -5,7 +5,7 @@ description: Ajouter une langue d'interface à l'extension LMC (panneau de l'ém
 
 # Ajouter une langue
 
-Sept endroits, dont quatre que le compilateur ou un contrôle réclamera de
+Huit points, dont quatre que le compilateur ou un contrôle réclamera de
 lui-même. Suivre l'ordre : le premier point est un prérequis, pas une étape.
 
 Dans ce qui suit, `xx` est l'étiquette BCP 47 primaire (`it`, `de`, `pt`…).
@@ -94,9 +94,9 @@ Les trois tests qui bouclent dessus couvrent alors la nouvelle langue sans
 être touchés — chaque message se rend non vide, chaque étiquette est
 remplie, chaque langue a son étiquette BCP 47 distincte.
 
-`scripts/smoke-webview.mjs`, section « La langue du panneau » : deux
-vérifications dans le DOM, un bouton et une infobulle, sur le modèle de
-celles de l'espagnol.
+`scripts/smoke-webview.mjs`, section « La langue du panneau » : au moins une
+vérification dans le DOM, sur le modèle de celles de l'espagnol, du japonais
+et du coréen.
 
 ## 6. Vérifier, en exécutant
 
@@ -114,7 +114,19 @@ celles-là.
 Puis **casser pour vérifier le filet**, comme partout ici : retirer la langue
 de `hostText`, constater l'échec et le code de sortie 1, remettre.
 
-## 7. Dire ce qui reste
+## 7. Ne pas confondre défaut et repli
+
+`webview/text/locale.gleam` expose les deux, et ils ne coïncident pas :
+
+- `default_locale` (français) est ce que le panneau peint à sa toute première
+  image, avant que l'hôte n'ait parlé, parce que c'est ce que `lmc.locale`
+  enverra une milliseconde plus tard ;
+- `fallback_locale` (anglais, celui du serveur) répond « je ne parle pas ce
+  que tu demandes ».
+
+Ajouter une langue ne change ni l'un ni l'autre.
+
+## 8. Dire ce qui reste
 
 Deux choses ne suivent pas le réglage, et il vaut mieux l'écrire que le
 laisser découvrir :

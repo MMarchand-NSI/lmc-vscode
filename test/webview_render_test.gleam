@@ -150,14 +150,14 @@ pub fn asking_for_english_renders_english_test() {
 }
 
 pub fn an_unknown_language_falls_back_rather_than_breaking_test() {
-  // « de-DE » n'est pas traduit : le panneau retombe sur le français plutôt
-  // que de rendre des trous. C'est la règle de `lmc_lsp`, réutilisée telle
-  // quelle plutôt que redécidée ici.
+  // « de-DE » n'est pas traduit : le panneau retombe sur l'anglais plutôt
+  // que de rendre des trous. C'est la règle de `lmc_lsp` — son repli depuis
+  // la v0.8.2 — réutilisée telle quelle plutôt que redécidée ici.
   let m =
     loaded("INP\nOUT\nHLT\n")
     |> model.set_locale(language.from_tag("de-DE"))
     |> model.step
-  assert string.contains(render.to_json(m), "lire mem[0]")
+  assert string.contains(render.to_json(m), "read mem[0]")
 }
 
 pub fn the_error_phase_is_the_only_translated_phase_name_test() {

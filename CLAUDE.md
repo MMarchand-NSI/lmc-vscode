@@ -34,7 +34,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the build script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.1" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.2" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -553,6 +553,21 @@ never just code review):
   `scripts/check-manifest.mjs` now reads the tags `from_tag` recognises straight out of
   `locale.gleam` and requires the setting to offer exactly those. Verified by breaking it: dropping
   `es` from the enum fails and exits non-zero.
+- **`lmc_lsp` v0.8.2: five languages, and the fallback becomes English.** Japanese and Korean
+  landed upstream, the server now negotiates (`locale.negotiate([announced, system_locale()])`),
+  and `default_locale` moved from French to **English**. Taken up here in the shape the split was
+  made for: two new files, `japanese.gleam` and `korean.gleam`, plus arms the compiler demanded in
+  `render`, `label`, `phase_label` and `tag`.
+  **A default and a fallback stopped coinciding, and the code now says so.**
+  `webview/text/locale.gleam` exposes both: `default_locale` is French — what the panel paints on
+  its very first frame, because that is what `lmc.locale` will send a millisecond later, and
+  taking the server's fallback there would flash English before the first `setLocale` —
+  and `fallback_locale` is the server's English, what answers "I do not speak what you asked".
+  Three render tests caught the change on their own, which is why they existed.
+  `lmc.locale` and `hostText` grew `ja` and `ko`; `check-manifest.mjs` demanded both, as designed.
+  **Only French and English have been read by people who speak them.** Spanish, Japanese and
+  Korean were written from the server's own vocabulary and are marked unreviewed in their own
+  headers. For course material that matters.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the

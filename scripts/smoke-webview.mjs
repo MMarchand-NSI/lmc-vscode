@@ -363,9 +363,16 @@ async function language() {
   check("jusqu'aux infobulles", p.document.querySelector("[data-ui=tipSpTitle]").textContent,
     "Puntero de pila");
 
+  await p.send({ type: "setLocale", locale: "ja" });
+  check("le japonais aussi", p.document.getElementById("assemble").textContent,
+    ".lmc をアセンブル");
+  await p.send({ type: "setLocale", locale: "ko" });
+  check("et le coréen", p.document.getElementById("assemble").textContent,
+    ".lmc 어셈블");
+
   await p.send({ type: "setLocale", locale: "de-DE" });
-  check("une langue non traduite retombe sur le français",
-    p.document.getElementById("assemble").textContent, "Assembler .lmc");
+  check("une langue non traduite retombe sur l'anglais",
+    p.document.getElementById("assemble").textContent, "Assemble .lmc");
 
   // Le cycle suit la même langue que le décor : c'est le même rendu.
   await p.send({ type: "setLocale", locale: "en" });

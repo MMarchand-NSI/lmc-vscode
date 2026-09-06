@@ -1,7 +1,7 @@
 {
   "name": "lmc-vscode",
   "displayName": "LMC — teaching assembly language",
-  "description": "The LMC assembly language: diagnostics, completion, formatting and a step-through emulator. A teaching tool, in French, English or Spanish.",
+  "description": "The LMC assembly language: diagnostics, completion, formatting and a step-through emulator. A teaching tool, in French, English, Spanish, Japanese or Korean.",
   "version": "0.1.0",
   "publisher": "lmc-vscode",
   "repository": {
@@ -61,12 +61,16 @@
             "fr",
             "en",
             "es",
+            "ja",
+            "ko",
             "auto"
           ],
           "enumDescriptions": [
             "French.",
             "English.",
             "Spanish.",
+            "Japanese.",
+            "Korean.",
             "Follow VS Code's display language. Only useful if you have actually set it: it stays English for most people whatever their country."
           ],
           "default": "fr",

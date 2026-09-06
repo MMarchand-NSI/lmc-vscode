@@ -15,15 +15,30 @@ import lmc/runner/load
 import lmc/text/locale as server
 import webview/text/english
 import webview/text/french
+import webview/text/japanese
+import webview/text/korean
 import webview/text/message.{type Label, type Phase, type Text}
 import webview/text/spanish
 
 pub type Locale =
   server.Locale
 
-/// Le français, comme côté serveur : un panneau muet est plus probablement
-/// une classe qu'un anglophone.
-pub const default_locale = server.default_locale
+/// La langue du tout premier affichage, avant que l'hôte n'ait dit laquelle
+/// il veut.
+///
+/// **Un défaut et un repli sont deux choses**, et depuis la v0.8.2 du
+/// serveur elles ne coïncident plus. Le repli répond « je ne parle pas ce
+/// que tu demandes » et vaut l'anglais, la langue qu'un lecteur venu
+/// d'ailleurs a le plus de chances de comprendre : c'est
+/// `server.default_locale`, et `from_tag` s'en sert. Le défaut répond « tu
+/// n'as rien demandé » et vaut le français, parce que c'est ce que le
+/// réglage `lmc.locale` enverra une milliseconde plus tard. Prendre le
+/// repli ici ferait clignoter le panneau en anglais avant le premier
+/// `setLocale`.
+pub const default_locale = server.French
+
+/// Le repli, tel que le serveur le définit. Distinct du défaut ci-dessus.
+pub const fallback_locale = server.default_locale
 
 /// `fr`, `fr-FR`, `en-GB`… La lecture est celle du serveur, appelée et non
 /// réécrite : deux lectures du même réglage le feraient répondre de deux
@@ -37,6 +52,8 @@ pub fn render(text: Text, language: Locale) -> String {
     server.French -> french.render(text)
     server.English -> english.render(text)
     server.Spanish -> spanish.render(text)
+    server.Japanese -> japanese.render(text)
+    server.Korean -> korean.render(text)
   }
 }
 
@@ -45,6 +62,8 @@ pub fn label(label: Label, language: Locale) -> String {
     server.French -> french.label(label)
     server.English -> english.label(label)
     server.Spanish -> spanish.label(label)
+    server.Japanese -> japanese.label(label)
+    server.Korean -> korean.label(label)
   }
 }
 
@@ -60,6 +79,8 @@ pub fn phase_label(phase: Phase, language: Locale) -> String {
         server.French -> "Erreur"
         server.English -> "Error"
         server.Spanish -> "Error"
+        server.Japanese -> "エラー"
+        server.Korean -> "오류"
       }
   }
 }
@@ -71,6 +92,8 @@ pub fn tag(language: Locale) -> String {
     server.French -> "fr"
     server.English -> "en"
     server.Spanish -> "es"
+    server.Japanese -> "ja"
+    server.Korean -> "ko"
   }
 }
 

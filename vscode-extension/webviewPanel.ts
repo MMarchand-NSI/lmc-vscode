@@ -215,6 +215,18 @@ const hostText = {
     panelTitle: "LMC — Emulador",
     assembledInto: (name: string) => `Código ensamblado en ${name}`,
   },
+  ja: {
+    openFileFirst:
+      "先に .lmc ファイルを開いてから « LMC: Open Emulator » を実行してください。",
+    panelTitle: "LMC — エミュレータ",
+    assembledInto: (name: string) => `${name} にアセンブルしました`,
+  },
+  ko: {
+    openFileFirst:
+      "먼저 .lmc 파일을 연 다음 « LMC: Open Emulator »를 실행하세요.",
+    panelTitle: "LMC — 에뮬레이터",
+    assembledInto: (name: string) => `${name}에 어셈블했습니다`,
+  },
   en: {
     // La commande est citée sous le nom qu'elle porte dans la palette, le
     // même dans les trois langues : les chaînes du manifeste ne suivent pas
