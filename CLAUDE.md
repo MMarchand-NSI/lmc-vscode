@@ -661,16 +661,17 @@ Still open, roughly in the order it's worth tackling them:
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `build-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-8. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
-   three that were planned — `X` → `IX` (and `IX` → `SI` in v0.7.0, see the done list), opcode 9
-   in families with `PSH`/`POP` on a register, and
-   the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
-   data be called what it likes, the same split as `STA total`) — landed in `lmc_lsp` `v0.4.0` and
-   are taken up here; see the done list above. The rename is undecided and independent; the plan
-   and the reasoning live in `lmc_lsp`'s CLAUDE.md, the language being its business. Only the
-   ordering concerns this repo: the **file extension goes first or never**, since every `.lmc`
-   written meanwhile is one more file to rename, and this repo owns `.lmc`, `.lmcobj`, the `lmc`
-   language id, the `source.lmc` grammar scope and 26 example programs (the count here has been
-   wrong twice already, first at nine and then at twelve — `ls examples/*.lmc | wc -l` settles it,
-   and the `unit-*` series doubled it). It ends, like every
-   language change, with an `lmc_lsp` release and, here, the single `ref` in `gleam.toml`.
+8. ~~**Renaming the language itself** (`LMC` → ?).~~ **Settled, 2026-09-06: it stays `LMC`.** The
+   author's decision. So nothing changes here — `.lmc`, `.lmcobj`, the `lmc` language id, the
+   `source.lmc` grammar scope and the 26 example programs all stand, and the "file extension goes
+   first or never" ordering rule is moot: it is never.
+   Two things worth keeping from the analysis, which lives in `lmc_lsp`'s CLAUDE.md. The
+   compatibility argument for keeping the name got **stronger**, not weaker, after it was measured
+   here: a classic LMC program comes in for the price of a colon after each label, so the shared
+   name still buys something real (see the READMEs). And if only the "Man" ever grates, there is a
+   zero-file option that was already noted there: keep `LMC` and change what it expands to, in
+   French — « Le Mini-Calculateur ».
+   The other three planned language changes are long done: `X` → `IX` then `IX` → `SI`, opcode 9 in
+   families with `PSH`/`POP` on a register, and the screen instruction, shipped as **`PLT`** rather
+   than `PIX` — the verb names the action and lets the data be called what it likes, the same split
+   as `STA total`.
