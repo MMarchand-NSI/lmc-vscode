@@ -72,22 +72,24 @@ pub fn a_step_reports_the_cells_it_touched_test() {
       "        LDA n\n        STA m\n        HLT\nn:      DAT 7\nm:      DAT\n",
     )
   let first = model.step(m)
-  assert model.memory_accesses(first) == [#(0, model.Read)]
+  // Deux lectures : l'instruction elle-même, puis la donnée que LDA va
+  // chercher. La seconde n'existait pas avant lmc_lsp v0.8.3.
+  assert model.memory_accesses(first) == [#(0, model.Read), #(3, model.Read)]
 
   let second = model.step(first)
   assert model.memory_accesses(second)
     == [#(1, model.Read), #(4, model.Written)]
 }
 
-pub fn an_operand_read_is_not_reported_test() {
-  // `LDA n` lit mem[3], et cette lecture **n'apparaît pas** : le runner
-  // n'émet pas d'événement pour elle. On ne la reconstruit pas, on ne la
-  // devine pas, et ce test est là pour que personne ne prenne l'absence
-  // pour un oubli — la correction est un événement de plus côté `lmc_lsp`.
+pub fn an_operand_read_is_reported_test() {
+  // `LDA n` lit mem[2], et cette lecture apparaît depuis lmc_lsp v0.8.3.
+  // Ce test disait l'absence, il dit maintenant la présence — sans que rien
+  // n'ait été reconstruit ici : c'est le runner qui la rapporte, lui seul
+  // connaissant l'adresse effective d'un accès indexé.
   let m =
     loaded("        LDA n\n        HLT\nn:      DAT 7\n")
     |> model.step
-  assert list.map(model.memory_accesses(m), fn(pair) { pair.0 }) == [0]
+  assert model.memory_accesses(m) == [#(0, model.Read), #(2, model.Read)]
 }
 
 pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
@@ -302,7 +304,7 @@ pub fn fetch_shows_the_program_counter_moving_test() {
   // arrêtée montre un PC déjà passé à l'instruction suivante.
   let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step
   let assert [fetch, _decode, _execute] = model.last_cycle(m)
-  assert fetch.details == [text.FetchRead(0, 5003), text.FetchIncrement(0, 1)]
+  assert fetch.details == [text.CellRead(0, 5003), text.FetchIncrement(0, 1)]
 }
 
 pub fn the_program_counter_line_follows_the_instruction_test() {
@@ -335,7 +337,10 @@ pub fn the_index_register_is_named_si_test() {
 
   assert decode.details
     == [text.DecodedMove(5102, "SI", "mem[2]", "", text.LoadFromMemory)]
-  assert execute.details == [text.RegisterChanged("SI", 0, 5)]
+  // La lecture précède le changement de registre, et se dit comme celle du
+  // Fetch : c'est le même fait, dans une autre phase.
+  assert execute.details
+    == [text.CellRead(2, 5), text.RegisterChanged("SI", 0, 5)]
 }
 
 pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
@@ -400,7 +405,8 @@ pub fn add_accumulator_change_is_not_deduped_test() {
     |> model.step
     |> model.step
   let assert [_fetch, _decode, execute] = model.last_cycle(m)
-  assert execute.details == [text.RegisterChanged("ACC", 5, 10)]
+  assert execute.details
+    == [text.CellRead(3, 5), text.RegisterChanged("ACC", 5, 10)]
 }
 
 pub fn events_clear_on_reset_test() {

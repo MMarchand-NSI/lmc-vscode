@@ -11,7 +11,7 @@ import webview/text/message.{type Circuit, type Label, type Text}
 
 pub fn render(text: Text) -> String {
   case text {
-    message.FetchRead(address, word) ->
+    message.CellRead(address, word) ->
       "read mem[" <> int.to_string(address) <> "] → " <> int.to_string(word)
     message.FetchIncrement(from, to) ->
       "PC "

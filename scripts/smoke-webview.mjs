@@ -344,11 +344,14 @@ async function accesses() {
       .map((el) => el.dataset.address).join(",");
 
   await p.click("step");
-  check("le premier pas lit sa propre case", marked("read"), "0");
+  // Deux cases : celle de l'instruction, et celle de la donnée que LDA va
+  // chercher. La seconde est ce que `MemoryRead` a apporté en v0.8.3 — sans
+  // elle, l'élève voyait ACC changer sans que la case lue s'allume.
+  check("le premier pas allume l'instruction et la donnée lue", marked("read"), "0,3");
   check("et n'écrit rien", marked("written") || "aucune", "aucune");
 
   await p.click("step");
-  check("le deuxième pas lit la case suivante", marked("read"), "1");
+  check("le deuxième pas ne lit que son instruction", marked("read"), "1");
   check("et écrit là où STA range", marked("written"), "4");
 
   await p.click("reset");

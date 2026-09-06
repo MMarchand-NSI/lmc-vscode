@@ -8,7 +8,7 @@
 //// elle est justement inconnue.
 ////
 //// Effet de bord voulu, et c'est lui qui paie le refactoring : les tests
-//// comparent des valeurs (`FetchRead(0, 5003)`) et non des tournures de
+//// comparent des valeurs (`CellRead(0, 5003)`) et non des tournures de
 //// phrase, donc reformuler un message n'en casse plus aucun.
 ////
 //// Ce module ne porte que les **valeurs**. Chaque langue a son fichier
@@ -70,7 +70,11 @@ pub type Plotted {
 
 pub type Text {
   // ── Le cycle ──────────────────────────────────────────────────
-  FetchRead(address: Int, word: Int)
+  /// « lire mem[3] → 7 ». La même phrase sert à la lecture de l'instruction
+  /// par le Fetch et à celle d'un opérande par l'Execute, parce que c'est le
+  /// même fait : une case lue, et ce qu'elle contenait. Seule la phase
+  /// diffère, et c'est le panneau qui la porte.
+  CellRead(address: Int, word: Int)
   /// Le compteur ordinal avance pendant la lecture, avant le décodage.
   /// C'est ce qui explique qu'une machine arrêtée affiche un `PC` d'un cran
   /// au-delà de l'instruction qui l'a arrêtée.

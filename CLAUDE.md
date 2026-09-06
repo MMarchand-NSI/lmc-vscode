@@ -34,7 +34,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the build script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.2" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.3" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -431,12 +431,13 @@ never just code review):
   écrit, `render.gleam` l'envoie sous `accesses`, et `app_ffi.mjs` pose une classe que le CSS
   anime — retirée puis reposée après un reflow, sans quoi une case lue deux fois de suite ne
   clignoterait qu'une fois, ce qui est précisément le cas du pas à pas.
-  **Seule la moitié rapportée est montrée, et c'est délibéré** : `Fetched` (toute instruction lit
-  sa propre case) et `MemoryWritten`. La lecture d'opérande de `LDA n` **n'apparaît pas**, parce
-  que le runner n'émet rien pour elle. La reconstruire demanderait de recopier ici sa logique
-  d'adressage, indexation comprise — la duplication qui a déjà menti dans ce dépôt. Un test
-  (`an_operand_read_is_not_reported_test`) épingle l'absence pour qu'on ne la prenne pas pour un
-  oubli ; la correction est un `MemoryRead` côté `lmc_lsp`, en liste ouverte.
+  **Trois événements, tous rapportés par le runner** : `Fetched` (toute instruction lit sa propre
+  case), `MemoryRead` — arrivé en v0.8.3, c'est lui qui allume la case de la donnée que `LDA n` va
+  chercher — et `MemoryWritten`. Rien n'est reconstruit ici : l'adresse effective d'un accès
+  indexé n'est connue que du runner, et la recalculer serait la duplication qui a produit le bug
+  v0.1.5. La demande faite en amont plutôt que contournée ici, c'est le motif de tout ce dépôt.
+  Une même phrase sert la lecture du Fetch et celle de l'opérande (`message.CellRead`) : c'est le
+  même fait, une case lue et ce qu'elle contenait, et seule la phase diffère.
   `prefers-reduced-motion` désactive le clignotement et laisse la case allumée : l'information ne
   dépend pas de l'animation.
 - All five registers are shown (`ACC`, `PC`, then `SI`, `LR`, `SP` more discreetly, since they only
@@ -582,6 +583,17 @@ never just code review):
   French or English sentence gets corrected in the loop where the work happens, and nothing in that
   loop can see a wrong politeness register in Japanese or Korean. Each of those files says so in
   its own header, and the Marketplace page asks for corrections.
+- **`lmc_lsp` v0.8.3: `MemoryRead`, asked for and granted.** The pink pulse landed one release
+  earlier with a hole in it: `LDA n` lit the instruction's cell and not the data's, because the
+  runner reported writes and not reads. Rather than recompute the effective address here — indexed
+  mode, `SI` at the right instant, all of it already implemented over there — the gap was written
+  down as an open item and the event asked for. It exists now, deliberately not emitted for the
+  fetch (`Fetched` already says it), and this side gained exactly one arm in
+  `model.memory_accesses` plus one in the cycle panel.
+  The Execute line now reads `lire mem[3] → 5` before `ACC 5 → 10`, using the **same** text value
+  as the Fetch line (`message.CellRead`, renamed from `FetchRead`): one fact, one sentence, five
+  languages unchanged. Four model tests failed on the bump without being touched, including the one
+  that pinned the absence — it now pins the presence.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
@@ -660,14 +672,7 @@ Still open, roughly in the order it's worth tackling them:
    Not covered by any of this, and the larger half of the actual load: the 26 examples carry French
    comments and `LANGAGE.md` is French. Diagnostics in Spanish with course material in French only
    removes part of what this is for.
-4. **Demander un événement `MemoryRead` à `lmc_lsp`.** La grille fait pulser en rose les cases
-   qu'un pas touche, mais seulement celles que le runner rapporte : la lecture de l'instruction
-   (`Fetched`) et l'écriture (`MemoryWritten`). `LDA n` lit `mem[n]` sans que rien ne le dise, donc
-   la case de la donnée ne pulse pas — ce qu'un élève attend justement de voir. Le calcul appartient
-   au runner, qui connaît l'adressage indexé et la valeur de `SI` au bon instant ; le refaire ici
-   serait la duplication qui a déjà produit le bug v0.1.5. Une fois l'événement publié, ce côté-ci
-   n'a qu'un bras à ajouter dans `model.memory_accesses`.
-5. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+4. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 55
@@ -684,18 +689,18 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-6. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+5. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
    removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-7. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+6. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-8. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+7. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
@@ -709,7 +714,7 @@ Still open, roughly in the order it's worth tackling them:
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `build-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-9. ~~**Renaming the language itself** (`LMC` → ?).~~ **Settled, 2026-09-06: it stays `LMC`.** The
+8. ~~**Renaming the language itself** (`LMC` → ?).~~ **Settled, 2026-09-06: it stays `LMC`.** The
    author's decision. So nothing changes here — `.lmc`, `.lmcobj`, the `lmc` language id, the
    `source.lmc` grammar scope and the 26 example programs all stand, and the "file extension goes
    first or never" ordering rule is moot: it is never.

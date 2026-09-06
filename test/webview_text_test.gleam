@@ -9,7 +9,7 @@ import webview/text/message as text
 /// c'est la liste qu'il faut compléter quand une variante s'ajoute, et
 /// l'oublier ne coûte qu'une variante non couverte, jamais un faux succès.
 const samples: List(text.Text) = [
-  text.FetchRead(0, 5003),
+  text.CellRead(0, 5003),
   text.FetchIncrement(0, 1),
   text.DecodedPlain(9001, "INP", text.ReadingInput),
   text.DecodedWithOperand(1002, "ADD", "mem[2]", text.Addition),
@@ -78,7 +78,7 @@ pub fn the_two_languages_really_differ_test() {
   // prose : « ACC 0 → 12 » est un fait, pas une phrase, et il s'écrit
   // pareil dans les deux langues — c'est voulu, pas un oubli.
   let prose = [
-    text.FetchRead(0, 5003),
+    text.CellRead(0, 5003),
     text.FetchIncrement(0, 1),
     text.DecodedPlain(9001, "INP", text.ReadingInput),
     text.InputTaken(9),

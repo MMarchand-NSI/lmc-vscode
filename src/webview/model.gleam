@@ -655,6 +655,7 @@ pub fn memory_accesses(model: Model) -> List(#(Int, Access)) {
   |> list.filter_map(fn(evt) {
     case evt {
       event.Fetched(address, _) -> Ok(#(address, Read))
+      event.MemoryRead(address, _) -> Ok(#(address, Read))
       event.MemoryWritten(address, _) -> Ok(#(address, Written))
       _ -> Error(Nil)
     }
@@ -713,7 +714,7 @@ fn event_phase_and_detail(evt: Event) -> #(message.Phase, Text) {
   case evt {
     event.Fetched(address, raw) -> #(
       message.Fetch,
-      message.FetchRead(address, raw),
+      message.CellRead(address, raw),
     )
     event.Decoded(instr) -> #(message.Decode, describe_decoded(instr))
     event.InputConsumed(v) -> #(message.Execute, message.InputTaken(v))
@@ -724,6 +725,13 @@ fn event_phase_and_detail(evt: Event) -> #(message.Phase, Text) {
     event.PixelPlotted(x, y, colour) -> #(
       message.Execute,
       plotted_detail(x, y, colour),
+    )
+    // Depuis lmc_lsp v0.8.3, la lecture d'un opérande est rapportée elle
+    // aussi. Elle se dit exactement comme celle du Fetch — même fait, autre
+    // phase — et c'est ce qui fait pulser la case de la donnée.
+    event.MemoryRead(address, v) -> #(
+      message.Execute,
+      message.CellRead(address, v),
     )
     event.MemoryWritten(address, v) -> #(
       message.Execute,
