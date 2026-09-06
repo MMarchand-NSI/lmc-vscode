@@ -34,7 +34,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the build script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.0" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.1" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -70,6 +70,9 @@ node scripts/check-examples.mjs          # every examples/*.lmc parses clean (ex
                                           # unit-* series also runs the "Entrée : … Sortie : …"
                                           # cases in its own header
                                           # (needs `gleam build` first, like build-webview.mjs)
+node scripts/check-manifest.mjs          # checks the extension manifest against what is true
+                                          # elsewhere — today, that lmc.locale offers exactly the
+                                          # languages lmc_lsp speaks
 node scripts/check-grammar.mjs           # tokenizes with the real Oniguruma engine and checks the
                                           # TextMate grammar against lmc_lsp's lexer — the mnemonic
                                           # and register tables, and what counts as a name
@@ -124,8 +127,9 @@ CI (`.github/workflows/test.yml`) runs on gleam 1.18.1 and node 20, with no Erla
 gleam binary is standalone and this project targets JavaScript): it first configures SSH access to
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites
 `https://github.com/` git URLs to SSH via `git config --global url.insteadOf`), then runs `gleam deps
-download`, `gleam test`, `gleam format --check src test`, **then the four checks and the packaging
-chain**: `build-lsp-bundle` + `check-lsp`, `check-examples`, `check-grammar`, `build-webview` +
+download`, `gleam test`, `gleam format --check src test`, **then the five checks and the packaging
+chain**: `build-lsp-bundle` + `check-lsp`, `check-examples`, `check-grammar`, `check-manifest`,
+`build-webview` +
 `smoke-webview`, then `npm run compile` + `npx vsce package` with a `unzip -l` that asserts the
 archive really carries `lsp-server.mjs` and the bundle. That last part is there because `vsce
 package` had already been broken twice with nothing to notice it. The `npm ci` those need is the
@@ -503,6 +507,21 @@ never just code review):
   locale, so a VS Code running in English now gets English diagnostics — while the panel, the
   manifest, the 26 examples and the Marketplace page are French. That split is real and open; see
   the open list.
+- **`lmc_lsp` v0.8.1: one file per language, and Spanish.** `Locale` moved out of
+  `text/message.gleam` into its own `text/locale.gleam` and gained a third variant, so
+  `webview/text.gleam` follows: it imports `lmc/text/locale` and re-exports the type, because a
+  second `Locale` here would let the panel and the diagnostics answer the same setting
+  differently.
+  **The panel does not speak Spanish yet** and falls back to English, message by message, rather
+  than rendering blanks — a transition state, marked as such in the code, waiting on the
+  externalisation in the open list rather than tripling an in-code catalogue days before it
+  becomes files.
+  What was a real gap and is fixed: `lmc.locale` offered `fr`, `en`, `auto` and **not `es`**, so a
+  Spanish-speaking teacher could not choose the language the server was perfectly able to speak.
+  The manifest is a data file — nothing compiles it, nothing tied it to the server — so
+  `scripts/check-manifest.mjs` now reads the tags `from_tag` recognises straight out of
+  `locale.gleam` and requires the setting to offer exactly those. Verified by breaking it: dropping
+  `es` from the enum fails and exits non-zero.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the

@@ -60,11 +60,13 @@
           "enum": [
             "fr",
             "en",
+            "es",
             "auto"
           ],
           "enumDescriptions": [
             "Français.",
             "English.",
+            "Español.",
             "Suivre la langue d'affichage de VS Code. À n'utiliser que si elle est effectivement réglée : elle reste en anglais chez la plupart des gens, quel que soit leur pays."
           ],
           "default": "fr",

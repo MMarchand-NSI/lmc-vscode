@@ -51,7 +51,7 @@ jobs:
       - run: gleam test
       - run: gleam format --check src test
 
-      # Les quatre contrôles qui ne sont pas des tests Gleam. Ils exercent
+      # Les cinq contrôles qui ne sont pas des tests Gleam. Ils exercent
       # ce que `gleam test` ne voit pas : le serveur compilé qui parle le
       # protocole, les exemples qui tiennent leurs promesses, la grammaire
       # TextMate qui suit le lexer, et le webview construit dans un DOM.
@@ -70,6 +70,7 @@ jobs:
 
       - run: node scripts/check-examples.mjs
       - run: node scripts/check-grammar.mjs
+      - run: node scripts/check-manifest.mjs
 
       # smoke-webview.mjs lit le bundle du webview : le construire d'abord,
       # sinon il vérifie une version périmée sans le dire.

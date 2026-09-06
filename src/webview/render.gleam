@@ -4,7 +4,7 @@ import gleam/option.{None, Some}
 import lmc/runner/inspect
 import lmc/runner/memory
 import lmc/runner/state
-import lmc/text/message
+import lmc/text/locale
 import webview/model.{type Model}
 import webview/text
 
@@ -78,10 +78,11 @@ fn json_screen(mdl: Model) -> Json {
 
 /// L'étiquette BCP 47 de la langue rendue, pour l'attribut `lang` du
 /// document : la césure et les lecteurs d'écran s'en servent.
-fn locale_tag(locale: text.Locale) -> String {
-  case locale {
-    message.French -> "fr"
-    message.English -> "en"
+fn locale_tag(language: text.Locale) -> String {
+  case language {
+    locale.French -> "fr"
+    locale.English -> "en"
+    locale.Spanish -> "es"
   }
 }
 

@@ -18,20 +18,24 @@ import gleam/int
 import gleam/list
 import gleam/string
 import lmc/runner/load
-import lmc/text/message.{English, French}
+import lmc/text/locale.{English, French, Spanish}
+import lmc/text/message
 
+/// La `Locale` de `lmc_lsp`, re-exportée : le panneau et les diagnostics
+/// doivent répondre au même réglage avec la même valeur, et un second type
+/// ici les laisserait diverger.
 pub type Locale =
-  message.Locale
+  locale.Locale
 
 /// La langue par défaut, celle de `lmc_lsp` : le français. Un panneau muet
 /// est plus probablement une classe qu'un anglophone.
-pub const default_locale = message.default_locale
+pub const default_locale = locale.default_locale
 
 /// `fr`, `fr-FR`, `en-GB`… La bibliothèque du serveur fait déjà ce travail,
 /// et le refaire ici laisserait les deux répondre différemment au même
 /// réglage.
 pub fn from_tag(tag: String) -> Locale {
-  message.from_tag(tag)
+  locale.from_tag(tag)
 }
 
 /// Les trois phases du cycle, plus la ligne d'erreur qui prend leur place
@@ -138,20 +142,24 @@ pub type Text {
 
 /// Seule la quatrième dépend de la langue : les trois autres sont les
 /// termes du cours, employés tels quels en français.
-pub fn phase_label(phase: Phase, locale: Locale) -> String {
-  case phase, locale {
+pub fn phase_label(phase: Phase, language: Locale) -> String {
+  case phase, language {
     Fetch, _ -> "Fetch"
     Decode, _ -> "Decode"
     Execute, _ -> "Execute"
     Failure, French -> "Erreur"
-    Failure, English -> "Error"
+    Failure, English | Failure, Spanish -> "Error"
   }
 }
 
-pub fn render(text: Text, locale: Locale) -> String {
-  case locale {
+/// L'espagnol est arrivé côté serveur en v0.8.1 et le panneau ne le parle
+/// pas encore : il retombe sur l'anglais, message par message, plutôt que de
+/// rendre du vide. C'est un état de transition, pas une décision — voir la
+/// liste ouverte de CLAUDE.md, « externaliser les catalogues ».
+pub fn render(text: Text, language: Locale) -> String {
+  case language {
     French -> french(text)
-    English -> english(text)
+    English | Spanish -> english(text)
   }
 }
 
@@ -266,7 +274,7 @@ fn french(text: Text) -> String {
     Halted -> "HLT"
     WaitingForInput -> "en attente d'une entrée…"
 
-    RunnerError(reason) -> message.render(reason, French)
+    RunnerError(reason) -> locale.render(reason, French)
     SourceHasErrors ->
       "le programme contient des erreurs — voir les diagnostics dans l'éditeur"
     ProgramTooLong(cells) ->
@@ -400,7 +408,7 @@ fn english(text: Text) -> String {
     Halted -> "HLT"
     WaitingForInput -> "waiting for an input…"
 
-    RunnerError(reason) -> message.render(reason, English)
+    RunnerError(reason) -> locale.render(reason, English)
     SourceHasErrors ->
       "the program has errors — see the diagnostics in the editor"
     ProgramTooLong(cells) ->
@@ -559,10 +567,10 @@ pub fn labels(locale: Locale) -> List(#(String, String)) {
   |> list.map(fn(pair) { #(pair.0, label(pair.1, locale)) })
 }
 
-pub fn label(label: Label, locale: Locale) -> String {
-  case locale {
+pub fn label(label: Label, language: Locale) -> String {
+  case language {
     French -> french_label(label)
-    English -> english_label(label)
+    English | Spanish -> english_label(label)
   }
 }
 

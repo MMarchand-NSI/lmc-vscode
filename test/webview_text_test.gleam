@@ -1,5 +1,6 @@
 import gleam/list
 import gleam/string
+import lmc/text/locale
 import lmc/text/message
 import webview/text
 
@@ -57,16 +58,16 @@ pub fn nothing_renders_empty_test() {
   // Ce qu'un `-> ""` posé par mégarde laisserait passer : une ligne vide
   // dans le panneau, qui ne ressemble pas à une faute.
   list.each(samples, fn(sample) {
-    assert text.render(sample, message.French) != ""
-    assert text.render(sample, message.English) != ""
+    assert text.render(sample, locale.French) != ""
+    assert text.render(sample, locale.English) != ""
   })
 }
 
 pub fn no_circuit_renders_empty_test() {
   list.each(circuits, fn(circuit) {
     let sample = text.DecodedPlain(0, "HLT", circuit)
-    assert string.length(text.render(sample, message.French)) > 12
-    assert string.length(text.render(sample, message.English)) > 12
+    assert string.length(text.render(sample, locale.French)) > 12
+    assert string.length(text.render(sample, locale.English)) > 12
   })
 }
 
@@ -87,8 +88,8 @@ pub fn the_two_languages_really_differ_test() {
     text.NoObjectFile("essai.lmcobj"),
   ]
   list.each(prose, fn(sample) {
-    assert text.render(sample, message.French)
-      != text.render(sample, message.English)
+    assert text.render(sample, locale.French)
+      != text.render(sample, locale.English)
   })
 }
 
@@ -96,11 +97,11 @@ pub fn a_name_written_by_the_user_crosses_untranslated_test() {
   // « ghost » est le label de quelqu'un : il traverse les deux langues tel
   // quel, sans majuscule ajoutée ni traduction tentée.
   assert string.contains(
-    text.render(text.UndefinedLabel("ghost"), message.French),
+    text.render(text.UndefinedLabel("ghost"), locale.French),
     "ghost",
   )
   assert string.contains(
-    text.render(text.UndefinedLabel("ghost"), message.English),
+    text.render(text.UndefinedLabel("ghost"), locale.English),
     "ghost",
   )
 }
@@ -109,17 +110,17 @@ pub fn the_runner_error_is_rendered_in_the_asked_language_test() {
   // L'erreur d'exécution vient de `lmc_lsp` comme valeur : elle doit suivre
   // la même langue que le reste du panneau, pas la sienne.
   let sample = text.RunnerError(message.IllegalInstruction(9999))
-  assert text.render(sample, message.French)
-    == message.render(message.IllegalInstruction(9999), message.French)
-  assert text.render(sample, message.English)
-    == message.render(message.IllegalInstruction(9999), message.English)
+  assert text.render(sample, locale.French)
+    == locale.render(message.IllegalInstruction(9999), locale.French)
+  assert text.render(sample, locale.English)
+    == locale.render(message.IllegalInstruction(9999), locale.English)
 }
 
 pub fn a_locale_tag_is_read_like_the_server_reads_it_test() {
   // Même fonction que celle du serveur, exprès : deux lectures différentes
   // du même réglage donneraient un panneau et des diagnostics de langues
   // différentes.
-  assert text.from_tag("fr-FR") == message.French
-  assert text.from_tag("en") == message.English
+  assert text.from_tag("fr-FR") == locale.French
+  assert text.from_tag("en") == locale.English
   assert text.from_tag("de-DE") == text.default_locale
 }
