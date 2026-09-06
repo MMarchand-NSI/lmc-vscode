@@ -209,6 +209,12 @@ const hostText = {
     panelTitle: "LMC — Émulateur",
     assembledInto: (name: string) => `Code assemblé dans ${name}`,
   },
+  es: {
+    openFileFirst:
+      "Abre primero un archivo .lmc y luego ejecuta « LMC : ouvrir l'émulateur ».",
+    panelTitle: "LMC — Emulador",
+    assembledInto: (name: string) => `Código ensamblado en ${name}`,
+  },
   en: {
     // La commande est citée sous le nom qu'elle porte réellement dans la
     // palette. Les titres de commandes viennent du manifeste, que
@@ -223,10 +229,17 @@ const hostText = {
   },
 };
 
+/// La sous-étiquette primaire, comme le serveur la lit (`fr-FR` → `fr`), et
+/// le même repli : une langue qu'on ne parle pas ici donne le français.
+///
+/// Ce fut un bogue et pas une omission théorique : `hostText` n'avait que
+/// `fr` et `en` quand l'espagnol est arrivé, et un utilisateur réglé sur
+/// `es` a eu un panneau espagnol avec un titre d'onglet français.
+/// `scripts/check-manifest.mjs` exige désormais que cette table couvre
+/// toutes les langues du serveur.
 function t(): (typeof hostText)["fr"] {
-  return configuredLocale().toLowerCase().startsWith("en")
-    ? hostText.en
-    : hostText.fr;
+  const tag = configuredLocale().toLowerCase().split("-")[0];
+  return hostText[tag as keyof typeof hostText] ?? hostText.fr;
 }
 
 function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {

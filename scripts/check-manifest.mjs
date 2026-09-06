@@ -12,6 +12,9 @@
 //   - la même liste vue de `client.ts`, qui traduit le réglage en `locale`
 //     LSP : une valeur offerte ici et inconnue là-bas partirait telle quelle
 //     au serveur, qui retomberait silencieusement sur le français.
+//   - la table `hostText` de `webviewPanel.ts`, les trois phrases que l'hôte
+//     prononce lui-même. Elle est restée à deux langues quand l'espagnol est
+//     arrivé : panneau espagnol, titre d'onglet français.
 //
 // Demande `gleam deps download` (il lit les sources de la dépendance).
 
@@ -22,6 +25,7 @@ import { dirname, join } from "node:path";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = join(root, "vscode-extension", "package.json");
 const clientPath = join(root, "vscode-extension", "client.ts");
+const panelPath = join(root, "vscode-extension", "webviewPanel.ts");
 const localePath = join(root, "build", "packages", "lmc_lsp", "src", "lmc", "text", "locale.gleam");
 
 if (!existsSync(localePath)) {
@@ -58,6 +62,16 @@ check("son défaut est une langue offerte", setting.enum.includes(setting.defaul
 // serveur, ce qui n'est correct que si ce sont des étiquettes qu'il lit.
 const client = readFileSync(clientPath, "utf8");
 check("client.ts traite « auto » à part", client.includes('choice === "auto"'), true);
+
+// Les trois phrases que l'hôte prononce lui-même (titre de l'onglet,
+// notification, avertissement) ne passent pas par le catalogue Gleam : elles
+// sont dans une table de `webviewPanel.ts`. Elle a déjà été oubliée une fois
+// — l'espagnol est arrivé, la table est restée à deux langues, et un réglage
+// `es` donnait un panneau espagnol avec un titre d'onglet français.
+const panel = readFileSync(panelPath, "utf8");
+const table = panel.slice(panel.indexOf("const hostText = {"));
+const covered = [...table.slice(0, table.indexOf("\n};")).matchAll(/^  ([a-z]{2}): \{/gm)].map((m) => m[1]);
+check("hostText couvre les langues du serveur", covered.sort().join(","), spoken.sort().join(","));
 
 console.log(failures === 0 ? "\nTout est passé.\n" : `\n${failures} problème(s).\n`);
 process.exit(failures === 0 ? 0 : 1);

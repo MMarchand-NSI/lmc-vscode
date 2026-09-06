@@ -143,6 +143,13 @@ MMarchand-NSI/lmc_lsp`). If it's ever rotated: generate a new keypair, `gh repo 
 public half to `lmc_lsp`, `gh secret set LMC_LSP_DEPLOY_KEY` the private half here, delete the old
 deploy key, and don't leave the private key material on disk anywhere once it's uploaded.
 
+## Skills
+
+`.claude/skills/add-language/` — **ajouter une langue d'interface**. Sept endroits, dont un
+prérequis dans `lmc_lsp` (le type `Locale` est le sien) et trois que rien ne réclamerait tout seul :
+la table `hostText` de `webviewPanel.ts`, l'`enum` de `lmc.locale`, et la liste `languages` des
+tests. Écrite après que les deux premiers ont effectivement été oubliés en ajoutant l'espagnol.
+
 ## Architecture
 
 ```
@@ -274,7 +281,10 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   writes the sentence. A shell that phrased it would be choosing the language where it is not
   known.
   **Three sentences escape that rule and it is assumed, not worked around**: the "open an .lmc
-  file first" warning, the emulator tab's title, and the "code assembled into X" notification. A
+  file first" warning, the emulator tab's title, and the "code assembled into X" notification.
+  That table was left at two languages when Spanish arrived, so a reader set to `es` got a Spanish
+  panel with a French tab title; `scripts/check-manifest.mjs` now requires it to cover every
+  language the server speaks, and the primary-subtag lookup matches the server's own. A
   VS Code notification and a tab title do not go through the webview's rendering, and the object
   file's name only exists host-side, so they live in `webviewPanel.ts`'s `hostText` — the one other
   place in this repo where a language is chosen. Its fallback copies the server's rule: `en` gets
