@@ -78,6 +78,15 @@ function openPanel() {
   // « Écran » remplace ensuite ce null par un faux contexte qui note ce
   // qu'on lui demande de peindre.
   w.HTMLCanvasElement.prototype.getContext = () => null;
+  // TextEncoder est une API du navigateur que jsdom n'expose pas dans son
+  // window, alors qu'un webview VS Code (Chromium) l'a toujours. Sans elle,
+  // tout ce que la stdlib Gleam fait passer par `byte_size` explose : depuis
+  // lmc_lsp v0.6.1, `integer_literal` appelle `string.drop_start` sur chaque
+  // littéral, donc dès le premier `DAT`. Le manque est celui du bac à sable,
+  // pas celui de la page — d'où ce comblement plutôt qu'un contournement
+  // dans le code.
+  w.TextEncoder = TextEncoder;
+  w.TextDecoder = TextDecoder;
   w.eval(readFileSync(join(webviewDir, "app.bundle.js"), "utf8"));
   w.eval("LmcApp.main();");
 

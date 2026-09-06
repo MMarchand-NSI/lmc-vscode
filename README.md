@@ -144,7 +144,7 @@ Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for pro
 ### Fetch the language server
 
 ```sh
-node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.6.0) into
+node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.6.1) into
                                          #   vscode-extension/vendor/
 node scripts/fetch-lsp-bundle.mjs v0.5.0 # or a specific version
 ```

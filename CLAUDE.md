@@ -32,7 +32,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the fetch script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.6.0" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.6.1" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -148,7 +148,7 @@ VS Code ←—LSP (stdio)—→ vscode-extension/lsp-server.mjs → vendor/lmc-l
   `scripts/fetch-lsp-bundle.mjs` first.
 - **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
   download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
-  `vscode-extension/vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.6.0`; pass a version to pin a
+  `vscode-extension/vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.6.1`; pass a version to pin a
   different tag.
   That default and `gleam.toml`'s `ref` are the two pins that must always move together.
 
@@ -350,7 +350,7 @@ never just code review):
   machine words). They are **gitignored artefacts of the Assembler button**, not tracked files —
   `git ls-files examples/` lists no `.lmcobj` at all — so a stale one on someone's disk is a local
   matter, and re-clicking Assembler is the whole fix.
-- **The `lmc_lsp` v0.6.0 migration**, two releases in one step (v0.5.0 and v0.6.0 carry four
+- **The `lmc_lsp` v0.5.0 → v0.6.1 migration**, three releases in one step (v0.5.0 and v0.6.0 carry four
   full-layer reviews — `parse/`, `runner/`, `features/`, `semantic/`). The **double pin** moved as
   always, `gleam.toml` and `scripts/fetch-lsp-bundle.mjs` together. What it cost here:
   - `MachineState.output` became `output_reversed` (newest-first, so `OUT` costs a cons) and is
@@ -382,9 +382,18 @@ never just code review):
   (300 outputs in 10 ms). The whole path was driven for real: `lsp-server.mjs` started over stdio
   with a hand-written client, `initialize` answered, diagnostics and hover came back. All 26
   tracked examples still parse clean except `broken.lmc`, which is broken on purpose.
-  One thing did **not** come along: the "integer literal too large" fix. It exists only as an
-  unpushed commit in the local `../lmc_lsp` clone (`origin/master` is exactly `v0.6.0`), so there
-  is no `v0.6.1` to pin. Push and tag it there first; the double pin here is a two-line follow-up.
+  **`v0.6.1` followed the same day** and is what the double pin now names. No API moved, so it was
+  a pin bump and a re-run of the suite, not a migration: `Int` is a JS float, so beyond fifteen
+  digits `int.parse` rounded and beyond about three hundred it returned `Infinity` — a `DAT` of
+  four hundred `9`s stored `NaN` and the program died further on with "instruction illégale: NaN",
+  nothing having named the cause. Such a literal is now an error, reported where it is written,
+  and `DAT 00042` still assembles (leading zeros are not significant digits).
+  It did break one thing here, and the smoke test is what caught it: the new
+  `parse/integer_literal` calls `string.drop_start`, so **every** integer literal now goes through
+  the Gleam stdlib's `byte_size`, which needs `TextEncoder`. jsdom does not put `TextEncoder` in
+  its `window`; a Chromium-based VS Code webview always has it, so the gap was the harness's, and
+  `scripts/smoke-webview.mjs` now fills it rather than the page working around it. Nothing else in
+  the suite noticed — the gap only exists where a browser is being faked.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
@@ -417,11 +426,7 @@ Still open, roughly in the order it's worth tackling them:
    substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
    `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
    independent of how solid the model/render logic underneath now is.
-2. **The integer-literal fix is written but not published.** `lmc_lsp` refuses an integer too
-   large to be represented, but that commit sits unpushed in the local `../lmc_lsp` clone —
-   `origin/master` is exactly `v0.6.0`. Nothing here can pin it. Push and tag it there, then
-   the usual **double pin** is the whole of the work on this side.
-3. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 44
@@ -434,18 +439,18 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-4. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+3. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
    removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-5. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+4. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-6. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+5. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
@@ -459,7 +464,7 @@ Still open, roughly in the order it's worth tackling them:
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `fetch-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
+6. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX`, opcode 9 in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
    data be called what it likes, the same split as `STA total`) — landed in `lmc_lsp` `v0.4.0` and
