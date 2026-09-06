@@ -429,9 +429,13 @@ never just code review):
   line, debug-session-style current-line decoration).
   That panel was a collapsed `<details>` at first, on the argument that it should not compete with
   the step-by-step highlight. Use settled the opposite way: what the processor does at each step is
-  what the panel is *for*, and folding it hid the lesson. It is a plain section now, holding the
-  bottom of the window and scrolling inside itself — the page does not scroll, the panel does, so a
-  trace that grows from one step to the next cannot push the memory grid off screen.
+  what the panel is *for*, and folding it hid the lesson. It is a plain section now, stretching to
+  the bottom of the window and scrolling inside itself — it is the only block whose content grows
+  from one step to the next.
+  The block above it (processor, memory, I/O) is deliberately **not** a scroll box. Making it one
+  produced a scrollbar with nothing to scroll: the block came out taller than the three frames it
+  holds. It keeps its content height, and a window too short for everything scrolls the page — one
+  scrollbar rather than two nested.
   **The layout itself is unverified**: jsdom does no layout, so the smoke test can only assert that
   nothing is collapsible any more. Heights and scrollbars need a real panel — open item 1.
 - **La case touchée pulse : teal si elle a été lue, rose si elle a été écrite.** Deux couleurs et
