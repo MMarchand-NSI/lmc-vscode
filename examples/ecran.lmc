@@ -16,7 +16,7 @@
 // déjà en mémoire, il serait inutile d'en tenir un second à côté.
 
         MOV SI, un      // SI reste à 1 toute la diagonale : il ne sert qu'à
-                        // atteindre y, la deuxième des trois cases
+// atteindre y, la deuxième des trois cases
 
 // --- La diagonale : x et y avancent ensemble.
 diag:   PLT pixel

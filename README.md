@@ -60,7 +60,10 @@ introduced because you have just hit the wall that needs it, not because it exis
 Every one of them is run before being committed; none is a program that only looks plausible. For
 the `unit-*` series that is not a promise but a script: each file states its own cases in its header
 (`Entrée : … Sortie : …`), and `node scripts/check-examples.mjs` runs every one of them against the
-real `lmc_lsp` dependency, then checks the formatter would leave the file untouched.
+real `lmc_lsp` dependency. That script also holds *every* example, series or not, to two rules: it
+parses without a diagnostic (except `broken.lmc`, which is invalid on purpose) and it comes back
+byte for byte unchanged from the formatter, so that an accidental Format Document cannot reindent a
+course handout.
 
 ## Project Structure
 
@@ -84,7 +87,8 @@ scripts/
   check-lsp.mjs        # Runs lmc_lsp's own LSP integration suite against that bundle
   build-webview.mjs    # Bundles src/webview/ for the browser into vscode-extension/webview/
   smoke-webview.mjs    # Drives that bundle in jsdom, playing the extension host's half
-  check-examples.mjs   # Runs every unit-*.lmc against the cases in its own header
+  check-examples.mjs   # Every *.lmc parses clean and is already formatted; unit-* also runs
+                       #   the cases in its own header
   check-grammar.mjs    # Checks the TextMate grammar against lmc_lsp's lexer, with Oniguruma
 src/
   webview/              # Emulator webview — see "Emulator webview" below

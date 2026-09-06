@@ -21,27 +21,27 @@
         HLT
 
 somme:  MOV ACC, LR
-        PSH                 // 1re case : l'adresse de retour
+        PSH             // 1re case : l'adresse de retour
 
         LDA n
-        BRZ base            // somme(0) = 0, ACC vaut déjà 0
+        BRZ base        // somme(0) = 0, ACC vaut déjà 0
 
-        PSH                 // 2e case : notre n, que l'appel suivant écrasera
+        PSH             // 2e case : notre n, que l'appel suivant écrasera
         SUB un
         STA n
-        JSR somme           // ACC <- somme(n - 1)
+        JSR somme       // ACC <- somme(n - 1)
 
         STA partiel
-        POP                 // ACC <- notre n, retrouvé intact
+        POP             // ACC <- notre n, retrouvé intact
         ADD partiel
 
-base:   STA resultat        // POP passe par ACC : mettre le résultat de côté
-        POP                 // ACC <- l'adresse de retour
+base:   STA resultat    // POP passe par ACC : mettre le résultat de côté
+        POP             // ACC <- l'adresse de retour
         MOV LR, ACC
         LDA resultat
         RET
 
-n:        DAT
+n:      DAT
 resultat: DAT
-partiel:  DAT
-un:       DAT 1
+partiel: DAT
+un:     DAT 1

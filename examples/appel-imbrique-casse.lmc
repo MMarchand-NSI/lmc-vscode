@@ -23,7 +23,7 @@ paire:  LDA a
         RET             // LR désigne cette ligne : saut sur place
 
 affiche: OUT
-         RET
+        RET
 
 a:      DAT 7
 b:      DAT 21

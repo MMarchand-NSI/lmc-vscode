@@ -31,7 +31,7 @@ fin:    LDA total
         OUT
         HLT
 
-lst:    DAT 12, 4, 86, 7    // une ligne, quatre cases ; lst désigne la première
+lst:    DAT 12, 4, 86, 7 // une ligne, quatre cases ; lst désigne la première
 n:      DAT 4
 i:      DAT
 total:  DAT

@@ -65,9 +65,10 @@ gleam build && node scripts/build-webview.mjs  # required before "LMC: Open Emul
 node scripts/smoke-webview.mjs           # drives that built bundle in a real DOM, playing the
                                           # host's half of the protocol — run it after touching
                                           # the webview, and after build-webview.mjs, not before
-node scripts/check-examples.mjs          # runs every examples/unit-*.lmc against the
-                                          # "Entrée : … Sortie : …" cases in its own header, and
-                                          # checks the formatter would leave the file alone
+node scripts/check-examples.mjs          # every examples/*.lmc parses clean (except broken.lmc)
+                                          # and comes back unchanged from the formatter; the
+                                          # unit-* series also runs the "Entrée : … Sortie : …"
+                                          # cases in its own header
                                           # (needs `gleam build` first, like build-webview.mjs)
 node scripts/check-grammar.mjs           # tokenizes with the real Oniguruma engine and checks the
                                           # TextMate grammar against lmc_lsp's lexer — the mnemonic

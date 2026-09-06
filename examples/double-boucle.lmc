@@ -57,10 +57,10 @@ sortie: LDA produit
 
 fin:    HLT
 
-m:        DAT
-produit:  DAT
-i:        DAT
-k:        DAT
-n:        DAT 10
-zero:     DAT 0
-un:       DAT 1
+m:      DAT
+produit: DAT
+i:      DAT
+k:      DAT
+n:      DAT 10
+zero:   DAT 0
+un:     DAT 1

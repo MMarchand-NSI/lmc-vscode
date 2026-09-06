@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Vérifie les exemples `examples/unit-*.lmc` contre ce que leur en-tête
-// promet. Chaque fichier annonce ses cas sous la forme
+// Vérifie les exemples de `examples/`. Deux contrôles, de portées
+// différentes : **tout** fichier doit se lire sans diagnostic (sauf
+// `broken.lmc`, invalide exprès) et sortir inchangé du formateur ; la série
+// `unit-*` doit en plus tenir ce que son en-tête promet. Chaque fichier annonce ses cas sous la forme
 //
 //     // Entrée : 3 8          Sortie : 8 3
 //
@@ -35,8 +37,11 @@ const prelude = await import(join(js, "prelude.mjs"));
 
 const dir = join(root, "examples");
 const files = readdirSync(dir)
-  .filter((f) => f.startsWith("unit-") && f.endsWith(".lmc"))
+  .filter((f) => f.endsWith(".lmc"))
   .sort();
+
+// Le seul exemple qui doit rendre des diagnostics : c'est son sujet.
+const broken = "broken.lmc";
 
 let failures = 0;
 const fail = (message) => {
@@ -49,11 +54,22 @@ for (const name of files) {
   const parsed = pipeline.parse(source);
 
   const diagnostics = parsed.diagnostics.toArray();
-  if (diagnostics.length) {
+  if (name === broken) {
+    if (diagnostics.length === 0) {
+      fail(`${name} : aucun diagnostic, alors que ce fichier est invalide exprès`);
+    } else {
+      console.log(`  ok    ${name} : invalide comme prévu (${diagnostics.length} diagnostics)`);
+    }
+  } else if (diagnostics.length) {
     fail(`${name} : ${diagnostics.map((d) => d.message).join(" ; ")}`);
     continue;
   }
 
+  // Vrai de *tous* les exemples, pas seulement de la série unit-* : un
+  // « Format Document » malencontreux ne doit réindenter aucun support de
+  // cours. Huit anciens fichiers alignaient leurs commentaires à la main plus
+  // loin que la colonne du formateur ; ils ont été reformatés une fois pour
+  // que ce contrôle puisse porter sur tout le répertoire.
   if (format.format(parsed.cst, format.default_options()) !== source) {
     fail(`${name} : le formateur changerait le fichier`);
   }
@@ -64,8 +80,15 @@ for (const name of files) {
   const cases = [
     ...source.matchAll(/Entrée\s*:\s*([\d ]*?)\s{2,}Sortie\s*:\s*([\d ]*)/g),
   ];
+  // Seule la série unit-* promet ses cas dans son en-tête. Les autres
+  // exemples ne sont pas tenus d'en porter ; s'ils en portent, ils sont
+  // exécutés comme les autres.
   if (cases.length === 0) {
-    fail(`${name} : aucun cas « Entrée / Sortie » dans l'en-tête`);
+    if (name.startsWith("unit-")) {
+      fail(`${name} : aucun cas « Entrée / Sortie » dans l'en-tête`);
+    } else if (name !== broken) {
+      console.log(`  ok    ${name} : se lit sans diagnostic, et déjà formaté`);
+    }
     continue;
   }
 

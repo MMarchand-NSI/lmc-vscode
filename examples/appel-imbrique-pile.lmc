@@ -27,7 +27,7 @@ paire:  MOV ACC, LR     // ACC <- l'adresse de retour reçue
         RET
 
 affiche: OUT
-         RET
+        RET
 
 a:      DAT 7
 b:      DAT 21
