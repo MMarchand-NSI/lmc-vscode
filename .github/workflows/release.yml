@@ -120,17 +120,23 @@ jobs:
       - run: node scripts/build-webview.mjs
       - run: node scripts/smoke-webview.mjs
 
+      # `--out ../dist/` : le produit sort du répertoire des sources, et porte
+      # son numéro de version dans son nom. C'est du rangement, pas une
+      # protection : `vsce` exclut `**/*.vsix` par défaut (sa liste
+      # `defaultIgnore`, vérifié en emballant avec une archive posée dans
+      # `vscode-extension/` — elle n'y était pas), donc une extension ne
+      # pouvait de toute façon pas contenir une copie d'elle-même.
       - name: Package
         run: |
           npm run compile
-          npx vsce package --out "lmc-vscode-${GITHUB_REF_NAME#v}.vsix"
+          npx vsce package --out "../dist/lmc-vscode-${GITHUB_REF_NAME#v}.vsix"
         working-directory: vscode-extension
 
       - name: The archive must carry the server and its marketplace page
         run: |
-          unzip -l vscode-extension/*.vsix | grep -q "extension/lsp-server.mjs"
-          unzip -l vscode-extension/*.vsix | grep -q "extension/vendor/lmc-lsp.bundle.mjs"
-          unzip -l vscode-extension/*.vsix | grep -qi "extension/readme.md"
+          unzip -l dist/*.vsix | grep -q "extension/lsp-server.mjs"
+          unzip -l dist/*.vsix | grep -q "extension/vendor/lmc-lsp.bundle.mjs"
+          unzip -l dist/*.vsix | grep -qi "extension/readme.md"
 
       # `--packagePath` publie **l'archive qui vient d'être vérifiée**, au
       # lieu d'en fabriquer une seconde : sans lui, `vsce publish` remballe
@@ -140,7 +146,7 @@ jobs:
         if: ${{ secrets.VSCE_PAT != '' }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx vsce publish --packagePath "lmc-vscode-${GITHUB_REF_NAME#v}.vsix"
+        run: npx vsce publish --packagePath "../dist/lmc-vscode-${GITHUB_REF_NAME#v}.vsix"
         working-directory: vscode-extension
 
       # Le .vsix attaché à la release sert à installer une version précise
@@ -153,4 +159,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes "Published to the VS Code Marketplace. See vscode-extension/CHANGELOG.md." \
-            "vscode-extension/lmc-vscode-${GITHUB_REF_NAME#v}.vsix"
+            "dist/lmc-vscode-${GITHUB_REF_NAME#v}.vsix"

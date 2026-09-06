@@ -84,13 +84,13 @@ jobs:
       - name: Compile and package the extension
         run: |
           npm run compile
-          npx vsce package
+          npx vsce package --out ../dist/lmc-vscode.vsix
         working-directory: vscode-extension
       # Ce que l'archive doit contenir : le serveur, son bundle, et la page
       # que le Marketplace affichera. Cette dernière manquait sans que rien
       # ne le dise — vsce l'y range en minuscules, d'où le -i.
       - name: Check the .vsix carries the server and its marketplace page
         run: |
-          unzip -l vscode-extension/*.vsix | grep -q "extension/lsp-server.mjs"
-          unzip -l vscode-extension/*.vsix | grep -q "extension/vendor/lmc-lsp.bundle.mjs"
-          unzip -l vscode-extension/*.vsix | grep -qi "extension/readme.md"
+          unzip -l dist/*.vsix | grep -q "extension/lsp-server.mjs"
+          unzip -l dist/*.vsix | grep -q "extension/vendor/lmc-lsp.bundle.mjs"
+          unzip -l dist/*.vsix | grep -qi "extension/readme.md"
