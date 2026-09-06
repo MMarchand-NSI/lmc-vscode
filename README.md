@@ -46,6 +46,7 @@ are in French, like the language reference.
 | `affiche_tab.lmc` | the same walk, one instruction shorter: `MOV SI, i` loads a cell straight into `SI` |
 | `chaine.lmc` | a string walked to its terminal zero |
 | `double-boucle.lmc` | nested loops: a multiplication table, since the language has no multiply |
+| `somme-produits.lmc` | two Python loops become three here: `*` has to be spelled out as a loop |
 | `ecran.lmc` | `PLT` — a diagonal and a line, on the 32 × 32 screen |
 | `sous-programme.lmc` | `JSR`/`RET` — enough as long as calls are not nested |
 | `appel-imbrique-casse.lmc` | a nested call overwrites `LR`: the program loops, on purpose |
@@ -76,6 +77,7 @@ examples/              # Opened automatically by the "Run LMC Extension" launch
   affiche_tab.lmc
   chaine.lmc
   double-boucle.lmc
+  somme-produits.lmc
   sous-programme.lmc
   appel-imbrique-casse.lmc
   appel-imbrique-pile.lmc

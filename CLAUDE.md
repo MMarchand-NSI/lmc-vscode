@@ -246,10 +246,12 @@ existing standalone LMC simulator (plenty exist as plain websites) — moving th
 outlines the corresponding mailbox; clicking a mailbox reveals its source line. Don't regress this in
 future work on the webview; it's the reason to have one.
 
-Not covered by any GUI-free test — verified so far by (a) `gleam test` on `model.gleam`/`render.gleam`,
-and (b) manually driving the built bundle inside a minimal `node:vm`-stubbed DOM (see chat history /
-git history for the throwaway scripts; not committed). Actually opening the panel in a real Extension
-Development Host has not been done by an agent in this repo — see "Status" below, it's the top item.
+Verified by (a) `gleam test` on `model.gleam`/`render.gleam` and (b) `scripts/smoke-webview.mjs`,
+which drives the built bundle in jsdom and plays the host's half of the protocol — 44 checks, run by
+CI. Neither says anything about the panel as VS Code actually renders it: `acquireVsCodeApi` is
+stubbed, so CSP, `webviewPanel.ts`'s placeholder substitution and the look of the thing are still
+unverified. Actually opening the panel in a real Extension Development Host has not been done by an
+agent in this repo — see "Status" below, it's the top item.
 
 ## Design note: the functional core is why the tests are trustworthy — not why the code is bug-free
 
@@ -259,7 +261,7 @@ guide where new logic goes, not just serve as a general endorsement of "function
 **What immutability + a pure functional core actually bought:**
 - `webview/model.gleam`'s `Model` is fully immutable; every transition (`step`, `run_to_halt`,
   `resume_after_input`, `set_source_if_changed`, ...) is a pure function returning a new `Model`. That's
-  what makes the 40 `gleam test`s in `test/webview_model_test.gleam` cheap to write and trustworthy to
+  what makes the 56 `gleam test`s in `test/webview_model_test.gleam` cheap to write and trustworthy to
   run — no setup/teardown, no mocking, fully deterministic, sub-second. That fast, reliable feedback
   loop is the actual reason bugs like "Step behaves like Run" got caught, fixed, *and* pinned down with
   a regression test in the same session instead of lingering.
@@ -442,8 +444,9 @@ never just code review):
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
   writer, and the machine never sees it), `DAT` with an initial value, `BRA`, `BRZ`, `BRP`, a full
   if/else, and the two loops. Each header carries its own `Entrée : … Sortie : …` cases, and those
-  are not decoration: a scratch harness ran every one of them against the real dependency, 22 cases,
-  plus the three "remove this line and see" claims the comments make. The headers avoid a trailing
+  are not decoration: `scripts/check-examples.mjs` runs all 22 of them against the real dependency
+  on every push, and the three "remove this line and see" claims the comments make were checked once
+  by hand. The headers avoid a trailing
   comment on any `DAT` line, which was a workaround: `lmc_lsp`'s formatter used to eat them. It no
   longer does (v0.6.0, checked by running the formatter on `n: DAT 5  // cinq`), so the constraint
   is lifted — the files were left as they are because nothing in them wants such a comment, not
