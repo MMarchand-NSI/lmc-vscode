@@ -4,7 +4,7 @@ import gleam/string
 import lmc/runner/inspect
 import lmc/runner/state
 import webview/model
-import webview/text
+import webview/text/message as text
 
 /// Assemble puis charge en RAM, comme le feraient les boutons Assembler
 /// puis Charger. Passe par le vrai aller-retour : le texte du fichier objet

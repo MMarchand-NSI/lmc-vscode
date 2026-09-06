@@ -2,7 +2,8 @@ import gleam/option.{Some}
 import gleam/string
 import webview/model
 import webview/render
-import webview/text
+import webview/text/locale as language
+import webview/text/message
 
 /// Assemble puis charge, comme les boutons Assembler puis Charger.
 fn loaded(source: String) -> model.Model {
@@ -141,7 +142,7 @@ pub fn the_panel_speaks_french_by_default_test() {
 pub fn asking_for_english_renders_english_test() {
   let m =
     loaded("INP\nOUT\nHLT\n")
-    |> model.set_locale(text.from_tag("en-GB"))
+    |> model.set_locale(language.from_tag("en-GB"))
     |> model.step
   let json = render.to_json(m)
   assert string.contains(json, "read mem[0]")
@@ -154,7 +155,7 @@ pub fn an_unknown_language_falls_back_rather_than_breaking_test() {
   // quelle plutôt que redécidée ici.
   let m =
     loaded("INP\nOUT\nHLT\n")
-    |> model.set_locale(text.from_tag("de-DE"))
+    |> model.set_locale(language.from_tag("de-DE"))
     |> model.step
   assert string.contains(render.to_json(m), "lire mem[0]")
 }
@@ -162,7 +163,9 @@ pub fn an_unknown_language_falls_back_rather_than_breaking_test() {
 pub fn the_error_phase_is_the_only_translated_phase_name_test() {
   // Fetch, Decode et Execute sont les termes du cours dans les deux
   // langues ; seul « Erreur » est un mot.
-  assert text.phase_label(text.Fetch, text.from_tag("en")) == "Fetch"
-  assert text.phase_label(text.Failure, text.from_tag("fr")) == "Erreur"
-  assert text.phase_label(text.Failure, text.from_tag("en")) == "Error"
+  assert language.phase_label(message.Fetch, language.from_tag("en")) == "Fetch"
+  assert language.phase_label(message.Failure, language.from_tag("fr"))
+    == "Erreur"
+  assert language.phase_label(message.Failure, language.from_tag("en"))
+    == "Error"
 }

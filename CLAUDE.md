@@ -225,18 +225,27 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   needed. The points live in the `Model` and not in `MachineState` because the runner does not keep
   them — `OUT`'s output accumulates in the machine, `PLT`'s does not. Reset and load clear the
   screen; the RGB values themselves are in `app_ffi.mjs`, the only module that paints.
-- **`webview/text.gleam`** — **tout ce que le panneau affiche, comme valeur.** Same split as
-  `lmc_lsp` since its v0.8.0: no layer builds a sentence. `model.gleam` returns `Text` values,
-  `render.gleam` — the only module that knows the language asked for — turns them into strings. Two
-  catalogues in one file: `Text` for what the machine does (the Fetch/Decode/Execute lines, the
-  load and assembly failures) and `Label` for the panel's furniture (buttons, headings, legend,
-  tooltips), which used to live in `index.html` and therefore in one language, out of the
-  compiler's reach. `index.html` now carries `data-ui` attributes and no prose at all.
-  The `Locale` is **not** redefined here: it is `lmc_lsp`'s, so the panel and the diagnostics
-  cannot drift apart and `message.render` takes the same value with no conversion. A runtime error
-  from the runner arrives as a `message.Message` and is rendered in the same language, not copied.
-  What this bought, exactly as it did upstream: the model tests compare values
-  (`text.FetchRead(0, 5003)`), so rephrasing a message breaks none of them.
+- **`webview/text/`** — **tout ce que le panneau affiche**, split exactly the way `lmc_lsp` splits
+  its own since v0.8.1, and for the same reason: adding a language becomes one more file and one
+  more arm, with no existing translation touched.
+  - `message.gleam` — the **values** and nothing else. `Text` for what the machine does (the
+    Fetch/Decode/Execute lines, the load and assembly failures) and `Label` for the panel's
+    furniture (buttons, headings, legend, tooltips), which used to live in `index.html` and
+    therefore in one language, out of the compiler's reach — `index.html` now carries `data-ui`
+    attributes and no prose at all. It also holds the fragments that are **not** prose
+    (`shortcut`, `three_cells`): machine words and addresses, written once so two languages cannot
+    drift on a fact.
+  - `french.gleam`, `english.gleam` — one language per file, `render` and `label`, nothing else.
+  - `locale.gleam` — the dispatch, and the only place to touch to add a language. It does **not**
+    redefine `Locale`: that is `lmc_lsp`'s, imported `as server`, so the panel and the diagnostics
+    cannot answer the same setting differently and a runner error (`message.Message`) renders in
+    the same language without being copied here.
+  No layer builds a sentence: `model.gleam` returns values, and only `locale.gleam` knows the
+  language. What that bought, exactly as upstream: the model tests compare values
+  (`message.FetchRead(0, 5003)`), so rephrasing breaks none of them — and the per-language tests
+  loop over every locale the server knows, so Spanish is already covered the day it gets its file.
+  **The next step is data files**, and this split is what makes it cheap: only the language modules
+  get replaced, the types and every caller stay put. See the open list.
 - **`webview/render.gleam`** — `Model` -> single JSON payload (`gleam_json`), also `gleam test`-covered.
   One `ffi.render(json)` call re-renders the whole memory grid each time; 100 cells is cheap enough
   that a diffing renderer isn't worth the complexity. The screen is the one thing sent

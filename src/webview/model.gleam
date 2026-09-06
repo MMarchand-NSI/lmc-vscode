@@ -13,7 +13,8 @@ import lmc/runner/run
 import lmc/runner/state.{type MachineState}
 import lmc/semantic/ast
 import lmc/semantic/pipeline
-import webview/text.{type Text}
+import webview/text/locale
+import webview/text/message.{type Text}
 
 // Pure application state for the emulator webview — no FFI, no DOM, fully
 // testable with `gleam test`. app.gleam wires this up to the actual webview
@@ -80,7 +81,7 @@ pub type Model {
     // La langue du panneau, telle que l'hôte l'a demandée. Elle vit dans le
     // modèle et non dans le rendu parce que c'est un état : elle change
     // quand le réglage change, et le rendu suivant doit la voir.
-    locale: text.Locale,
+    locale: locale.Locale,
     // Pourquoi le source ne s'assemble pas, s'il ne s'assemble pas.
     assembly_error: Option(Text),
     // Pourquoi le dernier chargement en RAM a échoué : fichier objet absent
@@ -121,7 +122,7 @@ pub fn init(source: String) -> Model {
     line_to_address: dict.new(),
     address_to_instruction: dict.new(),
     cursor_line: None,
-    locale: text.default_locale,
+    locale: locale.default_locale,
     assembly_error: None,
     ram_error: None,
     last_events: [],
@@ -174,22 +175,26 @@ pub fn assemble_source(model: Model, source: String) -> Model {
           Model(
             ..base,
             assembled: None,
-            assembly_error: Some(text.load_error(err)),
+            assembly_error: Some(locale.load_error(err)),
           )
       }
     _ ->
       // Les erreurs de syntaxe et de résolution sont déjà visibles dans
       // l'éditeur via les diagnostics LSP — inutile de dupliquer le détail
       // ici, mais il n'y a pas d'assemblage possible non plus.
-      Model(..base, assembled: None, assembly_error: Some(text.SourceHasErrors))
+      Model(
+        ..base,
+        assembled: None,
+        assembly_error: Some(message.SourceHasErrors),
+      )
   }
 }
 
 /// La langue du panneau, telle que l'hôte l'a réglée (`lmc.locale`). Une
 /// transition comme une autre : le rendu suivant la voit, rien d'autre ne
 /// change.
-pub fn set_locale(model: Model, locale: text.Locale) -> Model {
-  Model(..model, locale: locale)
+pub fn set_locale(model: Model, language: locale.Locale) -> Model {
+  Model(..model, locale: language)
 }
 
 /// Charge un fichier objet en RAM. `content` est le texte du `.lmcobj` tel
@@ -232,13 +237,13 @@ fn parse_object_code(content: String) -> Result(List(Int), Text) {
     |> list.filter(fn(line) { line != "" })
 
   case lines {
-    [] -> Error(text.ObjectFileEmpty)
+    [] -> Error(message.ObjectFileEmpty)
     _ ->
       case list.try_map(lines, parse_word) {
-        Error(bad) -> Error(text.ObjectFileUnreadableLine(bad))
+        Error(bad) -> Error(message.ObjectFileUnreadableLine(bad))
         Ok(words) ->
           case list.length(words) > memory.size {
-            True -> Error(text.ObjectFileTooLong(list.length(words)))
+            True -> Error(message.ObjectFileTooLong(list.length(words)))
             False -> Ok(words)
           }
       }
@@ -591,11 +596,11 @@ pub fn last_cycle(model: Model) -> List(CyclePhase) {
 /// `lmc_lsp`, `runner/step_phase.gleam`), qui pose toujours
 /// `program_counter + 1` en émettant `Fetched(program_counter, raw)`. Si un
 /// jour l'incrément cesse d'être de 1, c'est ici que ça se corrige.
-fn event_phase_details(evt: Event) -> List(#(text.Phase, Text)) {
+fn event_phase_details(evt: Event) -> List(#(message.Phase, Text)) {
   case evt {
     event.Fetched(address, _) -> [
       event_phase_and_detail(evt),
-      #(text.Fetch, text.FetchIncrement(address, address + 1)),
+      #(message.Fetch, message.FetchIncrement(address, address + 1)),
     ]
     _ -> [event_phase_and_detail(evt)]
   }
@@ -624,7 +629,7 @@ fn dedupe_input_accumulator_change(events: List(Event)) -> List(Event) {
 }
 
 pub type CyclePhase {
-  CyclePhase(phase: text.Phase, details: List(Text))
+  CyclePhase(phase: message.Phase, details: List(Text))
 }
 
 // ── Internals ──────────────────────────────────────────────────────
@@ -671,45 +676,54 @@ fn build_address_to_instruction(
 /// #(phase, detail) — kept separate rather than pre-joined into one
 /// "Phase : detail" string so group_consecutive_by_phase can merge same-
 /// phase entries without string-parsing its own output back apart.
-fn event_phase_and_detail(evt: Event) -> #(text.Phase, Text) {
+fn event_phase_and_detail(evt: Event) -> #(message.Phase, Text) {
   case evt {
-    event.Fetched(address, raw) -> #(text.Fetch, text.FetchRead(address, raw))
-    event.Decoded(instr) -> #(text.Decode, describe_decoded(instr))
-    event.InputConsumed(v) -> #(text.Execute, text.InputTaken(v))
-    event.OutputProduced(v) -> #(text.Execute, text.OutputSent(v))
+    event.Fetched(address, raw) -> #(
+      message.Fetch,
+      message.FetchRead(address, raw),
+    )
+    event.Decoded(instr) -> #(message.Decode, describe_decoded(instr))
+    event.InputConsumed(v) -> #(message.Execute, message.InputTaken(v))
+    event.OutputProduced(v) -> #(message.Execute, message.OutputSent(v))
     // PLT n'écrit rien en mémoire : c'est une sortie, comme OUT, vers un
     // périphérique dont le processeur ignore tout — ni la taille de l'écran
     // ni la palette ne remontent jusqu'ici.
     event.PixelPlotted(x, y, colour) -> #(
-      text.Execute,
+      message.Execute,
       plotted_detail(x, y, colour),
     )
     event.MemoryWritten(address, v) -> #(
-      text.Execute,
-      text.MemoryWritten(address, v),
+      message.Execute,
+      message.MemoryWritten(address, v),
     )
     event.AccumulatorChanged(old, new) -> #(
-      text.Execute,
-      text.RegisterChanged("ACC", old, new),
+      message.Execute,
+      message.RegisterChanged("ACC", old, new),
     )
     event.IndexChanged(old, new) -> #(
-      text.Execute,
-      text.RegisterChanged("SI", old, new),
+      message.Execute,
+      message.RegisterChanged("SI", old, new),
     )
-    event.LinkChanged(old, new) -> #(text.Execute, text.LinkChanged(old, new))
+    event.LinkChanged(old, new) -> #(
+      message.Execute,
+      message.LinkChanged(old, new),
+    )
     event.StackPointerChanged(old, new) -> #(
-      text.Execute,
-      text.RegisterChanged("SP", old, new),
+      message.Execute,
+      message.RegisterChanged("SP", old, new),
     )
     // Un saut est une écriture dans le compteur ordinal, et le dire est tout
     // l'intérêt : « revenir » d'un sous-programme n'est rien d'autre.
-    event.Jumped(from, to) -> #(text.Execute, text.Jumped(from, to))
-    event.Halted -> #(text.Execute, text.Halted)
-    event.InputRequested -> #(text.Execute, text.WaitingForInput)
+    event.Jumped(from, to) -> #(message.Execute, message.Jumped(from, to))
+    event.Halted -> #(message.Execute, message.Halted)
+    event.InputRequested -> #(message.Execute, message.WaitingForInput)
     // Depuis lmc_lsp v0.8.0, l'erreur arrive comme valeur, pas comme
     // phrase : on la transporte telle quelle jusqu'au rendu, qui seul
     // connaît la langue.
-    event.ErrorOccurred(reason) -> #(text.Failure, text.RunnerError(reason))
+    event.ErrorOccurred(reason) -> #(
+      message.Failure,
+      message.RunnerError(reason),
+    )
   }
 }
 
@@ -720,11 +734,11 @@ fn event_phase_and_detail(evt: Event) -> #(text.Phase, Text) {
 /// suivi, et c'est précisément la leçon.
 fn plotted_detail(x: Int, y: Int, colour: Int) -> Text {
   let outcome = case on_screen(x, y), in_palette(colour) {
-    True, True -> text.Drawn
-    False, _ -> text.OffScreen(screen_width, screen_height)
-    _, False -> text.OffPalette(palette_size - 1)
+    True, True -> message.Drawn
+    False, _ -> message.OffScreen(screen_width, screen_height)
+    _, False -> message.OffPalette(palette_size - 1)
   }
-  text.PixelSent(x, y, colour, outcome)
+  message.PixelSent(x, y, colour, outcome)
 }
 
 /// Merges consecutive same-phase pairs into one CyclePhase each — "merges
@@ -734,7 +748,7 @@ fn plotted_detail(x: Int, y: Int, colour: Int) -> Text {
 /// once); today last_events only ever holds one instruction's worth, so in
 /// practice this always yields at most one Fetch, one Decode, one Execute.
 fn group_consecutive_by_phase(
-  pairs: List(#(text.Phase, Text)),
+  pairs: List(#(message.Phase, Text)),
 ) -> List(CyclePhase) {
   pairs
   |> list.fold([], fn(acc, pair) {
@@ -774,13 +788,24 @@ fn group_consecutive_by_phase(
 fn describe_decoded(instr: instruction.Instruction) -> Text {
   let word = instruction.encode(instr)
   case instr {
-    instruction.Inp -> text.DecodedPlain(word, "INP", text.ReadingInput)
-    instruction.Out -> text.DecodedPlain(word, "OUT", text.WritingOutput)
-    instruction.Hlt -> text.DecodedPlain(word, "HLT", text.StoppingProcessor)
+    instruction.Inp -> message.DecodedPlain(word, "INP", message.ReadingInput)
+    instruction.Out -> message.DecodedPlain(word, "OUT", message.WritingOutput)
+    instruction.Hlt ->
+      message.DecodedPlain(word, "HLT", message.StoppingProcessor)
     instruction.Add(a, m) ->
-      text.DecodedWithOperand(word, "ADD", memory_text(a, m), text.Addition)
+      message.DecodedWithOperand(
+        word,
+        "ADD",
+        memory_text(a, m),
+        message.Addition,
+      )
     instruction.Sub(a, m) ->
-      text.DecodedWithOperand(word, "SUB", memory_text(a, m), text.Subtraction)
+      message.DecodedWithOperand(
+        word,
+        "SUB",
+        memory_text(a, m),
+        message.Subtraction,
+      )
 
     // Un mot comme 5042 peut se lire « LDA 42 » ou « MOV ACC, 42 » : c'est
     // le même mot, il n'y a pas de bonne réponse déductible. On montre la
@@ -788,28 +813,28 @@ fn describe_decoded(instr: instruction.Instruction) -> Text {
     // l'équivalence est ainsi visible à chaque cycle plutôt qu'à expliquer
     // une fois pour toutes.
     instruction.Load(register, a, m) ->
-      text.DecodedMove(
+      message.DecodedMove(
         word,
         register_name(register),
         memory_text(a, m),
         alias("LDA", register, a, m),
-        text.LoadFromMemory,
+        message.LoadFromMemory,
       )
     instruction.Store(register, a, m) ->
-      text.DecodedMove(
+      message.DecodedMove(
         word,
         memory_text(a, m),
         register_name(register),
         alias("STA", register, a, m),
-        text.StoreToMemory,
+        message.StoreToMemory,
       )
     instruction.Move(destination, source) ->
-      text.DecodedMove(
+      message.DecodedMove(
         word,
         register_name(destination),
         register_name(source),
         "",
-        text.RegisterTransfer,
+        message.RegisterTransfer,
       )
 
     // `PSH` et `POP` portent maintenant un registre. Le mot machine, lui,
@@ -818,52 +843,52 @@ fn describe_decoded(instr: instruction.Instruction) -> Text {
     // `MOV ACC, n` — et le raccourci disparaît au décodage, comme tous les
     // autres.
     instruction.Push(register) ->
-      text.DecodedWithOperand(
+      message.DecodedWithOperand(
         word,
         "PSH",
         register_name(register),
-        text.PushRegister,
+        message.PushRegister,
       )
     instruction.Pop(register) ->
-      text.DecodedWithOperand(
+      message.DecodedWithOperand(
         word,
         "POP",
         register_name(register),
-        text.PopRegister,
+        message.PopRegister,
       )
 
     // PLT ne calcule rien : il lit trois cases consécutives — x, y, couleur —
     // et les envoie à l'écran. Les trois adresses sont écrites en clair parce
     // que l'opérande unique du mot machine n'en désigne que la première.
-    instruction.Plot(a) -> text.DecodedPlot(word, a, text.SendPixel)
+    instruction.Plot(a) -> message.DecodedPlot(word, a, message.SendPixel)
 
     instruction.Jsr(a) ->
-      text.DecodedWithOperand(
+      message.DecodedWithOperand(
         word,
         "JSR",
         memory_text(a, instruction.Direct),
-        text.JumpAndLink,
+        message.JumpAndLink,
       )
     instruction.Bra(a) ->
-      text.DecodedWithOperand(
+      message.DecodedWithOperand(
         word,
         "BRA",
         memory_text(a, instruction.Direct),
-        text.Jump,
+        message.Jump,
       )
     instruction.Brz(a) ->
-      text.DecodedWithOperand(
+      message.DecodedWithOperand(
         word,
         "BRZ",
         memory_text(a, instruction.Direct),
-        text.JumpIfZero,
+        message.JumpIfZero,
       )
     instruction.Brp(a) ->
-      text.DecodedWithOperand(
+      message.DecodedWithOperand(
         word,
         "BRP",
         memory_text(a, instruction.Direct),
-        text.JumpIfPositive,
+        message.JumpIfPositive,
       )
   }
 }

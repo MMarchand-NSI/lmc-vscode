@@ -4,7 +4,8 @@ import gleam/option.{type Option, None, Some}
 import webview/ffi.{type Ref}
 import webview/model.{type Model}
 import webview/render
-import webview/text
+import webview/text/locale
+import webview/text/message
 
 // Entry point loaded inside the webview (browser context, not Node — see
 // scripts/build-webview.mjs). Wires model.gleam + render.gleam to the DOM
@@ -95,9 +96,9 @@ fn handle_host_message(cell: Ref(Model), raw: String) -> Nil {
     ObjectLoaded(content) ->
       update(cell, fn(m) { model.load_object_code(m, content) })
     ObjectLoadFailed(name) ->
-      update(cell, fn(m) { model.fail_load(m, text.NoObjectFile(name)) })
+      update(cell, fn(m) { model.fail_load(m, message.NoObjectFile(name)) })
     SetLocale(tag) ->
-      update(cell, fn(m) { model.set_locale(m, text.from_tag(tag)) })
+      update(cell, fn(m) { model.set_locale(m, locale.from_tag(tag)) })
     Unrecognized -> Nil
   }
 }
