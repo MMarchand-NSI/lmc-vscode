@@ -292,9 +292,11 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   **What `lmc.locale` cannot reach at all**: the manifest strings — the extension's name, its
   description, the command title, the setting's own description. VS Code localizes `package.json`
   only through `package.nls.json`, keyed on **its** display language, which is the very thing this
-  setting exists to stop deferring to. So the command palette says `LMC : ouvrir l'émulateur`
-  whatever the setting, and the English warning above quotes it under that name rather than
-  sending someone to look for an entry that does not exist.
+  setting exists to stop deferring to. Since they can only be one language, they are **English**,
+  the same call as the Marketplace page: a string that cannot follow the reader should carry the
+  furthest. So the palette reads `LMC: Open Emulator` whatever the setting, and all three
+  `hostText` languages quote it under that name rather than sending someone after an entry that
+  does not exist.
 - **The `lmc.locale` setting** (`package.json`'s `contributes.configuration`, read by `client.ts`)
   — `fr` (default), `en`, or `auto`. `client.ts` subclasses `LanguageClient` to override
   `getLocale()`, which is what the library sends as `initialize`'s `locale` and the only entry

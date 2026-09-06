@@ -72,9 +72,10 @@ d'abord un fichier .lmc ». Elles ne peuvent pas venir du catalogue Gleam (une
 notification VS Code et un titre d'onglet ne passent pas par le rendu du
 webview).
 
-Citer la commande sous son nom réel, `LMC : ouvrir l'émulateur`, dans toutes
-les langues : les titres de commandes viennent du manifeste, que `lmc.locale`
-ne traduit pas.
+Citer la commande sous son nom réel, `LMC: Open Emulator`, dans toutes les
+langues : les chaînes du manifeste ne suivent pas `lmc.locale` et sont en
+anglais pour cette raison. Traduire la citation enverrait chercher une entrée
+qui n'existe pas.
 
 Cet oubli est déjà arrivé : l'espagnol est arrivé, la table est restée à deux
 langues, et un réglage `es` donnait un panneau espagnol avec un titre
@@ -121,7 +122,10 @@ laisser découvrir :
 - **les chaînes du manifeste** — nom de l'extension, description, titre de la
   commande, description du réglage. VS Code ne localise `package.json` que
   par `package.nls.json`, indexé sur *sa* langue d'affichage, ce que
-  `lmc.locale` sert justement à ne plus suivre ;
+  `lmc.locale` sert justement à ne plus suivre. Ne pouvant être que d'une
+  seule langue, elles sont en **anglais** : une chaîne qui ne peut pas suivre
+  son lecteur doit porter le plus loin. Ne pas les traduire en ajoutant une
+  langue ;
 - **les 26 exemples et la référence du langage**, en français.
 
 Si la traduction n'a pas été relue par quelqu'un dont c'est la langue, le

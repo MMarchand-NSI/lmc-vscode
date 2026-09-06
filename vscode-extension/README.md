@@ -31,7 +31,7 @@ example programs that ship with the extension.
   instruction*, silently.
 - **Hover, go to definition, find references, completion** on labels and mnemonics.
 - **Formatting** of the whole document, to one canonical shape.
-- **A step-through emulator**, command "LMC : ouvrir l'émulateur". This is the centrepiece.
+- **A step-through emulator**, command "LMC: Open Emulator". This is the centrepiece.
 
 ## The emulator
 

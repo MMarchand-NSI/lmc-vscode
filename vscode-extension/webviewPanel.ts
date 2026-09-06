@@ -205,25 +205,25 @@ function configuredLocale(): string {
 const hostText = {
   fr: {
     openFileFirst:
-      "Ouvrez d'abord un fichier .lmc, puis lancez « LMC : ouvrir l'émulateur ».",
+      "Ouvrez d'abord un fichier .lmc, puis lancez « LMC: Open Emulator ».",
     panelTitle: "LMC — Émulateur",
     assembledInto: (name: string) => `Code assemblé dans ${name}`,
   },
   es: {
     openFileFirst:
-      "Abre primero un archivo .lmc y luego ejecuta « LMC : ouvrir l'émulateur ».",
+      "Abre primero un archivo .lmc y luego ejecuta « LMC: Open Emulator ».",
     panelTitle: "LMC — Emulador",
     assembledInto: (name: string) => `Código ensamblado en ${name}`,
   },
   en: {
-    // La commande est citée sous le nom qu'elle porte réellement dans la
-    // palette. Les titres de commandes viennent du manifeste, que
-    // `lmc.locale` ne peut pas traduire (VS Code ne localise `package.json`
-    // que par `package.nls.json`, et selon *sa* langue d'affichage) :
-    // écrire ici un nom anglais enverrait chercher une entrée qui n'existe
-    // pas.
+    // La commande est citée sous le nom qu'elle porte dans la palette, le
+    // même dans les trois langues : les chaînes du manifeste ne suivent pas
+    // `lmc.locale` (VS Code ne localise `package.json` que par
+    // `package.nls.json`, selon *sa* langue d'affichage), elles sont donc en
+    // anglais, comme la page Marketplace. Traduire la citation enverrait
+    // chercher une entrée qui n'existe pas.
     openFileFirst:
-      "Open an .lmc file first, then run « LMC : ouvrir l'émulateur ».",
+      "Open an .lmc file first, then run « LMC: Open Emulator ».",
     panelTitle: "LMC — Emulator",
     assembledInto: (name: string) => `Code assembled into ${name}`,
   },

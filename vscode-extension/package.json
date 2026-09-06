@@ -1,7 +1,7 @@
 {
   "name": "lmc-vscode",
-  "displayName": "LMC — assembleur pédagogique",
-  "description": "Le langage d'assemblage LMC : diagnostics, complétion, formatage et un émulateur pas à pas. Outil de cours, en français.",
+  "displayName": "LMC — teaching assembly language",
+  "description": "The LMC assembly language: diagnostics, completion, formatting and a step-through emulator. A teaching tool, in French, English or Spanish.",
   "version": "0.1.0",
   "publisher": "lmc-vscode",
   "repository": {
@@ -39,7 +39,7 @@
     "commands": [
       {
         "command": "lmc.openEmulator",
-        "title": "LMC : ouvrir l'émulateur",
+        "title": "LMC: Open Emulator",
         "icon": "$(debug-start)"
       }
     ],
@@ -64,13 +64,13 @@
             "auto"
           ],
           "enumDescriptions": [
-            "Français.",
+            "French.",
             "English.",
-            "Español.",
-            "Suivre la langue d'affichage de VS Code. À n'utiliser que si elle est effectivement réglée : elle reste en anglais chez la plupart des gens, quel que soit leur pays."
+            "Spanish.",
+            "Follow VS Code's display language. Only useful if you have actually set it: it stays English for most people whatever their country."
           ],
           "default": "fr",
-          "description": "Langue des diagnostics, des survols et de la complétion. Le défaut est le français, parce que la langue de VS Code n'indique pas la langue de la classe. Le serveur redémarre au changement, la langue étant annoncée à son démarrage."
+          "description": "Language of the diagnostics, hover, completion and the emulator panel. French by default, because VS Code's display language is a poor guess at the language of a classroom. The server restarts when this changes, since the language is announced when it starts."
         }
       }
     }
