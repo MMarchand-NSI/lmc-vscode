@@ -701,6 +701,24 @@ never just code review):
     back, is masked in logs, and is unavailable to pull requests from forks, which now matters
     since the repo is public. The secret is passed through `env:` and never interpolated into a
     `run:` line.
+    **The token has a deadline that is not its own, and it is close.** VS Code's publishing doc
+    has you create the PAT with *All accessible organizations*, which makes it a **global** PAT,
+    and Microsoft is removing those: creation blocked and full decommissioning announced for
+    **2026-12-01** ([Azure DevOps
+    blog](https://devblogs.microsoft.com/devops/retirement-of-global-personal-access-tokens-in-azure-devops/),
+    read 2026-09-06). Two honest caveats, both from that post: it carries a revision note on the
+    blocking date, so whether a global PAT can still be minted today is untested; and **it says
+    nothing about extension publishing** — a commenter asked, nobody answered. So the day the
+    `Publish` step fails on authentication, suspect this before suspecting the secret. The
+    replacement is `vsce publish --azure-credential` (Entra rather than a stored token), already
+    present in the vsce version used here.
+    Getting the token at all was its own obstacle, worth recording since it will recur on any
+    rotation: signing in through `dev.azure.com` lands a personal Microsoft account in the
+    "Microsoft Services" tenant, which has no directory behind it, and the sign-in loops. The
+    documented way round is to sign out of everything, use a private window, and mint the token
+    from the **Marketplace publisher portal** (`marketplace.visualstudio.com/manage` → Security →
+    Personal Access Tokens) with one account used consistently — Azure DevOps also accepts a
+    **GitHub** sign-in, which avoids the tenant question entirely.
   **What is not done and needs the author**: creating the `mmarchand` publisher on the
   Marketplace, generating a PAT (Azure DevOps, *All accessible organizations* + *Marketplace →
   Manage*, 30 days by default), and storing it as the `VSCE_PAT` repo secret. An agent cannot and

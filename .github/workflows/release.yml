@@ -1,5 +1,17 @@
 # Publication sur le Marketplace, déclenchée par une étiquette.
 #
+# **`VSCE_PAT` a une date de péremption qui n'est pas la sienne.** La doc de
+# VS Code fait créer le jeton avec « All accessible organizations », c'est-à-dire
+# un PAT *global*, et Microsoft les supprime : création bloquée et
+# décommissionnement complet annoncés pour le 1er décembre 2026
+# (https://devblogs.microsoft.com/devops/retirement-of-global-personal-access-tokens-in-azure-devops/,
+# lu le 2026-09-06 ; le billet porte une note de révision sur la date de blocage,
+# et ne dit rien de la publication d'extensions, un commentaire l'ayant soulevé
+# sans réponse). Quand ce workflow échouera à l'étape « Publish » avec une erreur
+# d'authentification, ce sera probablement cela et non le secret : la relève est
+# `vsce publish --azure-credential`, qui authentifie via Entra au lieu d'un jeton
+# stocké, et qui existe déjà dans la version de vsce utilisée ici.
+#
 #     git tag v0.1.0 && git push origin v0.1.0
 #
 # Le jeton vit dans le secret `VSCE_PAT` du dépôt et non sur une machine :
