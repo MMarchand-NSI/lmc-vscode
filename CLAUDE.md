@@ -123,6 +123,16 @@ language server is a separate forked process, plain JS, no native module). Why t
 is unknown, and the flag does not answer it, it only keeps it out of this window. If a development
 window dies again, `dmesg | grep CaptureCrash` says in one line whether it is the same cause.
 
+**Lint a workflow before pushing it — `actionlint`, not a careful read.** Both workflow files
+were broken by hand-checking alone on 2026-09-06: `test.yml` packaged into a `dist/` that
+`vsce package --out` does not create (`ENOENT` on a fresh runner, after emballing everything for
+nothing), and `release.yml` carried `if: ${{ secrets.VSCE_PAT != '' }}`, which is invalid because
+**the `secrets` context is not available in an `if`**. That second one costs more than it looks:
+an unparseable workflow fails *at startup, with no job*, on **every** push, including the ones it
+does not concern — so it had been red since the day it was added, silently, while `test` stayed
+green. `actionlint` (a single Go binary, `rhysd/actionlint`) names both in one run; verified by
+putting the bad `if:` back and watching it point at the line.
+
 CI is two workflows. `release.yml` publishes to the Marketplace on a `v*` tag; see the release
 entry under Status for what it guards against and why the token is a secret.
 `.github/workflows/test.yml` runs on gleam 1.18.1 and node 20, with no Erlang at all (the

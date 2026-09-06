@@ -84,6 +84,8 @@ jobs:
       - name: Compile and package the extension
         run: |
           npm run compile
+          # `--out` ne crée pas le répertoire : sans ce mkdir, ENOENT.
+          mkdir -p ../dist
           npx vsce package --out ../dist/lmc-vscode.vsix
         working-directory: vscode-extension
       # Ce que l'archive doit contenir : le serveur, son bundle, et la page
