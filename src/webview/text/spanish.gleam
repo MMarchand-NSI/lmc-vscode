@@ -3,6 +3,10 @@
 //// Los valores están en `webview/text/message.gleam`, el reparto en
 //// `webview/text/locale.gleam`. Este archivo solo traduce.
 ////
+//// **Nadie que hable español ha leído este archivo.** No se trata de quién
+//// lo escribió, sino de quién puede detectar un error: una frase torpe en
+//// francés o en inglés se corrige en el flujo de trabajo, una en español no.
+////
 //// El vocabulario sigue el del servidor (`lmc/text/spanish.gleam` en
 //// `lmc_lsp`): celda, dirección, etiqueta, pila, acumulador, contador de
 //// programa. Dos traducciones del mismo término harían leer dos máquinas

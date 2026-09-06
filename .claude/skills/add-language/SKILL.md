@@ -140,6 +140,9 @@ laisser découvrir :
   langue ;
 - **les 26 exemples et la référence du langage**, en français.
 
-Si la traduction n'a pas été relue par quelqu'un dont c'est la langue, le
-dire dans l'en-tête du fichier `xx.gleam` et dans le commit. Pour un support
-de cours, ça compte.
+Si personne qui lise `xx` n'a relu la traduction, le dire dans l'en-tête du
+fichier `xx.gleam`, dans le commit, et sur la page Marketplace. Le critère
+n'est pas qui a écrit la traduction — tout a été écrit ici — mais **qui peut
+repérer une faute** : une tournure bancale en français ou en anglais se
+corrige dans le flux de travail, la même en japonais n'est vue par personne.
+Pour un support de cours, ça compte.

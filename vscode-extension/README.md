@@ -9,8 +9,8 @@ follow VS Code's display language). French is the default, deliberately: VS Code
 stays English for most people whatever their country, so it is a poor guess at the language of a
 classroom. A language nobody here speaks falls back to English rather than to blanks.
 
-Only French and English have been read by people who speak them. The other three were written with
-care, from the server's own vocabulary, but they have not been reviewed — corrections are welcome.
+The Spanish, Japanese and Korean have not been read by anyone who speaks them. Corrections are very
+welcome — an awkward turn of phrase in a teaching tool costs more than in most software.
 
 This is not the original LMC. The machine word is four digits, there are five registers (`ACC`,
 `SI`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`, subroutines (`JSR`/`RET`), a stack

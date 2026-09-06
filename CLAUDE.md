@@ -565,9 +565,11 @@ never just code review):
   and `fallback_locale` is the server's English, what answers "I do not speak what you asked".
   Three render tests caught the change on their own, which is why they existed.
   `lmc.locale` and `hostText` grew `ja` and `ko`; `check-manifest.mjs` demanded both, as designed.
-  **Only French and English have been read by people who speak them.** Spanish, Japanese and
-  Korean were written from the server's own vocabulary and are marked unreviewed in their own
-  headers. For course material that matters.
+  **Spanish, Japanese and Korean have not been read by anyone who speaks them.** The criterion is
+  not who wrote a translation — everything here was — but **who can catch a mistake**: a clumsy
+  French or English sentence gets corrected in the loop where the work happens, and nothing in that
+  loop can see a wrong politeness register in Japanese or Korean. Each of those files says so in
+  its own header, and the Marketplace page asks for corrections.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
