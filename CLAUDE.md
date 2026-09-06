@@ -259,8 +259,10 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   `waiting_input`, `halted` and `error`. That word is a **machine token**, not prose —
   `app_ffi.mjs` branches on it — so it is not translated and never should be; it is now `empty`,
   like its four siblings.
-  **The next step is data files**, and this split is what makes it cheap: only the language modules
-  get replaced, the types and every caller stay put. See the open list.
+  Data files were the planned next step, and they are **refused** (open item 3, settled
+  2026-09-06): the split into one module per language already bought what mattered, and JSON only
+  pays off for a translator who does not write Gleam, of whom there is none. So this is the final
+  shape, not a transition state.
 - **`webview/render.gleam`** — `Model` -> single JSON payload (`gleam_json`), also `gleam test`-covered.
   One `ffi.render(json)` call re-renders the whole memory grid each time; 100 cells is cheap enough
   that a diffing renderer isn't worth the complexity. The screen is the one thing sent
@@ -560,19 +562,18 @@ never just code review):
   register list changed shape, so the pattern it read the names with matched nothing and the script
   refused to pretend it had checked anything. It now reads the whole `register_completions` block
   instead of one line, since the formatting has moved once and the contents have not.
-  **What this repo has NOT decided**: `vscode-languageclient` sends `vscode.env.language` as the
-  locale, so a VS Code running in English now gets English diagnostics — while the panel, the
-  manifest, the 26 examples and the Marketplace page are French. That split is real and open; see
-  the open list.
+  **What that opened, and how it was closed**: `vscode-languageclient` sends `vscode.env.language`
+  as the locale, so a VS Code running in English would have got English diagnostics while
+  everything else was French. The answer is the `lmc.locale` setting described above, whose
+  default is `fr` and explicitly **not** `auto`, for exactly that reason.
 - **`lmc_lsp` v0.8.1: one file per language, and Spanish.** `Locale` moved out of
   `text/message.gleam` into its own `text/locale.gleam` and gained a third variant, so
   `webview/text.gleam` follows: it imports `lmc/text/locale` and re-exports the type, because a
   second `Locale` here would let the panel and the diagnostics answer the same setting
   differently.
-  **The panel does not speak Spanish yet** and falls back to English, message by message, rather
-  than rendering blanks — a transition state, marked as such in the code, waiting on the
-  externalisation in the open list rather than tripling an in-code catalogue days before it
-  becomes files.
+  **The panel did not speak Spanish on the day of the bump** and fell back to English, message by
+  message, rather than rendering blanks. That state is over: `spanish.gleam` landed the same day,
+  and Japanese and Korean followed at v0.8.2.
   What was a real gap and is fixed: `lmc.locale` offered `fr`, `en`, `auto` and **not `es`**, so a
   Spanish-speaking teacher could not choose the language the server was perfectly able to speak.
   The manifest is a data file — nothing compiles it, nothing tied it to the server — so
@@ -635,7 +636,9 @@ never just code review):
   refocus, Fetch/Decode/Execute events splitting across an input pause, a redundant post-INP
   accumulator-changed event, and the Decode line reading like reconstructed source code.
 
-Still open, roughly in the order it's worth tackling them:
+Still open, roughly in the order it's worth tackling them. As of 2026-09-06 that list is
+**short**: item 1 is the only thing genuinely left to build, item 9 is deferred by choice, and
+items 2, 3, 5, 6, 8 and 10 are decisions taken, kept here so they are not re-proposed:
 
 1. **The webview has never been opened in a real Extension Development Host by an agent here.**
    Every fix above was validated with `gleam test` plus a throwaway `node:vm`-stubbed-DOM script
@@ -643,51 +646,32 @@ Still open, roughly in the order it's worth tackling them:
    substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
    `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
    independent of how solid the model/render logic underneath now is.
-2. **`// @locale fr-FR` at the top of a file, decided but not implemented.** The setting above is
-   per user; the directive would be per *file*, which is the right grain for teaching material —
-   a handout carries its own language and keeps it on someone else's machine. It is `lmc_lsp`'s
-   work (lexer, parser, semantic), not this repo's. Three things need deciding there before a line
-   is written, and they are recorded here because they are what would otherwise get decided by
-   accident:
-   - **A file with no directive**: follows the client's `locale` (so `lmc.locale` above), which is
-     what happens today. The author asked for English on an *unimplemented* locale; that is not
-     the same case as an absent directive.
-   - **Precedence**: the file's directive over the client's `locale`. The obvious reading, worth
-     writing down anyway.
-   - **The directive must survive a broken file and the formatter.** It will be read while the
-     file is half-typed and full of errors, and Format Document has eaten comments before (the
-     `DAT` line bug). Both paths need a test.
-   What comes back here once it exists: the webview reads the same directive instead of asking for
-   `message.French` outright (`model.gleam`'s `ErrorOccurred` branch), the grammar colours the
-   directive as something other than a plain comment, and the 26 examples get a header line.
-3. **Externalise the message catalogues into per-language files.** Decided 2026-09-06: many
-   languages, to take the cognitive load off students from different countries. That kills the
-   in-code catalogue, which only paid off for two languages and one author — nobody outside can
-   translate a Gleam `case`, and each new language would touch both repos.
-   **`lmc_lsp` goes first, and its author is handling it**: its `Locale` is a closed
-   `French | English`, and this repo reuses that type, so nothing here can name a language the
-   server does not know. Do not start on this side before that lands.
-   What survives the migration, and what makes it cheap: **call sites already build values**
-   (`text.FetchRead(0, 5003)`), never sentences. The sum type stays the message's identity; only
-   the rendering becomes data.
-   What has to be rebuilt, because the compiler stops guaranteeing it: a test walking every variant
-   × every shipped language for a present, non-empty string; a check that no placeholder is left
-   unsubstituted and none is unknown; and a per-message fallback so a half-translated language
-   stays usable.
-   Agreed defaults, unless the `lmc_lsp` side decides otherwise: **fallback** requested → English →
-   never empty, while the **default** for a silent client stays French (they are different
-   things); **plurals** — the format allows a value to be a string *or* an object of plural forms,
-   only the string path is implemented, and no message is phrased so that it depends on a number,
-   which keeps Polish and Arabic open without writing ICU in Gleam today; **format** one JSON per
-   language in-repo, PRs to contribute, a translation platform later if translators should not
-   have to touch git.
-   Three things on this side when the time comes: `src/webview/text.gleam`'s two catalogues,
-   `webviewPanel.ts`'s `hostText`, and the fact that catalogues are **build-time** data — the
-   webview has no disk access and the server is a single bundled file, so translators edit files
-   and the build embeds them.
-   Not covered by any of this, and the larger half of the actual load: the 26 examples carry French
-   comments and `LANGAGE.md` is French. Diagnostics in Spanish with course material in French only
-   removes part of what this is for.
+2. ~~**`// @locale fr-FR` at the top of a file.**~~ **Settled, 2026-09-06: it will not be done.**
+   The author's decision, and the reason is that the case it was meant to cover is already
+   covered: `lmc.locale` is a setting now, with five languages and `es`/`ja`/`ko` in the enum, so
+   choosing the language no longer requires touching a file. The per-file grain would have bought
+   one thing the setting does not, a handout carrying its own language onto someone else's
+   machine, and that is not worth a lexer, parser and semantic change in `lmc_lsp` plus a grammar
+   rule and a header line in every example here. Checked before recording this: `lmc_lsp`'s own
+   "Envisagé, pas fait" section does not list the directive either, so nothing upstream is waiting
+   on it. Consequences that stay as they are: `model.gleam`'s `ErrorOccurred` branch renders in
+   the locale the panel was told, and the examples carry no language header.
+3. ~~**Externalise the message catalogues into per-language files (JSON).**~~ **Settled,
+   2026-09-06: it will not be done.** Half of what this item asked for happened anyway, in a
+   better shape: `lmc_lsp` v0.8.1 split its catalogue into one Gleam module per language and this
+   repo followed (`src/webview/text/{french,english,spanish,japanese,korean}.gleam`), so adding a
+   language is already one file and one arm, with no existing translation touched, and five
+   languages ship. What is refused is the remaining step, turning those modules into JSON data
+   read at build time. Its only real gain is letting someone who does not write Gleam translate,
+   and there is no such translator: one author, a private server repo, no distribution. The cost
+   is what the compiler stops guaranteeing, which the item itself listed: a test walking every
+   variant x every language, a placeholder check, a per-message fallback, all of it work to buy
+   back what exhaustive `case` gives for free today.
+   The argument this item made about **the 26 examples and `LANGAGE.md` being French** does not
+   apply either: `examples/` sits at the repo root and `vsce` archives `vscode-extension/` and
+   nothing above it, so the examples are **not shipped in the `.vsix`** at all, today. They are
+   development material, opened by the `F5` launch config. If they are ever shipped, their
+   language becomes a question again; until then it is not one.
 4. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
@@ -712,10 +696,12 @@ Still open, roughly in the order it's worth tackling them:
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-6. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
-   the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
-   VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
-   the same authenticated way this one does.
+6. **No Zed extension exists yet, and it is not work for this repo.** Settled, 2026-09-06: it is
+   a separate chantier, in its own repo, consuming `lmc_lsp` the way this one does. Editor
+   independence was the explicit reason to keep the two repos separate (see "Relationship to
+   `lmc_lsp`" above), and this is what that independence is for. Private does not prevent it: a
+   Zed extension would fetch the bundle the same authenticated way this one does. Nothing here
+   blocks it and nothing here has to change for it, which is the point.
 7. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
@@ -744,3 +730,15 @@ Still open, roughly in the order it's worth tackling them:
    families with `PSH`/`POP` on a register, and the screen instruction, shipped as **`PLT`** rather
    than `PIX` — the verb names the action and lets the data be called what it likes, the same split
    as `STA total`.
+9. **Spanish, Japanese and Korean have not been read by anyone who speaks them.** Deferred, not
+   refused: 2026-09-06 the author's answer was "plus tard". Each of the three files says so in its
+   own header and the Marketplace page asks for corrections, so the gap is visible where it
+   matters rather than only here. Nothing else waits on it: the languages ship, and a correction
+   is one file and no interface change.
+10. ~~**Colour every name a `DAT` declares, via semantic tokens.**~~ **Settled, 2026-09-06: it will
+   not be done.** `lmc_lsp` had it under "Envisagé, pas fait" (it would be `semanticTokensProvider`
+   plus a `features/semantic_tokens.gleam` there, and strictly nothing here, since
+   `vscode-languageclient` handles the tokens as soon as the server announces them). The author's
+   decision covers both sides. The analysis stays in `lmc_lsp`'s CLAUDE.md if it ever comes back;
+   the reservation worth remembering is that such a colour would be **provenance, not machine
+   state**, the same status as the dotted `DAT` marking in the memory grid.
