@@ -24,6 +24,17 @@ pas ici, et l'inverse est vrai aussi. La référence du langage est
 - **Formatage** du document entier, sur une forme canonique.
 - **Un émulateur pas à pas**, commande « LMC : ouvrir l'émulateur ». C'est la pièce centrale.
 
+## La langue
+
+Diagnostics, survols et complétion sont en **français** par défaut. Le réglage `lmc.locale` permet
+`fr`, `en`, ou `auto` pour suivre la langue d'affichage de VS Code. `auto` n'est délibérément pas le
+défaut : cette langue reste l'anglais chez la plupart des gens quel que soit leur pays, parce qu'on
+ne la change pas — la prendre pour la langue de la classe rendrait des diagnostics anglais à un
+cours français. Le serveur redémarre quand le réglage change, la langue étant annoncée à son
+démarrage.
+
+Le panneau de l'émulateur et les exemples restent français quoi qu'il arrive.
+
 ## L'émulateur
 
 Une grille de cent cases, les cinq registres, les files d'entrée et de sortie, et le cycle

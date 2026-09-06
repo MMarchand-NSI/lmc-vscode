@@ -233,6 +233,18 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   `ref`/`deref`/`setRef` mutable-cell pattern `lmc_lsp`'s `lsp/ffi.gleam` uses for server state
   (reimplemented here, not shared — the two repos stay independent). Browser FFI, not Node FFI —
   don't reach for `node:*` imports in this file.
+- **The `lmc.locale` setting** (`package.json`'s `contributes.configuration`, read by `client.ts`)
+  — `fr` (default), `en`, or `auto`. `client.ts` subclasses `LanguageClient` to override
+  `getLocale()`, which is what the library sends as `initialize`'s `locale` and the only entry
+  point: the field is not exposed in the options, and the server reads `params.locale`, not
+  `initializationOptions`. **`auto` is deliberately not the default.** Its value is
+  `vscode.env.language`, and that stays English for most people whatever their country, because
+  nobody changes it; taking it for the language of the classroom would hand English diagnostics to
+  a French course, which is the opposite of the service. The client restarts the server when the
+  setting changes, since the language is announced once at startup — without that, changing the
+  setting would silently do nothing and read as a broken feature.
+  This is the one piece of *logic* in a file otherwise described as mechanical wiring, and it is
+  not covered by any test: it needs a real VS Code. Same gap as open item 1.
 - **`vscode-extension/README.md`** — the **Marketplace page**, and the reason it is a second README:
   the one at the repo root is developer documentation and stays in English, this one is what someone
   installing the extension reads. It is in **French**, like everything the extension says, with an
@@ -493,7 +505,24 @@ Still open, roughly in the order it's worth tackling them:
    substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
    `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
    independent of how solid the model/render logic underneath now is.
-2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+2. **`// @locale fr-FR` at the top of a file, decided but not implemented.** The setting above is
+   per user; the directive would be per *file*, which is the right grain for teaching material —
+   a handout carries its own language and keeps it on someone else's machine. It is `lmc_lsp`'s
+   work (lexer, parser, semantic), not this repo's. Three things need deciding there before a line
+   is written, and they are recorded here because they are what would otherwise get decided by
+   accident:
+   - **A file with no directive**: follows the client's `locale` (so `lmc.locale` above), which is
+     what happens today. The author asked for English on an *unimplemented* locale; that is not
+     the same case as an absent directive.
+   - **Precedence**: the file's directive over the client's `locale`. The obvious reading, worth
+     writing down anyway.
+   - **The directive must survive a broken file and the formatter.** It will be read while the
+     file is half-typed and full of errors, and Format Document has eaten comments before (the
+     `DAT` line bug). Both paths need a test.
+   What comes back here once it exists: the webview reads the same directive instead of asking for
+   `message.French` outright (`model.gleam`'s `ErrorOccurred` branch), the grammar colours the
+   directive as something other than a plain comment, and the 26 examples get a header line.
+3. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 44
@@ -506,18 +535,18 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-3. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+4. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
    removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-4. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+5. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-5. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+6. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
@@ -531,7 +560,7 @@ Still open, roughly in the order it's worth tackling them:
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `build-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-6. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
+7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX` (and `IX` → `SI` in v0.7.0, see the done list), opcode 9
    in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the

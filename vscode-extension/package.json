@@ -51,6 +51,26 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "LMC",
+      "properties": {
+        "lmc.locale": {
+          "type": "string",
+          "enum": [
+            "fr",
+            "en",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "Français.",
+            "English.",
+            "Suivre la langue d'affichage de VS Code. À n'utiliser que si elle est effectivement réglée : elle reste en anglais chez la plupart des gens, quel que soit leur pays."
+          ],
+          "default": "fr",
+          "description": "Langue des diagnostics, des survols et de la complétion. Le défaut est le français, parce que la langue de VS Code n'indique pas la langue de la classe. Le serveur redémarre au changement, la langue étant annoncée à son démarrage."
+        }
+      }
     }
   },
   "scripts": {

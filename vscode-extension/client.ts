@@ -1,5 +1,5 @@
 import * as path from "path";
-import { commands, ExtensionContext } from "vscode";
+import { commands, env, ExtensionContext, workspace } from "vscode";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -8,7 +8,30 @@ import {
 } from "vscode-languageclient/node";
 import { openEmulatorPanel } from "./webviewPanel";
 
-let client: LanguageClient;
+let client: LmcLanguageClient;
+
+/// La langue que le serveur doit parler, telle que le réglage `lmc.locale`
+/// la demande.
+///
+/// Le défaut est le français, et « auto » n'est *pas* le défaut : la langue
+/// d'affichage de VS Code reste l'anglais chez la plupart des gens, quel que
+/// soit leur pays, parce qu'on ne la change pas. La prendre pour la langue de
+/// la classe rendrait des diagnostics anglais à un cours français, ce qui est
+/// précisément le contraire du service rendu.
+function configuredLocale(): string {
+  const choice = workspace.getConfiguration("lmc").get<string>("locale", "fr");
+  return choice === "auto" ? env.language : choice;
+}
+
+/// `getLocale()` est ce que la bibliothèque envoie dans le `locale` de
+/// `initialize`, et sa valeur par défaut est `env.language`. La surcharger
+/// est le seul point d'entrée : le champ n'est pas exposé dans les options,
+/// et le serveur lit `params.locale`, pas les `initializationOptions`.
+class LmcLanguageClient extends LanguageClient {
+  protected getLocale(): string {
+    return configuredLocale();
+  }
+}
 
 export function activate(context: ExtensionContext): void {
   // The LSP server ships *inside* the extension: lsp-server.mjs and the
@@ -35,7 +58,7 @@ export function activate(context: ExtensionContext): void {
     documentSelector: [{ scheme: "file", language: "lmc" }],
   };
 
-  client = new LanguageClient(
+  client = new LmcLanguageClient(
     "lmc-language-server",
     "LMC Language Server",
     serverOptions,
@@ -46,6 +69,14 @@ export function activate(context: ExtensionContext): void {
 
   context.subscriptions.push(
     commands.registerCommand("lmc.openEmulator", () => openEmulatorPanel(context)),
+    // La langue n'est annoncée qu'une fois, dans `initialize` : changer le
+    // réglage sans redémarrer le serveur ne changerait rien, et laisserait
+    // croire que le réglage ne marche pas.
+    workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("lmc.locale")) {
+        client.restart();
+      }
+    }),
   );
 }
 
