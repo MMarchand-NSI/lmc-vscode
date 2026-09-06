@@ -50,3 +50,42 @@ jobs:
       - run: gleam deps download
       - run: gleam test
       - run: gleam format --check src test
+
+      # Les quatre contrôles qui ne sont pas des tests Gleam. Ils exercent
+      # ce que `gleam test` ne voit pas : le serveur compilé qui parle le
+      # protocole, les exemples qui tiennent leurs promesses, la grammaire
+      # TextMate qui suit le lexer, et le webview construit dans un DOM.
+      # Ils demandent la compilation JS et les outils de dev de l'extension
+      # (jsdom, esbuild, le moteur Oniguruma), d'où les deux étapes qui
+      # suivent.
+      - run: gleam build
+      - name: Install the extension's dev dependencies
+        run: npm ci
+        working-directory: vscode-extension
+
+      # Le serveur de langage : construit ici depuis la dépendance, puis
+      # soumis à la suite d'intégration de lmc_lsp elle-même.
+      - run: node scripts/build-lsp-bundle.mjs
+      - run: node scripts/check-lsp.mjs
+
+      - run: node scripts/check-examples.mjs
+      - run: node scripts/check-grammar.mjs
+
+      # smoke-webview.mjs lit le bundle du webview : le construire d'abord,
+      # sinon il vérifie une version périmée sans le dire.
+      - run: node scripts/build-webview.mjs
+      - run: node scripts/smoke-webview.mjs
+
+      # La chaîne de packaging, celle qui produit l'extension installable.
+      # `vsce package` a déjà échoué en silence ici (rien ne la lançait) :
+      # une fois pour @types/vscode plus récent que engines.vscode, une
+      # fois en emballant une archive sans serveur de langage dedans.
+      - name: Compile and package the extension
+        run: |
+          npm run compile
+          npx vsce package
+        working-directory: vscode-extension
+      - name: Check the .vsix carries the language server
+        run: |
+          unzip -l vscode-extension/*.vsix | grep -q "extension/lsp-server.mjs"
+          unzip -l vscode-extension/*.vsix | grep -q "extension/vendor/lmc-lsp.bundle.mjs"

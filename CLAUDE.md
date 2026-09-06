@@ -123,7 +123,12 @@ CI (`.github/workflows/test.yml`) runs on gleam 1.18.1 and node 20, with no Erla
 gleam binary is standalone and this project targets JavaScript): it first configures SSH access to
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites
 `https://github.com/` git URLs to SSH via `git config --global url.insteadOf`), then runs `gleam deps
-download`, `gleam test`, `gleam format --check src test`. It doesn't touch the LSP bundle at all —
+download`, `gleam test`, `gleam format --check src test`, **then the four checks and the packaging
+chain**: `build-lsp-bundle` + `check-lsp`, `check-examples`, `check-grammar`, `build-webview` +
+`smoke-webview`, then `npm run compile` + `npx vsce package` with a `unzip -l` that asserts the
+archive really carries `lsp-server.mjs` and the bundle. That last part is there because `vsce
+package` had already been broken twice with nothing to notice it. The `npm ci` those need is the
+only slow step. It doesn't touch a downloaded bundle at all —
 the LSP bundle and the Gleam library both come out of the one clone that `gleam deps download`
 makes, so `LMC_LSP_DEPLOY_KEY` is what gives CI access to all of it.
 
@@ -463,12 +468,7 @@ Still open, roughly in the order it's worth tackling them:
    substitution and the actual panel chrome (`{{cspSource}}` / `{{styleUri}}` / `{{scriptUri}}` /
    `{{nonce}}` in `webview/index.html`) are unverified. Do this before trusting the UI wiring itself,
    independent of how solid the model/render logic underneath now is.
-2. **CI runs none of the four scripts.** `.github/workflows/test.yml` stops at `gleam deps
-   download`, `gleam test` and `gleam format --check`, so `check-lsp.mjs`, `check-examples.mjs`,
-   `check-grammar.mjs` and `smoke-webview.mjs` only ever run when someone remembers to. Three of
-   them need `gleam build` and one needs `npm install` in `vscode-extension/` (jsdom, esbuild,
-   the TextMate engine), which is the only reason it has not been done.
-3. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+2. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 44
@@ -481,18 +481,18 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-4. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+3. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
    removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-5. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+4. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-6. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+5. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
@@ -506,7 +506,7 @@ Still open, roughly in the order it's worth tackling them:
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `build-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
+6. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX` (and `IX` → `SI` in v0.7.0, see the done list), opcode 9
    in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
