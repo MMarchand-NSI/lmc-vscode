@@ -1,71 +1,61 @@
-> **In English:** this is a teaching extension for **LMC**, an assembly language used in French
-> high-school computer science (NSI). Everything it says — diagnostics, hover, the emulator panel,
-> the example programs — is in French, on purpose. The language reference is
-> [LANGAGE.md](https://github.com/MMarchand-NSI/lmc_lsp/blob/master/LANGAGE.md).
+# LMC — teaching assembly language
 
-# LMC — assembleur pédagogique
+The **LMC** assembly language in VS Code: everything you need to write, understand and run programs
+for a machine with a hundred memory cells, in class.
 
-Le langage d'assemblage **LMC** dans VS Code : de quoi écrire, comprendre et exécuter des programmes
-pour une machine à cent cases mémoire, en cours.
+**Available in French, English and Spanish.** Diagnostics, hover, completion and the emulator panel
+all follow the `lmc.locale` setting (`fr`, `en`, `es`, or `auto` to follow VS Code's display
+language). French is the default, deliberately: VS Code's display language stays English for most
+people whatever their country, so it is a poor guess at the language of a classroom.
 
-Ce n'est pas le LMC d'origine. Le mot machine fait quatre chiffres, il y a cinq registres (`ACC`,
-`SI`, `LR`, `SP`, `PC`) et dix-sept mnémoniques, dont `MOV`, les sous-programmes (`JSR`/`RET`), une
-pile (`PSH`/`POP`) et un écran (`PLT`). Un programme écrit pour un émulateur LMC classique ne tourne
-pas ici, et l'inverse est vrai aussi. La référence du langage est
-[LANGAGE.md](https://github.com/MMarchand-NSI/lmc_lsp/blob/master/LANGAGE.md).
+This is not the original LMC. The machine word is four digits, there are five registers (`ACC`,
+`SI`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`, subroutines (`JSR`/`RET`), a stack
+(`PSH`/`POP`) and a screen (`PLT`). A program written for a stock LMC emulator will not run here,
+and the reverse is true too. The language reference is
+[LANGAGE.md](https://github.com/MMarchand-NSI/lmc_lsp/blob/master/LANGAGE.md) — in French, like the
+example programs that ship with the extension.
 
-## Ce que l'extension apporte
+## What the extension gives you
 
-- **Des diagnostics qui expliquent** plutôt que de constater : une étiquette non définie, un `HLT`
-  manquant, un programme qui déborde des cent cases, une adresse hors de 0-99 — celle-ci parce
-  qu'écrite telle quelle elle déborderait sur le chiffre de mode et assemblerait *une autre
-  instruction valide*, en silence.
-- **Survol, aller à la définition, références, complétion** sur les étiquettes et les mnémoniques.
-- **Formatage** du document entier, sur une forme canonique.
-- **Un émulateur pas à pas**, commande « LMC : ouvrir l'émulateur ». C'est la pièce centrale.
+- **Diagnostics that explain** rather than merely report: an undefined label, a missing `HLT`, a
+  program that outgrows the hundred cells, an address outside 0-99 — that last one because, written
+  as is, it would overflow into the mode digit and assemble into *another perfectly valid
+  instruction*, silently.
+- **Hover, go to definition, find references, completion** on labels and mnemonics.
+- **Formatting** of the whole document, to one canonical shape.
+- **A step-through emulator**, command "LMC : ouvrir l'émulateur". This is the centrepiece.
 
-## La langue
+## The emulator
 
-Diagnostics, survols et complétion sont en **français** par défaut. Le réglage `lmc.locale` permet
-`fr`, `en`, ou `auto` pour suivre la langue d'affichage de VS Code. `auto` n'est délibérément pas le
-défaut : cette langue reste l'anglais chez la plupart des gens quel que soit leur pays, parce qu'on
-ne la change pas — la prendre pour la langue de la classe rendrait des diagnostics anglais à un
-cours français. Le serveur redémarre quand le réglage change, la langue étant annoncée à son
-démarrage.
+A grid of a hundred cells, the five registers, the input and output trays, and the
+**Fetch / Decode / Execute** cycle unfolded at every step — including the program counter being
+incremented during the read, which is what explains why a stopped machine shows a `PC` one past the
+instruction that stopped it.
 
-Le panneau de l'émulateur suit le même réglage, jusqu'à ses infobulles. Les exemples et la
-référence du langage, eux, restent français.
+The panel and the editor are synced both ways: moving the cursor outlines the matching cell,
+clicking a cell reveals its source line. That is the reason for a panel here rather than one of the
+many standalone LMC simulators on the web.
 
-## L'émulateur
+The grid marks four things: the stack above `SP`, the cells a `DAT` reserved, the unused middle, and
+the code. Those marks say **what the author wrote**, not what the machine does: nothing distinguishes
+a code cell from a data cell, and a `STA` writing into code does not change a colour. That gap is
+the lesson, not a defect.
 
-Une grille de cent cases, les cinq registres, les files d'entrée et de sortie, et le cycle
-**Fetch / Decode / Execute** déplié à chaque pas — y compris l'incrément du compteur ordinal pendant
-la lecture, qui est ce qui explique qu'une machine arrêtée affiche un `PC` d'un cran au-delà de
-l'instruction qui l'a arrêtée.
+**Assemble**, **Load** and **Run** are three separate acts, with three buttons. "Assemble" writes a
+`.lmcobj` next to the source: four digits per line, one line per cell, no mnemonics and no labels,
+because that is all the processor ever receives. "Load" reads that file back off the disk. Loading
+before assembling fails, and editing the source without reassembling loads the old program: that is
+how a real toolchain behaves.
 
-Le panneau et l'éditeur sont synchronisés dans les deux sens : déplacer le curseur souligne la case
-correspondante, cliquer une case révèle sa ligne source. C'est la raison d'être de ce panneau plutôt
-que d'un simulateur LMC en ligne.
+## A screen
 
-La grille distingue quatre choses : la pile au-dessus de `SP`, les cases réservées par un `DAT`, le
-milieu inutilisé, et le code. Ce marquage dit **ce que l'auteur a écrit**, pas ce que la machine
-fait : rien ne distingue une case de code d'une case de données, et un `STA` qui écrit dans du code
-ne change pas la couleur. Cet écart est la leçon, pas un défaut.
+`PLT` lights a pixel on a 32 × 32 screen in eight colours. Colour 0 is the background, so lighting a
+pixel in 0 erases it. A pixel outside the screen or outside the palette is not drawn, and the cycle
+panel says so instead of leaving an unexplained blank.
 
-**Assembler**, **Charger** et **Exécuter** sont trois actes séparés, avec trois boutons. « Assembler »
-écrit un `.lmcobj` à côté du source : quatre chiffres par ligne, une ligne par case, sans mnémonique
-ni étiquette, parce que c'est tout ce que le processeur reçoit. « Charger » relit ce fichier sur le
-disque. Charger avant d'avoir assemblé échoue, et modifier le source sans réassembler charge
-l'ancien programme : c'est ainsi que se comporte une vraie chaîne d'outils.
+## The code
 
-## Un écran
-
-`PLT` allume un point sur un écran de 32 × 32 en huit couleurs. La couleur 0 est le fond, donc
-allumer un point en 0 l'efface. Un point hors de l'écran ou hors de la palette n'est pas dessiné, et
-le panneau du cycle le dit au lieu de laisser un blanc.
-
-## Le code
-
-Développé pour l'enseignement de NSI. Le serveur de langage vit dans un dépôt séparé,
-[lmc_lsp](https://github.com/MMarchand-NSI/lmc_lsp), pour rester indépendant de l'éditeur ;
-l'extension elle-même est dans [lmc-vscode](https://github.com/MMarchand-NSI/lmc-vscode).
+Written for teaching *Numérique et Sciences Informatiques*, the French high-school computer science
+curriculum. The language server lives in a separate repository,
+[lmc_lsp](https://github.com/MMarchand-NSI/lmc_lsp), so that it stays editor-independent; the
+extension itself is in [lmc-vscode](https://github.com/MMarchand-NSI/lmc-vscode).

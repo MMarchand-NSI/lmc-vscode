@@ -298,10 +298,12 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   This is the one piece of *logic* in a file otherwise described as mechanical wiring, and it is
   not covered by any test: it needs a real VS Code. Same gap as open item 1.
 - **`vscode-extension/README.md`** — the **Marketplace page**, and the reason it is a second README:
-  the one at the repo root is developer documentation and stays in English, this one is what someone
-  installing the extension reads. It is in **French**, like everything the extension says, with an
-  English paragraph at the top so a visitor who does not read French knows that in one line rather
-  than after installing. `vsce` renames it to `extension/readme.md` in the archive; CI asserts it is
+  the one at the repo root is developer documentation, this one is what someone installing the
+  extension reads. Both are in **English**. It was French at first, when the extension only spoke
+  French; now that it speaks three languages, the shop window is the one place where the widest
+  reach wins, and it says in its second paragraph which languages the extension offers and how to
+  choose one. What stays French is stated there too: the example programs and the language
+  reference. `vsce` renames it to `extension/readme.md` in the archive; CI asserts it is
   there, because it was missing at first with nothing to say so.
 - **`vscode-extension/webviewPanel.ts`** — creates the panel (`retainContextWhenHidden: true`, so
   stepping progress survives switching tabs), fills in `webview/index.html`'s `{{cspSource}}` /
