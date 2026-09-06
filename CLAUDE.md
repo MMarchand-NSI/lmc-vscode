@@ -719,10 +719,25 @@ never just code review):
     from the **Marketplace publisher portal** (`marketplace.visualstudio.com/manage` → Security →
     Personal Access Tokens) with one account used consistently — Azure DevOps also accepts a
     **GitHub** sign-in, which avoids the tenant question entirely.
-  **What is not done and needs the author**: creating the `mmarchand` publisher on the
-  Marketplace, generating a PAT (Azure DevOps, *All accessible organizations* + *Marketplace →
-  Manage*, 30 days by default), and storing it as the `VSCE_PAT` repo secret. An agent cannot and
-  should not do that part. After that, releasing is `git tag v0.1.0 && git push origin v0.1.0`.
+  **How the first release actually goes out: by hand, and that is not a workaround to fix.**
+  The token path is blocked, and the reason was measured rather than guessed on 2026-09-06:
+  `az login --allow-no-subscriptions` returns `[]` — the author's personal Microsoft account
+  belongs to **no Entra tenant at all** (`azureProfile.json` records zero subscriptions; the MSAL
+  cache holds the account and nothing else). That one fact blocks both routes at once, which is
+  why neither moved: a PAT needs an Azure DevOps organization (`dev.azure.com/_usersSettings/
+  tokens` is a 404 without one), and `vsce publish --azure-credential` needs an Entra token for
+  the Azure DevOps resource (`499b84ac-…/.default`, read out of vsce's own `auth.js`), which
+  cannot be issued to an account with no directory. Creating an organization is a web-portal act
+  — "Automated creation of organizations isn't supported" — and the current doc lists an active
+  Azure subscription as a prerequisite for it.
+  **The publisher page uploads a `.vsix` directly** (New extension → Visual Studio Code), no token
+  anywhere, and that is how this ships. So `release.yml`'s publish step is conditional on the
+  secret existing: a tag with no `VSCE_PAT` still builds, checks, and attaches the archive to a
+  GitHub release rather than going red, because having no token is not a failure here.
+  What remains the author's, if the automated path is ever wanted: an Azure DevOps organization
+  (signing in to `dev.azure.com` with the **GitHub** account is the cheapest way to get one), then
+  a token in the `VSCE_PAT` secret. Nothing else changes; the workflow starts publishing on its
+  own the moment the secret is there.
 
 Still open, roughly in the order it's worth tackling them. As of 2026-09-06 that list is
 **short**, and nothing on it is a missing feature: item 1 is a gap in *automation*, not in

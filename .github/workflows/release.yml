@@ -1,5 +1,16 @@
 # Publication sur le Marketplace, déclenchée par une étiquette.
 #
+# **L'étape de publication est conditionnelle, et c'est voulu.** Sans le secret
+# `VSCE_PAT`, ce workflow construit, vérifie et attache quand même le .vsix à
+# une release GitHub : il ne devient pas rouge, parce que ne pas avoir de jeton
+# n'est pas une panne. Le compte de l'auteur n'appartient à aucun annuaire
+# Entra (mesuré le 2026-09-06 : `az login --allow-no-subscriptions` rend `[]`,
+# aucun locataire), donc ni un PAT ni `--azure-credential` ne peuvent être
+# obtenus tant qu'il n'existe pas d'organisation Azure DevOps. Le chemin qui
+# marche sans rien de tout cela est le **téléversement manuel** du .vsix depuis
+# la page du publisher (New extension -> Visual Studio Code), et ce workflow
+# produit précisément le fichier à y déposer.
+#
 # **`VSCE_PAT` a une date de péremption qui n'est pas la sienne.** La doc de
 # VS Code fait créer le jeton avec « All accessible organizations », c'est-à-dire
 # un PAT *global*, et Microsoft les supprime : création bloquée et
@@ -80,10 +91,17 @@ jobs:
       # commande : interpoler un secret directement dans un `run:` le met
       # dans le script que le runner écrit sur disque, et n'importe quel
       # `set -x` ou message d'erreur peut alors le recracher.
-      - name: The publishing token must be there
+      - name: Say whether this run will publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: test -n "$VSCE_PAT"
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            echo "VSCE_PAT est présent : cette étiquette publiera sur le Marketplace."
+          else
+            echo "VSCE_PAT est absent : cette étiquette construira, vérifiera et attachera"
+            echo "le .vsix à une release GitHub, sans publier. Ce n'est pas une erreur —"
+            echo "voir le commentaire en tête de ce fichier sur le téléversement manuel."
+          fi
 
       - run: gleam deps download
       - run: gleam test
@@ -119,6 +137,7 @@ jobs:
       # tout, et ce qui part n'est pas exactement ce que les lignes
       # ci-dessus ont inspecté.
       - name: Publish to the Marketplace
+        if: ${{ secrets.VSCE_PAT != '' }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npx vsce publish --packagePath "lmc-vscode-${GITHUB_REF_NAME#v}.vsix"
