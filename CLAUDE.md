@@ -23,8 +23,8 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   parser (enables `textDocument/formatting`), byte-correct `Content-Length` framing, and a richer
   event-sourced runner. It builds to a self-contained esbuild bundle published as a downloadable
   asset on tagged GitHub releases (`.github/workflows/release.yml` there).
-- **The LSP integration is done, with no fallback.** `lsp-server.mjs` here loads the bundle from
-  `vendor/lmc-lsp.bundle.mjs`, fetched by `scripts/fetch-lsp-bundle.mjs` via the `gh` CLI (needed
+- **The LSP integration is done, with no fallback.** `vscode-extension/lsp-server.mjs` loads the
+  bundle from `vscode-extension/vendor/lmc-lsp.bundle.mjs`, fetched by `scripts/fetch-lsp-bundle.mjs` via the `gh` CLI (needed
   because `lmc_lsp` is private). A fallback to the legacy in-tree server existed briefly during the
   migration ("keep it until manually validated"); once validated — and after it turned out to be
   broken anyway, see the git history around "Fix broken Result import in the legacy LSP's FFI layer"
@@ -53,7 +53,7 @@ else keeps working as-is.
 
 ```sh
 node scripts/fetch-lsp-bundle.mjs        # required before the extension will run at all —
-                                          # fetches vendor/lmc-lsp.bundle.mjs (gitignored)
+                                          # fetches vscode-extension/vendor/lmc-lsp.bundle.mjs
 gleam build && node scripts/build-webview.mjs  # required before "LMC: Open Emulator" shows
                                                 # anything — bundles src/webview/ for the browser
 node scripts/smoke-webview.mjs           # drives that built bundle in a real DOM, playing the
@@ -118,7 +118,7 @@ gleam binary is standalone and this project targets JavaScript): it first config
 the private `lmc_lsp` repo (writes the `LMC_LSP_DEPLOY_KEY` secret to a key file, rewrites
 `https://github.com/` git URLs to SSH via `git config --global url.insteadOf`), then runs `gleam deps
 download`, `gleam test`, `gleam format --check src test`. It doesn't touch the LSP bundle at all —
-`vendor/`, `fetch-lsp-bundle.mjs`, and `LMC_LSP_DEPLOY_KEY` are three independent things that happen
+`vscode-extension/vendor/`, `fetch-lsp-bundle.mjs`, and `LMC_LSP_DEPLOY_KEY` are three independent things that happen
 to depend on the same private repo for two different reasons (LSP bundle vs. Gleam library).
 
 **`LMC_LSP_DEPLOY_KEY`** is a repo secret on `lmc-vscode` holding an ed25519 private key; the matching
@@ -130,22 +130,26 @@ deploy key, and don't leave the private key material on disk anywhere once it's 
 ## Architecture
 
 ```
-VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fetched from lmc_lsp releases)
+VS Code ←—LSP (stdio)—→ vscode-extension/lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (from lmc_lsp releases)
 ```
 
 - **`vscode-extension/client.ts`** — the extension host. On activate, it hands
-  `<repo-root>/lsp-server.mjs` (one directory above the extension itself) to
+  `<extensionPath>/lsp-server.mjs` (inside the extension, so that it ships in the `.vsix`) to
   `vscode-languageclient` as a `module`, scoped to files with language id `lmc`. `module` and not
   `command: "node"`: the library then forks it with `cp.fork`, i.e. `process.execPath` under
   `ELECTRON_RUN_AS_NODE=1` — **the Node inside VS Code**. Spawning `"node"` required one on the
   user's PATH, so the extension did not start at all for anyone who has VS Code but no separate
   Node install.
-- **`lsp-server.mjs`** (repo root) — imports `main` from `./vendor/lmc-lsp.bundle.mjs` and calls it.
+- **`vscode-extension/lsp-server.mjs`** — imports `main` from `./vendor/lmc-lsp.bundle.mjs` and
+  calls it. It sits inside the extension, not at the repo root where it used to, because an
+  installed extension has no repo around it: `vsce package` archives `vscode-extension/` and
+  nothing else, so a server one directory above would simply not be in the `.vsix`.
   Exits with a clear error (not a silent fallback) if that file is missing — run
   `scripts/fetch-lsp-bundle.mjs` first.
 - **`scripts/fetch-lsp-bundle.mjs`** — downloads a tagged `lmc_lsp` release asset via `gh release
   download` (plain `fetch()` won't work, the repo is private — see the script's own comments) into
-  `vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.6.0`; pass a version to pin a different tag.
+  `vscode-extension/vendor/lmc-lsp.bundle.mjs`. Defaults to `v0.6.0`; pass a version to pin a
+  different tag.
   That default and `gleam.toml`'s `ref` are the two pins that must always move together.
 
 None of the LSP protocol logic (diagnostics, hover, completion, formatting, etc.) lives in this repo
@@ -303,7 +307,7 @@ above), so there's little latent risk left to remove; the win would be mostly co
 Done and working, each verified by actually running it (`gleam test`, or driving the built bundle —
 never just code review):
 
-- LSP integration (`lsp-server.mjs` → `vendor/lmc-lsp.bundle.mjs`), no fallback.
+- LSP integration (`vscode-extension/lsp-server.mjs` → `vendor/lmc-lsp.bundle.mjs`), no fallback.
 - Emulator API as an `lmc_lsp` git dependency; CI pulls it over the `LMC_LSP_DEPLOY_KEY` deploy key.
 - `lmc_lsp`'s own release pipeline, publishing tagged bundles — this repo pins a tag in two places,
   `gleam.toml` and `scripts/fetch-lsp-bundle.mjs`, and both must move together.
@@ -441,11 +445,20 @@ Still open, roughly in the order it's worth tackling them:
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-6. **The VS Code extension isn't packaged as a `.vsix`.** No Marketplace listing is wanted (see 4),
-   but a local install still needs one, and `npx vsce package` alone does not produce a working
-   extension: it packages `vscode-extension/` only, while `lsp-server.mjs` and `vendor/` sit one
-   directory above and would be missing from the archive. Whoever does this has to decide what
-   ships inside the `.vsix` first.
+6. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+   **self-contained** archive. Two things had to change first, and neither was cosmetic.
+   `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
+   `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
+   have shipped a `.vsix` with no language server in it at all. And `@types/vscode` is now pinned
+   *exactly* to `1.80.0` — `vsce` refuses to package when the types are newer than
+   `engines.vscode`, and `^1.80.0` resolves to the latest minor, so the caret was the bug.
+   Verified by running, not by reading the file list: the archive was unzipped and its
+   `extension/lsp-server.mjs` driven over stdio, `initialize` answered, diagnostics and hover came
+   back. `.vscodeignore` keeps the TypeScript sources out; `node_modules` is deliberately *not*
+   listed there, since `vsce` already ships production dependencies only (`vscode-languageclient`)
+   and dropping it would remove the one dependency the extension needs at runtime.
+   What is still untested is the installed extension inside VS Code itself — same gap as item 1.
+   Rebuild order before packaging: `fetch-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
 7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX`, opcode 9 in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the

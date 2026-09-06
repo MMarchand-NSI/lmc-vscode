@@ -65,7 +65,6 @@ real `lmc_lsp` dependency, then checks the formatter would leave the file untouc
 ## Project Structure
 
 ```
-lsp-server.mjs         # LSP entry point: loads vendor/lmc-lsp.bundle.mjs
 examples/              # Opened automatically by the "Run LMC Extension" launch
   test-pgm.lmc          # config (F5) — see "Examples" below
   fibo.lmc
@@ -81,7 +80,7 @@ examples/              # Opened automatically by the "Run LMC Extension" launch
   ecran.lmc
   unit-01-inp-out.lmc … unit-13-boucle-somme.lmc
 scripts/
-  fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vendor/ (gitignored)
+  fetch-lsp-bundle.mjs # Downloads a tagged lmc_lsp release into vscode-extension/vendor/
   build-webview.mjs    # Bundles src/webview/ for the browser into vscode-extension/webview/
   smoke-webview.mjs    # Drives that bundle in jsdom, playing the extension host's half
   check-examples.mjs   # Runs every unit-*.lmc against the cases in its own header
@@ -93,7 +92,10 @@ src/
     app.gleam              # Entry point: wires model+render to ffi.gleam
     ffi.gleam                # External declarations, implemented in app_ffi.mjs
     app_ffi.mjs                # DOM + VS Code webview postMessage bridge
-vscode-extension/
+vscode-extension/      # Everything in here ships in the .vsix
+  lsp-server.mjs       # LSP entry point: loads vendor/lmc-lsp.bundle.mjs
+  vendor/
+    lmc-lsp.bundle.mjs  # Fetched by fetch-lsp-bundle.mjs (gitignored)
   client.ts            # VS Code extension host
   webviewPanel.ts       # Creates/manages the emulator panel, editor <-> webview sync
   webview/
@@ -116,13 +118,13 @@ The extension runs two processes:
    server and relays LSP messages between VS Code and the server.
 2. **Language server** — [`lmc_lsp`](https://github.com/MMarchand-NSI/lmc_lsp), a standalone,
    editor-agnostic Gleam/Node.js LSP server that also targets other LSP clients (e.g. Zed). It lives
-   in its own repo, not here: `lsp-server.mjs` loads a tagged release fetched into
-   `vendor/lmc-lsp.bundle.mjs` by `node scripts/fetch-lsp-bundle.mjs` (requires the `gh` CLI,
+   in its own repo, not here: `vscode-extension/lsp-server.mjs` loads a tagged release fetched into
+   `vscode-extension/vendor/lmc-lsp.bundle.mjs` by `node scripts/fetch-lsp-bundle.mjs` (requires the `gh` CLI,
    authenticated with access to that repo, which is currently private — run the script before first
    use, there is no in-tree fallback).
 
 ```
-VS Code ←—LSP (stdio)—→ lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (fetched from lmc_lsp releases)
+VS Code ←—LSP (stdio)—→ vscode-extension/lsp-server.mjs → vendor/lmc-lsp.bundle.mjs (from lmc_lsp releases)
 ```
 
 The [Emulator API](#emulator-api) is unrelated to the above and to the extension at runtime — it's a
@@ -142,7 +144,8 @@ Gleam-only, `gleam.toml`-level dependency on the same `lmc_lsp` package, for pro
 ### Fetch the language server
 
 ```sh
-node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.6.0) into vendor/
+node scripts/fetch-lsp-bundle.mjs        # fetches the pinned release (v0.6.0) into
+                                         #   vscode-extension/vendor/
 node scripts/fetch-lsp-bundle.mjs v0.5.0 # or a specific version
 ```
 
@@ -166,6 +169,17 @@ npm run compile   # Compile TypeScript — not `npx tsc`, which fetches an unrel
                   #   registry package named `tsc` when the local one is out of reach
 npx vsce package  # Package as .vsix
 ```
+
+The `.vsix` is self-contained: `lsp-server.mjs` and `vendor/lmc-lsp.bundle.mjs` live inside
+`vscode-extension/` precisely so that they end up in the archive, along with the compiled
+`out/client.js`, the webview bundle and the one runtime dependency (`vscode-languageclient`). An
+installed extension has no repo around it. Run `node scripts/fetch-lsp-bundle.mjs`,
+`node scripts/build-webview.mjs` and `npm run compile` before packaging, or the archive will be
+missing one of the three.
+
+`@types/vscode` is pinned exactly to `1.80.0` to match `engines.vscode`: `vsce` refuses to package
+when the types are newer than the oldest VS Code the extension claims to support, and `^1.80.0`
+resolves to whatever the latest minor is.
 
 ### Build the emulator webview
 

@@ -11,13 +11,12 @@ import { openEmulatorPanel } from "./webviewPanel";
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext): void {
-  // The LSP server is a compiled Gleam/Node.js script one level above this
-  // extension directory (at the project root).
-  const serverEntry = path.join(
-    context.extensionPath,
-    "..",
-    "lsp-server.mjs"
-  );
+  // The LSP server ships *inside* the extension: lsp-server.mjs and the
+  // vendor/ bundle it loads are packaged into the .vsix, so an installed
+  // extension is self-contained and needs nothing from the repo around it.
+  // It used to live one directory above (at the project root), which worked
+  // under F5 and would have shipped a .vsix with no server in it at all.
+  const serverEntry = path.join(context.extensionPath, "lsp-server.mjs");
 
   // `module`, not `command: "node"`. With a module and no explicit runtime,
   // vscode-languageclient forks it with `cp.fork`, which uses

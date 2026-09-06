@@ -4,6 +4,10 @@
   "description": "Little Man Computer (LMC) assembly language support for VS Code",
   "version": "0.1.0",
   "publisher": "lmc-vscode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MMarchand-NSI/lmc-vscode.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -60,7 +64,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "@types/vscode": "^1.109.0",
+    "@types/vscode": "1.80.0",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.25.0",
     "jsdom": "^24.1.3",

@@ -7,7 +7,8 @@
 //   node scripts/fetch-lsp-bundle.mjs [version]
 //
 // `version` defaults to the LMC_LSP_VERSION env var, or v0.6.0 if unset.
-// The result is written to vendor/lmc-lsp.bundle.mjs (gitignored — re-run
+// The result is written to vscode-extension/vendor/lmc-lsp.bundle.mjs
+// (gitignored — re-run
 // this script to pick it up, it is not committed).
 //
 // lmc_lsp is currently a PRIVATE repo, so downloading its release assets
@@ -28,7 +29,9 @@ const ASSET = "lmc-lsp.bundle.mjs";
 
 const version = process.argv[2] ?? process.env.LMC_LSP_VERSION ?? "v0.6.0";
 const here = dirname(fileURLToPath(import.meta.url));
-const destDir = join(here, "..", "vendor");
+// Dans l'extension, pas à la racine : le .vsix doit embarquer le serveur,
+// sinon l'extension installée n'en a aucun. Voir client.ts.
+const destDir = join(here, "..", "vscode-extension", "vendor");
 
 console.log(`Fetching lmc_lsp ${version} (${ASSET}) from ${REPO} via gh CLI...`);
 await mkdir(destDir, { recursive: true });

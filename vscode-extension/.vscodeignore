@@ -1,0 +1,13 @@
+# Ce qui ne sert qu'au développement. Tout le reste part dans le .vsix, et
+# c'est voulu : lsp-server.mjs et vendor/lmc-lsp.bundle.mjs en font partie,
+# sans eux l'extension installée n'a pas de serveur de langage.
+#
+# node_modules n'est pas listé ici : vsce n'emballe que les dépendances de
+# production (vscode-languageclient), ce qui est exactement ce qu'il faut.
+.vscode/**
+client.ts
+webviewPanel.ts
+tsconfig.json
+.vscodeignore
+**/*.map
+**/tsconfig.tsbuildinfo
