@@ -34,7 +34,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the build script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.7.0" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.0" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -445,6 +445,21 @@ never just code review):
   names them as a set, the way it already read the mnemonics out of `lexer.gleam`. And nothing
   covered `register_name` at all, so half a rename would have compiled and passed: a model test now
   pins both sentences the cycle panel builds from it.
+- **`lmc_lsp` v0.8.0: the server is bilingual, and no layer builds a sentence any more.** Every
+  user-visible string is now a `text/message.Message` value that only `lsp/server.gleam` renders,
+  in the language the client announced in `initialize`'s `locale` (French by default, English for
+  `en`, French for anything else). Two things followed here.
+  `event.ErrorOccurred` carries a `Message` rather than a `String`, so `model.gleam` renders it —
+  `message.render(reason, message.French)`, because the webview is French; see "one language"
+  below.
+  And `check-grammar.mjs` **failed loudly**, exactly as designed: `features/completion.gleam`'s
+  register list changed shape, so the pattern it read the names with matched nothing and the script
+  refused to pretend it had checked anything. It now reads the whole `register_completions` block
+  instead of one line, since the formatting has moved once and the contents have not.
+  **What this repo has NOT decided**: `vscode-languageclient` sends `vscode.env.language` as the
+  locale, so a VS Code running in English now gets English diagnostics — while the panel, the
+  manifest, the 26 examples and the Marketplace page are French. That split is real and open; see
+  the open list.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the

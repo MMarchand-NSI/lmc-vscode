@@ -13,6 +13,7 @@ import lmc/runner/run
 import lmc/runner/state.{type MachineState}
 import lmc/semantic/ast
 import lmc/semantic/pipeline
+import lmc/text/message
 
 // Pure application state for the emulator webview — no FFI, no DOM, fully
 // testable with `gleam test`. app.gleam wires this up to the actual webview
@@ -733,7 +734,14 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
     )
     event.Halted -> #("Execute", "HLT")
     event.InputRequested -> #("Execute", "en attente d'une entrée…")
-    event.ErrorOccurred(message) -> #("Erreur", message)
+    // Depuis lmc_lsp v0.8.0, aucune couche ne fabrique de phrase : l'erreur
+    // arrive comme valeur, et c'est ici qu'elle devient du texte. Le webview
+    // parle français, donc il demande le français — voir CLAUDE.md, « une
+    // seule langue ».
+    event.ErrorOccurred(reason) -> #(
+      "Erreur",
+      message.render(reason, message.French),
+    )
   }
 }
 

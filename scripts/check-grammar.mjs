@@ -94,13 +94,17 @@ if (words.length === 0) {
 // Les registres se lisent eux aussi dans la dépendance, et non ici : c'est un
 // nom de registre qui vient de changer (IX -> SI en v0.7.0), et une liste
 // écrite à la main dans ce fichier aurait fait passer le contrôle au vert
-// avec l'ancien nom des deux côtés. `features/completion.gleam` est le seul
-// endroit de `lmc_lsp` qui nomme les registres comme un ensemble.
+// avec l'ancien nom des deux côtés. Ils vivent dans la liste de complétion de
+// `features/completion.gleam`, le seul endroit de `lmc_lsp` qui les nomme
+// comme un ensemble. On lit le bloc entier plutôt qu'une ligne : sa mise en
+// forme a déjà changé une fois (v0.8.0), le contenu non.
+const completionSource = readFileSync(completionPath, "utf8");
+const block = completionSource.slice(completionSource.indexOf("const register_completions"));
 const registers = [
-  ...readFileSync(completionPath, "utf8").matchAll(/CompletionItem\("([A-Z]{2,3})", CompletionRegister/g),
-].map((m) => m[1]);
+  ...new Set([...block.slice(0, block.indexOf("\n]")).matchAll(/"([A-Z]{2,3})"/g)].map((m) => m[1])),
+];
 if (registers.length === 0) {
-  console.error(`Aucune entrée « CompletionItem("XX", CompletionRegister » dans ${completionPath} : ce script ne vérifie plus rien.`);
+  console.error(`Aucun registre dans le bloc « register_completions » de ${completionPath} : ce script ne vérifie plus rien.`);
   process.exit(1);
 }
 const mnemonics = words.filter((w) => !registers.includes(w));
