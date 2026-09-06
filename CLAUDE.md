@@ -430,14 +430,22 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-4. **`lmc_lsp` is still private**, so `fetch-lsp-bundle.mjs` and `gleam deps download` both need `gh
-   auth`/the deploy key — fine for solo development, but blocks any real distribution. No public-
-   release work (Marketplace listing, making `lmc_lsp` public) has started.
+4. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+   decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
+   qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
+   removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
+   distribution" as a problem: there is no audience to distribute to. The passage under
+   "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
+   answered — no public release is planned.
 5. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
-   VS Code client using it.
-6. **The VS Code extension itself isn't packaged/published anywhere** — `npx vsce package` works
-   locally, but there's no CI job building a `.vsix`, let alone a Marketplace listing.
+   VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
+   the same authenticated way this one does.
+6. **The VS Code extension isn't packaged as a `.vsix`.** No Marketplace listing is wanted (see 4),
+   but a local install still needs one, and `npx vsce package` alone does not produce a working
+   extension: it packages `vscode-extension/` only, while `lsp-server.mjs` and `vendor/` sit one
+   directory above and would be missing from the archive. Whoever does this has to decide what
+   ships inside the `.vsix` first.
 7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX`, opcode 9 in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
