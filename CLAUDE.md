@@ -553,7 +553,35 @@ Still open, roughly in the order it's worth tackling them:
    What comes back here once it exists: the webview reads the same directive instead of asking for
    `message.French` outright (`model.gleam`'s `ErrorOccurred` branch), the grammar colours the
    directive as something other than a plain comment, and the 26 examples get a header line.
-3. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
+3. **Externalise the message catalogues into per-language files.** Decided 2026-09-06: many
+   languages, to take the cognitive load off students from different countries. That kills the
+   in-code catalogue, which only paid off for two languages and one author — nobody outside can
+   translate a Gleam `case`, and each new language would touch both repos.
+   **`lmc_lsp` goes first, and its author is handling it**: its `Locale` is a closed
+   `French | English`, and this repo reuses that type, so nothing here can name a language the
+   server does not know. Do not start on this side before that lands.
+   What survives the migration, and what makes it cheap: **call sites already build values**
+   (`text.FetchRead(0, 5003)`), never sentences. The sum type stays the message's identity; only
+   the rendering becomes data.
+   What has to be rebuilt, because the compiler stops guaranteeing it: a test walking every variant
+   × every shipped language for a present, non-empty string; a check that no placeholder is left
+   unsubstituted and none is unknown; and a per-message fallback so a half-translated language
+   stays usable.
+   Agreed defaults, unless the `lmc_lsp` side decides otherwise: **fallback** requested → English →
+   never empty, while the **default** for a silent client stays French (they are different
+   things); **plurals** — the format allows a value to be a string *or* an object of plural forms,
+   only the string path is implemented, and no message is phrased so that it depends on a number,
+   which keeps Polish and Arabic open without writing ICU in Gleam today; **format** one JSON per
+   language in-repo, PRs to contribute, a translation platform later if translators should not
+   have to touch git.
+   Three things on this side when the time comes: `src/webview/text.gleam`'s two catalogues,
+   `webviewPanel.ts`'s `hostText`, and the fact that catalogues are **build-time** data — the
+   webview has no disk access and the server is a single bundled file, so translators edit files
+   and the build embeds them.
+   Not covered by any of this, and the larger half of the actual load: the 26 examples carry French
+   comments and `LANGAGE.md` is French. Diagnostics in Spanish with course material in French only
+   removes part of what this is for.
+4. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
    variable that starts `null`, which is what makes "load before assembling" testable at all. 55
@@ -570,18 +598,18 @@ Still open, roughly in the order it's worth tackling them:
    It does **not** replace opening the panel for real: `acquireVsCodeApi` is stubbed, so it says
    nothing about CSP, about webviewPanel.ts's placeholder substitution, or about how any of it
    looks.
-4. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
+5. ~~**`lmc_lsp` is still private.**~~ **Settled, 2026-09-06: it stays private.** The author's
    decision, in their words: "il est hors de question de rendre le lmc_lsp public, tout ne sert
    qu'à moi." So `gh auth` locally and the deploy key in CI are not a temporary arrangement to be
    removed, they are the arrangement. Do not re-propose making it public, and do not treat "blocks
    distribution" as a problem: there is no audience to distribute to. The passage under
    "Relationship to lmc_lsp" that says to revisit this if a public release makes it impractical is
    answered — no public release is planned.
-5. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
+6. **No Zed extension exists yet.** Editor independence via `lmc_lsp` was the explicit reason to keep
    the two repos separate (see "Relationship to lmc_lsp" above) — today `lmc_lsp` only has this one
    VS Code client using it. Private does not prevent this: a Zed extension would fetch the bundle
    the same authenticated way this one does.
-6. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
+7. ~~**The VS Code extension isn't packaged as a `.vsix`.**~~ Done: `npx vsce package` produces a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
@@ -595,7 +623,7 @@ Still open, roughly in the order it's worth tackling them:
    and dropping it would remove the one dependency the extension needs at runtime.
    What is still untested is the installed extension inside VS Code itself — same gap as item 1.
    Rebuild order before packaging: `build-lsp-bundle.mjs`, `build-webview.mjs`, `npm run compile`.
-7. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
+8. **One language change is still open: renaming the language itself** (`LMC` → ?). The other
    three that were planned — `X` → `IX` (and `IX` → `SI` in v0.7.0, see the done list), opcode 9
    in families with `PSH`/`POP` on a register, and
    the screen instruction (shipped as **`PLT`**, not `PIX`: the verb names the action and lets the
