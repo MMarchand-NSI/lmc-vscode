@@ -33,7 +33,8 @@ ne la change pas — la prendre pour la langue de la classe rendrait des diagnos
 cours français. Le serveur redémarre quand le réglage change, la langue étant annoncée à son
 démarrage.
 
-Le panneau de l'émulateur et les exemples restent français quoi qu'il arrive.
+Le panneau de l'émulateur suit le même réglage, jusqu'à ses infobulles. Les exemples et la
+référence du langage, eux, restent français.
 
 ## L'émulateur
 

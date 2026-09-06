@@ -4,6 +4,7 @@ import gleam/string
 import lmc/runner/inspect
 import lmc/runner/state
 import webview/model
+import webview/text
 
 /// Assemble puis charge en RAM, comme le feraient les boutons Assembler
 /// puis Charger. Passe par le vrai aller-retour : le texte du fichier objet
@@ -59,10 +60,7 @@ pub fn a_program_too_long_does_not_assemble_test() {
   let m = model.init(source)
 
   assert m.assembled == None
-  assert m.assembly_error
-    == Some(
-      "le programme contient des erreurs — voir les diagnostics dans l'éditeur",
-    )
+  assert m.assembly_error == Some(text.SourceHasErrors)
 }
 
 pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
@@ -264,10 +262,10 @@ pub fn step_produces_one_entry_per_phase_test() {
     |> model.step
   let cycle = model.last_cycle(m)
   let assert [fetch, decode, execute] = cycle
-  assert fetch.name == "Fetch"
-  assert decode.name == "Decode"
-  assert execute.name == "Execute"
-  assert execute.details == ["sortie ← ACC (9)"]
+  assert fetch.phase == text.Fetch
+  assert decode.phase == text.Decode
+  assert execute.phase == text.Execute
+  assert execute.details == [text.OutputSent(9)]
 }
 
 pub fn fetch_shows_the_program_counter_moving_test() {
@@ -277,11 +275,7 @@ pub fn fetch_shows_the_program_counter_moving_test() {
   // arrêtée montre un PC déjà passé à l'instruction suivante.
   let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step
   let assert [fetch, _decode, _execute] = model.last_cycle(m)
-  assert fetch.details
-    == [
-      "lire mem[0] → 5003",
-      "PC 0 → 1 (incrémenté pendant la lecture, avant le décodage)",
-    ]
+  assert fetch.details == [text.FetchRead(0, 5003), text.FetchIncrement(0, 1)]
 }
 
 pub fn the_program_counter_line_follows_the_instruction_test() {
@@ -289,10 +283,7 @@ pub fn the_program_counter_line_follows_the_instruction_test() {
   // sur 0 → 1.
   let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step |> model.step
   let assert [fetch, ..] = model.last_cycle(m)
-  assert list.contains(
-    fetch.details,
-    "PC 1 → 2 (incrémenté pendant la lecture, avant le décodage)",
-  )
+  assert list.contains(fetch.details, text.FetchIncrement(1, 2))
 }
 
 pub fn the_program_counter_line_stays_inside_the_fetch_phase_test() {
@@ -300,7 +291,8 @@ pub fn the_program_counter_line_stays_inside_the_fetch_phase_test() {
   // Fetch → Decode → Execute, ce qui est tout l'intérêt du panneau.
   let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step
   let cycle = model.last_cycle(m)
-  assert list.map(cycle, fn(p) { p.name }) == ["Fetch", "Decode", "Execute"]
+  assert list.map(cycle, fn(p) { p.phase })
+    == [text.Fetch, text.Decode, text.Execute]
 }
 
 pub fn the_index_register_is_named_si_test() {
@@ -315,10 +307,8 @@ pub fn the_index_register_is_named_si_test() {
   let assert [_fetch, decode, execute] = model.last_cycle(m)
 
   assert decode.details
-    == [
-      "5102 → MOV SI, mem[2] (configuration des circuits du processeur pour chargement depuis la mémoire)",
-    ]
-  assert execute.details == ["SI 0 → 5"]
+    == [text.DecodedMove(5102, "SI", "mem[2]", "", text.LoadFromMemory)]
+  assert execute.details == [text.RegisterChanged("SI", 0, 5)]
 }
 
 pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
@@ -335,10 +325,7 @@ pub fn decode_shows_the_raw_number_not_just_the_mnemonic_test() {
     |> model.step
     |> model.step
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
-  assert decode.details
-    == [
-      "9002 → OUT (configuration des circuits du processeur pour écriture de la sortie)",
-    ]
+  assert decode.details == [text.DecodedPlain(9002, "OUT", text.WritingOutput)]
 }
 
 pub fn decode_shows_the_raw_number_with_an_address_test() {
@@ -350,9 +337,7 @@ pub fn decode_shows_the_raw_number_with_an_address_test() {
   let m = loaded("STA total\nHLT\ntotal: DAT 0\n") |> model.step
   let assert [_fetch, decode, _execute] = model.last_cycle(m)
   assert decode.details
-    == [
-      "3002 → MOV mem[2], ACC (alias STA 2) (configuration des circuits du processeur pour stockage en mémoire)",
-    ]
+    == [text.DecodedMove(3002, "mem[2]", "ACC", "STA 2", text.StoreToMemory)]
 }
 
 pub fn events_accumulate_across_an_input_pause_test() {
@@ -368,15 +353,15 @@ pub fn events_accumulate_across_an_input_pause_test() {
     |> model.step
   let cycle = model.last_cycle(m)
   let assert [fetch, decode, execute] = cycle
-  assert fetch.name == "Fetch"
-  assert decode.name == "Decode"
+  assert fetch.phase == text.Fetch
+  assert decode.phase == text.Decode
   // Une seule entrée "Execute", pas trois — c'est tout l'enjeu : ses
   // sous-actions restent groupées dans .details, pas éclatées en plusieurs
   // phases qui donneraient l'impression que Fetch→Decode→Execute se répète.
   // Seulement 2 sous-actions, pas 3 : "ACC 0 → 9" est déduplié, il ne dit
   // rien de plus que "ACC ← entrée (9)" (voir dedupe_input_accumulator_change).
-  assert execute.name == "Execute"
-  assert execute.details == ["en attente d'une entrée…", "ACC ← entrée (9)"]
+  assert execute.phase == text.Execute
+  assert execute.details == [text.WaitingForInput, text.InputTaken(9)]
 }
 
 pub fn add_accumulator_change_is_not_deduped_test() {
@@ -388,7 +373,7 @@ pub fn add_accumulator_change_is_not_deduped_test() {
     |> model.step
     |> model.step
   let assert [_fetch, _decode, execute] = model.last_cycle(m)
-  assert execute.details == ["ACC 5 → 10"]
+  assert execute.details == [text.RegisterChanged("ACC", 5, 10)]
 }
 
 pub fn events_clear_on_reset_test() {
@@ -576,7 +561,12 @@ pub fn a_point_outside_the_screen_is_not_lit_test() {
   assert m
     |> model.last_cycle
     |> list.any(fn(phase) {
-      list.any(phase.details, string.contains(_, "hors écran"))
+      list.any(phase.details, fn(detail) {
+        case detail {
+          text.PixelSent(_, _, _, text.OffScreen(_, _)) -> True
+          _ -> False
+        }
+      })
     })
 }
 
@@ -586,7 +576,12 @@ pub fn a_colour_outside_the_palette_is_not_lit_test() {
   assert m
     |> model.last_cycle
     |> list.any(fn(phase) {
-      list.any(phase.details, string.contains(_, "hors palette"))
+      list.any(phase.details, fn(detail) {
+        case detail {
+          text.PixelSent(_, _, _, text.OffPalette(_)) -> True
+          _ -> False
+        }
+      })
     })
 }
 

@@ -77,6 +77,7 @@ let memoryCellsBuilt = false;
 
 export function render(json) {
   const state = JSON.parse(json);
+  renderLabels(state);
   renderMemory(state);
   renderRegisters(state);
   renderCycleEvents(state);
@@ -85,6 +86,29 @@ export function render(json) {
   renderStatus(state);
   renderInput(state);
   renderError(state);
+}
+
+/// Le texte fixe du panneau : boutons, titres, légendes, infobulles. Il
+/// n'est plus écrit dans index.html mais rendu par `webview/text.gleam`,
+/// dans la langue que l'hôte a réglée — sans quoi il n'y aurait qu'une
+/// langue possible, celle du HTML.
+///
+/// `textContent` et non `innerHTML` : ce sont des phrases, pas du balisage,
+/// et le titre en gras d'une infobulle est déjà un <strong> dans le HTML.
+function renderLabels(state) {
+  const ui = state.ui ?? {};
+  for (const el of document.querySelectorAll("[data-ui]")) {
+    const value = ui[el.dataset.ui];
+    if (value !== undefined) el.textContent = value;
+  }
+  // L'étiquette d'accessibilité du canvas n'est pas du contenu : elle se
+  // pose en attribut.
+  for (const el of document.querySelectorAll("[data-ui-aria]")) {
+    const value = ui[el.dataset.uiAria];
+    if (value !== undefined) el.setAttribute("aria-label", value);
+  }
+  // La langue du document suit, pour la césure et les lecteurs d'écran.
+  if (state.locale) document.documentElement.lang = state.locale;
 }
 
 function renderMemory(state) {

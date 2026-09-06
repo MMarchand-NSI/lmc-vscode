@@ -102,7 +102,7 @@ function openPanel() {
       if (m.type === "requestLoad") {
         w.postMessage(
           disk === null
-            ? { type: "objectLoadFailed", message: "pas de fichier objet" }
+            ? { type: "objectLoadFailed", name: "essai.lmcobj" }
             : { type: "objectLoaded", content: disk },
           "*",
         );
@@ -325,6 +325,51 @@ async function cycle() {
   check("et le registre PC le confirme", p.text("pc"), "1");
 }
 
+// ── La langue ──────────────────────────────────────────────────────
+
+// index.html ne porte plus une seule phrase : tout son texte vient de
+// `webview/text.gleam` par la clé `ui` du rendu. Deux choses peuvent donc
+// casser sans que rien ne le dise — une clé écrite d'un côté et pas de
+// l'autre laisse un élément vide, et un `setLocale` ignoré laisse le
+// panneau en français. Les deux se voient ici, dans le DOM.
+async function language() {
+  console.log("\nLa langue du panneau");
+  const p = openPanel();
+  await p.send({ type: "setSource", source: "INP\nOUT\nHLT\n" });
+
+  const slots = [...p.document.querySelectorAll("[data-ui]")];
+  check("le HTML n'écrit plus aucun texte lui-même", slots.length > 25, true);
+  const empty = slots.filter((el) => el.textContent.trim() === "");
+  check("et le rendu les remplit tous", empty.map((el) => el.dataset.ui).join(",") || "aucun vide",
+    "aucun vide");
+
+  check("le défaut est le français", p.document.getElementById("assemble").textContent,
+    "Assembler .lmc");
+  check("y compris l'attribut lang du document", p.document.documentElement.lang, "fr");
+  check("et l'étiquette du canvas", p.document.getElementById("screen").getAttribute("aria-label"),
+    "Écran, 32 sur 32 points");
+
+  await p.send({ type: "setLocale", locale: "en-GB" });
+  check("setLocale bascule les boutons", p.document.getElementById("assemble").textContent,
+    "Assemble .lmc");
+  check("les titres", p.document.querySelector("[data-ui=headingMemory]").textContent, "Memory");
+  check("les infobulles", p.document.querySelector("[data-ui=tipSpBody]").textContent.slice(0, 16),
+    "points at the ne");
+  check("et l'attribut lang", p.document.documentElement.lang, "en");
+
+  await p.send({ type: "setLocale", locale: "de-DE" });
+  check("une langue non traduite retombe sur le français",
+    p.document.getElementById("assemble").textContent, "Assembler .lmc");
+
+  // Le cycle suit la même langue que le décor : c'est le même rendu.
+  await p.send({ type: "setLocale", locale: "en" });
+  await p.click("assemble");
+  await p.click("load");
+  await p.click("step");
+  check("le cycle parle anglais lui aussi",
+    p.document.querySelector("#cycle-events li li")?.textContent ?? "", "read mem[0] → 9001");
+}
+
 // ── ─────────────────────────────────────────────────────────────────
 
 await pipeline();
@@ -332,6 +377,7 @@ await frames();
 await annotations();
 await screen();
 await cycle();
+await language();
 
 console.log(
   failures === 0

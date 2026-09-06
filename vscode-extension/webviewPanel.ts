@@ -16,7 +16,8 @@ import * as vscode from "vscode";
 //   webview -> host  {"type":"objectCode","content":"5042\n..."}
 //   webview -> host  {"type":"requestLoad"}
 //   host -> webview  {"type":"objectLoaded","content":"5042\n..."}
-//   host -> webview  {"type":"objectLoadFailed","message":"..."}
+//   host -> webview  {"type":"objectLoadFailed","name":"essai.lmcobj"}
+//   host -> webview  {"type":"setLocale","locale":"fr"}
 //   host -> webview  {"type":"setSource","source":"..."}
 //   host -> webview  {"type":"cursorLine","line":N|null}
 //
@@ -82,6 +83,19 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
   );
 
   currentPanel.webview.html = renderHtml(currentPanel.webview, webviewDir);
+
+  // Le serveur, lui, redémarre pour changer de langue ; le panneau n'a qu'à
+  // recevoir la nouvelle et se repeindre.
+  disposables.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("lmc.locale")) {
+        currentPanel?.webview.postMessage({
+          type: "setLocale",
+          locale: configuredLocale(),
+        });
+      }
+    }),
+  );
 
   currentPanel.webview.onDidReceiveMessage(
     (message) => handleWebviewMessage(currentPanel!, message),
@@ -170,9 +184,21 @@ function findOpenTabGroupColumn(): vscode.ViewColumn | undefined {
   return undefined;
 }
 
+/// Le même réglage que celui que `client.ts` envoie au serveur, lu de la
+/// même façon : le panneau et les diagnostics doivent parler la même langue,
+/// et deux lectures différentes du même réglage les feraient diverger.
+function configuredLocale(): string {
+  const choice = vscode.workspace.getConfiguration("lmc").get<string>("locale", "fr");
+  return choice === "auto" ? vscode.env.language : choice;
+}
+
 function handleWebviewMessage(panel: vscode.WebviewPanel, message: any): void {
   switch (message?.type) {
     case "ready":
+      // La langue d'abord : le panneau se peint dès le premier message, et
+      // l'envoyer après le source le ferait clignoter d'une langue à
+      // l'autre.
+      panel.webview.postMessage({ type: "setLocale", locale: configuredLocale() });
       if (sourceUri) {
         const editor = findLiveEditor();
         if (editor) sendSource(panel, editor.document);
@@ -229,12 +255,11 @@ async function sendObjectFile(panel: vscode.WebviewPanel): Promise<void> {
       content: new TextDecoder().decode(bytes),
     });
   } catch {
+    // Le nom du fichier, pas une phrase : c'est le panneau qui écrit, et
+    // lui seul sait dans quelle langue.
     panel.webview.postMessage({
       type: "objectLoadFailed",
-      message:
-        "pas de fichier objet à charger (" +
-        path.basename(target.fsPath) +
-        ") — assemblez d'abord",
+      name: path.basename(target.fsPath),
     });
   }
 }

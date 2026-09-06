@@ -4,6 +4,7 @@ import gleam/option.{type Option, None, Some}
 import webview/ffi.{type Ref}
 import webview/model.{type Model}
 import webview/render
+import webview/text
 
 // Entry point loaded inside the webview (browser context, not Node — see
 // scripts/build-webview.mjs). Wires model.gleam + render.gleam to the DOM
@@ -79,7 +80,10 @@ type HostMessage {
   SetSource(source: String)
   CursorLine(line: Option(Int))
   ObjectLoaded(content: String)
-  ObjectLoadFailed(message: String)
+  /// L'hôte envoie le *nom* du fichier absent, pas une phrase : c'est le
+  /// panneau qui écrit, et lui seul connaît la langue demandée.
+  ObjectLoadFailed(name: String)
+  SetLocale(tag: String)
   Unrecognized
 }
 
@@ -90,8 +94,10 @@ fn handle_host_message(cell: Ref(Model), raw: String) -> Nil {
     CursorLine(line) -> update(cell, fn(m) { model.set_cursor_line(m, line) })
     ObjectLoaded(content) ->
       update(cell, fn(m) { model.load_object_code(m, content) })
-    ObjectLoadFailed(message) ->
-      update(cell, fn(m) { model.fail_load(m, message) })
+    ObjectLoadFailed(name) ->
+      update(cell, fn(m) { model.fail_load(m, text.NoObjectFile(name)) })
+    SetLocale(tag) ->
+      update(cell, fn(m) { model.set_locale(m, text.from_tag(tag)) })
     Unrecognized -> Nil
   }
 }
@@ -118,8 +124,12 @@ fn host_message_decoder() -> decode.Decoder(HostMessage) {
       decode.success(ObjectLoaded(content))
     }
     "objectLoadFailed" -> {
-      use message <- decode.field("message", decode.string)
-      decode.success(ObjectLoadFailed(message))
+      use name <- decode.field("name", decode.string)
+      decode.success(ObjectLoadFailed(name))
+    }
+    "setLocale" -> {
+      use tag <- decode.field("locale", decode.string)
+      decode.success(SetLocale(tag))
     }
     _ -> decode.success(Unrecognized)
   }

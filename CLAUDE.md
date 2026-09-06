@@ -221,6 +221,18 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   needed. The points live in the `Model` and not in `MachineState` because the runner does not keep
   them — `OUT`'s output accumulates in the machine, `PLT`'s does not. Reset and load clear the
   screen; the RGB values themselves are in `app_ffi.mjs`, the only module that paints.
+- **`webview/text.gleam`** — **tout ce que le panneau affiche, comme valeur.** Same split as
+  `lmc_lsp` since its v0.8.0: no layer builds a sentence. `model.gleam` returns `Text` values,
+  `render.gleam` — the only module that knows the language asked for — turns them into strings. Two
+  catalogues in one file: `Text` for what the machine does (the Fetch/Decode/Execute lines, the
+  load and assembly failures) and `Label` for the panel's furniture (buttons, headings, legend,
+  tooltips), which used to live in `index.html` and therefore in one language, out of the
+  compiler's reach. `index.html` now carries `data-ui` attributes and no prose at all.
+  The `Locale` is **not** redefined here: it is `lmc_lsp`'s, so the panel and the diagnostics
+  cannot drift apart and `message.render` takes the same value with no conversion. A runtime error
+  from the runner arrives as a `message.Message` and is rendered in the same language, not copied.
+  What this bought, exactly as it did upstream: the model tests compare values
+  (`text.FetchRead(0, 5003)`), so rephrasing a message breaks none of them.
 - **`webview/render.gleam`** — `Model` -> single JSON payload (`gleam_json`), also `gleam test`-covered.
   One `ffi.render(json)` call re-renders the whole memory grid each time; 100 cells is cheap enough
   that a diffing renderer isn't worth the complexity. The screen is the one thing sent
@@ -233,6 +245,13 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   `ref`/`deref`/`setRef` mutable-cell pattern `lmc_lsp`'s `lsp/ffi.gleam` uses for server state
   (reimplemented here, not shared — the two repos stay independent). Browser FFI, not Node FFI —
   don't reach for `node:*` imports in this file.
+- **The panel follows the same `lmc.locale` setting as the server.** `webviewPanel.ts` reads it the
+  same way `client.ts` does and posts `setLocale` — on `ready`, before the source, so the panel
+  never flashes one language then the other, and again whenever the setting changes. The server
+  restarts to change language; the panel only has to repaint.
+  The host sends **facts, not prose**: `objectLoadFailed` carries the file's `name`, and the panel
+  writes the sentence. A shell that phrased it would be choosing the language where it is not
+  known.
 - **The `lmc.locale` setting** (`package.json`'s `contributes.configuration`, read by `client.ts`)
   — `fr` (default), `en`, or `auto`. `client.ts` subclasses `LanguageClient` to override
   `getLocale()`, which is what the library sends as `initialize`'s `locale` and the only entry
@@ -525,10 +544,14 @@ Still open, roughly in the order it's worth tackling them:
 3. ~~**No committed smoke-test script.**~~ Done: `scripts/smoke-webview.mjs`. It loads
    `webview/index.html` with its placeholders substituted, runs the built bundle in jsdom, and plays
    the extension host's half of the protocol — including the object file, which it holds as a
-   variable that starts `null`, which is what makes "load before assembling" testable at all. 44
+   variable that starts `null`, which is what makes "load before assembling" testable at all. 55
    checks over the assemble/load/execute pipeline, the von Neumann frame grouping, the tooltips
-   and legend, the screen, and the Fetch/Decode/Execute panel (that the three phases are three,
-   and that Fetch carries both the read and the PC increment). jsdom has no 2d context, so the script installs one of its own that
+   and legend, the screen, the Fetch/Decode/Execute panel (that the three phases are three, and
+   that Fetch carries both the read and the PC increment), and **the language**: that no `data-ui`
+   slot is left empty (a key written on one side only), that `setLocale` switches the buttons, the
+   headings, the tooltips, the `lang` attribute and the cycle lines, and that an untranslated
+   language falls back rather than blanking. Verified by breaking it: dropping one label from the
+   catalogue names the empty slot and exits non-zero. jsdom has no 2d context, so the script installs one of its own that
    records what it is asked to paint — which is how the screen's rendering gets covered at all, and
    it is exactly the impure boundary this script exists for. It fails and exits non-zero when any
    of it breaks — verified by breaking it.

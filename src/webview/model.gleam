@@ -13,7 +13,7 @@ import lmc/runner/run
 import lmc/runner/state.{type MachineState}
 import lmc/semantic/ast
 import lmc/semantic/pipeline
-import lmc/text/message
+import webview/text.{type Text}
 
 // Pure application state for the emulator webview — no FFI, no DOM, fully
 // testable with `gleam test`. app.gleam wires this up to the actual webview
@@ -77,12 +77,16 @@ pub type Model {
     // Line the host's cursor is currently on — independent of execution
     // state, doesn't get reset by step/run/reset.
     cursor_line: Option(Int),
+    // La langue du panneau, telle que l'hôte l'a demandée. Elle vit dans le
+    // modèle et non dans le rendu parce que c'est un état : elle change
+    // quand le réglage change, et le rendu suivant doit la voir.
+    locale: text.Locale,
     // Pourquoi le source ne s'assemble pas, s'il ne s'assemble pas.
-    assembly_error: Option(String),
+    assembly_error: Option(Text),
     // Pourquoi le dernier chargement en RAM a échoué : fichier objet absent
     // (on n'a pas assemblé), ou illisible. Distinct de assembly_error : un
     // source parfaitement valide peut très bien n'avoir jamais été assemblé.
-    ram_error: Option(String),
+    ram_error: Option(Text),
     // Fetch/Decode/Execute events from the *last* step/run_to_halt call —
     // lmc_lsp's runner already produces these per sub-phase, previously
     // just discarded. Powers the collapsible "what actually just
@@ -117,6 +121,7 @@ pub fn init(source: String) -> Model {
     line_to_address: dict.new(),
     address_to_instruction: dict.new(),
     cursor_line: None,
+    locale: text.default_locale,
     assembly_error: None,
     ram_error: None,
     last_events: [],
@@ -169,21 +174,22 @@ pub fn assemble_source(model: Model, source: String) -> Model {
           Model(
             ..base,
             assembled: None,
-            assembly_error: Some(load_error_message(err)),
+            assembly_error: Some(text.load_error(err)),
           )
       }
     _ ->
       // Les erreurs de syntaxe et de résolution sont déjà visibles dans
       // l'éditeur via les diagnostics LSP — inutile de dupliquer le détail
       // ici, mais il n'y a pas d'assemblage possible non plus.
-      Model(
-        ..base,
-        assembled: None,
-        assembly_error: Some(
-          "le programme contient des erreurs — voir les diagnostics dans l'éditeur",
-        ),
-      )
+      Model(..base, assembled: None, assembly_error: Some(text.SourceHasErrors))
   }
+}
+
+/// La langue du panneau, telle que l'hôte l'a réglée (`lmc.locale`). Une
+/// transition comme une autre : le rendu suivant la voit, rien d'autre ne
+/// change.
+pub fn set_locale(model: Model, locale: text.Locale) -> Model {
+  Model(..model, locale: locale)
 }
 
 /// Charge un fichier objet en RAM. `content` est le texte du `.lmcobj` tel
@@ -210,15 +216,15 @@ pub fn load_object_code(model: Model, content: String) -> Model {
 }
 
 /// Le chargement a échoué côté hôte (fichier objet absent, illisible).
-pub fn fail_load(model: Model, message: String) -> Model {
-  Model(..model, ram_error: Some(message))
+pub fn fail_load(model: Model, reason: Text) -> Model {
+  Model(..model, ram_error: Some(reason))
 }
 
 /// Un mot par ligne, quatre chiffres, rien d'autre — le format qu'écrit
 /// `object_code`. Le vérifier plutôt que de faire confiance : le fichier est
 /// sur le disque, quelqu'un a pu l'éditer à la main, et c'est même une chose
 /// intéressante à essayer.
-fn parse_object_code(content: String) -> Result(List(Int), String) {
+fn parse_object_code(content: String) -> Result(List(Int), Text) {
   let lines =
     content
     |> string.split("\n")
@@ -226,17 +232,13 @@ fn parse_object_code(content: String) -> Result(List(Int), String) {
     |> list.filter(fn(line) { line != "" })
 
   case lines {
-    [] -> Error("le fichier objet est vide")
+    [] -> Error(text.ObjectFileEmpty)
     _ ->
       case list.try_map(lines, parse_word) {
-        Error(bad) ->
-          Error(
-            "le fichier objet contient une ligne illisible : « " <> bad <> " »",
-          )
+        Error(bad) -> Error(text.ObjectFileUnreadableLine(bad))
         Ok(words) ->
           case list.length(words) > memory.size {
-            True ->
-              Error("le fichier objet dépasse les 100 cases de la mémoire")
+            True -> Error(text.ObjectFileTooLong(list.length(words)))
             False -> Ok(words)
           }
       }
@@ -589,18 +591,11 @@ pub fn last_cycle(model: Model) -> List(CyclePhase) {
 /// `lmc_lsp`, `runner/step_phase.gleam`), qui pose toujours
 /// `program_counter + 1` en émettant `Fetched(program_counter, raw)`. Si un
 /// jour l'incrément cesse d'être de 1, c'est ici que ça se corrige.
-fn event_phase_details(evt: Event) -> List(#(String, String)) {
+fn event_phase_details(evt: Event) -> List(#(text.Phase, Text)) {
   case evt {
     event.Fetched(address, _) -> [
       event_phase_and_detail(evt),
-      #(
-        "Fetch",
-        "PC "
-          <> int.to_string(address)
-          <> " → "
-          <> int.to_string(address + 1)
-          <> " (incrémenté pendant la lecture, avant le décodage)",
-      ),
+      #(text.Fetch, text.FetchIncrement(address, address + 1)),
     ]
     _ -> [event_phase_and_detail(evt)]
   }
@@ -629,7 +624,7 @@ fn dedupe_input_accumulator_change(events: List(Event)) -> List(Event) {
 }
 
 pub type CyclePhase {
-  CyclePhase(name: String, details: List(String))
+  CyclePhase(phase: text.Phase, details: List(Text))
 }
 
 // ── Internals ──────────────────────────────────────────────────────
@@ -676,72 +671,45 @@ fn build_address_to_instruction(
 /// #(phase, detail) — kept separate rather than pre-joined into one
 /// "Phase : detail" string so group_consecutive_by_phase can merge same-
 /// phase entries without string-parsing its own output back apart.
-fn event_phase_and_detail(evt: Event) -> #(String, String) {
+fn event_phase_and_detail(evt: Event) -> #(text.Phase, Text) {
   case evt {
-    event.Fetched(address, raw) -> #(
-      "Fetch",
-      "lire mem[" <> int.to_string(address) <> "] → " <> int.to_string(raw),
-    )
-    event.Decoded(instr) -> #("Decode", describe_decoded(instr))
-    event.InputConsumed(v) -> #(
-      "Execute",
-      "ACC ← entrée (" <> int.to_string(v) <> ")",
-    )
-    event.OutputProduced(v) -> #(
-      "Execute",
-      "sortie ← ACC (" <> int.to_string(v) <> ")",
-    )
+    event.Fetched(address, raw) -> #(text.Fetch, text.FetchRead(address, raw))
+    event.Decoded(instr) -> #(text.Decode, describe_decoded(instr))
+    event.InputConsumed(v) -> #(text.Execute, text.InputTaken(v))
+    event.OutputProduced(v) -> #(text.Execute, text.OutputSent(v))
     // PLT n'écrit rien en mémoire : c'est une sortie, comme OUT, vers un
     // périphérique dont le processeur ignore tout — ni la taille de l'écran
     // ni la palette ne remontent jusqu'ici.
     event.PixelPlotted(x, y, colour) -> #(
-      "Execute",
+      text.Execute,
       plotted_detail(x, y, colour),
     )
     event.MemoryWritten(address, v) -> #(
-      "Execute",
-      "mem[" <> int.to_string(address) <> "] ← ACC (" <> int.to_string(v) <> ")",
+      text.Execute,
+      text.MemoryWritten(address, v),
     )
     event.AccumulatorChanged(old, new) -> #(
-      "Execute",
-      "ACC " <> int.to_string(old) <> " → " <> int.to_string(new),
+      text.Execute,
+      text.RegisterChanged("ACC", old, new),
     )
     event.IndexChanged(old, new) -> #(
-      "Execute",
-      "SI " <> int.to_string(old) <> " → " <> int.to_string(new),
+      text.Execute,
+      text.RegisterChanged("SI", old, new),
     )
-    event.LinkChanged(old, new) -> #(
-      "Execute",
-      "LR "
-        <> int.to_string(old)
-        <> " → "
-        <> int.to_string(new)
-        <> " (adresse de retour)",
+    event.LinkChanged(old, new) -> #(text.Execute, text.LinkChanged(old, new))
+    event.StackPointerChanged(old, new) -> #(
+      text.Execute,
+      text.RegisterChanged("SP", old, new),
     )
     // Un saut est une écriture dans le compteur ordinal, et le dire est tout
     // l'intérêt : « revenir » d'un sous-programme n'est rien d'autre.
-    event.StackPointerChanged(old, new) -> #(
-      "Execute",
-      "SP " <> int.to_string(old) <> " → " <> int.to_string(new),
-    )
-    event.Jumped(from, to) -> #(
-      "Execute",
-      "PC "
-        <> int.to_string(from)
-        <> " → "
-        <> int.to_string(to)
-        <> " (écriture dans le compteur ordinal)",
-    )
-    event.Halted -> #("Execute", "HLT")
-    event.InputRequested -> #("Execute", "en attente d'une entrée…")
-    // Depuis lmc_lsp v0.8.0, aucune couche ne fabrique de phrase : l'erreur
-    // arrive comme valeur, et c'est ici qu'elle devient du texte. Le webview
-    // parle français, donc il demande le français — voir CLAUDE.md, « une
-    // seule langue ».
-    event.ErrorOccurred(reason) -> #(
-      "Erreur",
-      message.render(reason, message.French),
-    )
+    event.Jumped(from, to) -> #(text.Execute, text.Jumped(from, to))
+    event.Halted -> #(text.Execute, text.Halted)
+    event.InputRequested -> #(text.Execute, text.WaitingForInput)
+    // Depuis lmc_lsp v0.8.0, l'erreur arrive comme valeur, pas comme
+    // phrase : on la transporte telle quelle jusqu'au rendu, qui seul
+    // connaît la langue.
+    event.ErrorOccurred(reason) -> #(text.Failure, text.RunnerError(reason))
   }
 }
 
@@ -750,29 +718,13 @@ fn event_phase_and_detail(evt: Event) -> #(String, String) {
 /// Execute plutôt que de laisser l'écran rester vide sans explication — le
 /// programme a bien fait ce qu'il a fait, c'est l'affichage qui n'a pas
 /// suivi, et c'est précisément la leçon.
-fn plotted_detail(x: Int, y: Int, colour: Int) -> String {
-  let point =
-    "écran ← point ("
-    <> int.to_string(x)
-    <> ", "
-    <> int.to_string(y)
-    <> "), couleur "
-    <> int.to_string(colour)
-  case on_screen(x, y), in_palette(colour) {
-    True, True -> point
-    False, _ ->
-      point
-      <> " — hors écran ("
-      <> int.to_string(screen_width)
-      <> " × "
-      <> int.to_string(screen_height)
-      <> ") : rien n'est allumé"
-    _, False ->
-      point
-      <> " — hors palette (0 à "
-      <> int.to_string(palette_size - 1)
-      <> ") : rien n'est allumé"
+fn plotted_detail(x: Int, y: Int, colour: Int) -> Text {
+  let outcome = case on_screen(x, y), in_palette(colour) {
+    True, True -> text.Drawn
+    False, _ -> text.OffScreen(screen_width, screen_height)
+    _, False -> text.OffPalette(palette_size - 1)
   }
+  text.PixelSent(x, y, colour, outcome)
 }
 
 /// Merges consecutive same-phase pairs into one CyclePhase each — "merges
@@ -782,14 +734,14 @@ fn plotted_detail(x: Int, y: Int, colour: Int) -> String {
 /// once); today last_events only ever holds one instruction's worth, so in
 /// practice this always yields at most one Fetch, one Decode, one Execute.
 fn group_consecutive_by_phase(
-  pairs: List(#(String, String)),
+  pairs: List(#(text.Phase, Text)),
 ) -> List(CyclePhase) {
   pairs
   |> list.fold([], fn(acc, pair) {
     let #(phase, detail) = pair
     case acc {
-      [CyclePhase(name, details), ..rest] if name == phase -> [
-        CyclePhase(name, list.append(details, [detail])),
+      [CyclePhase(current, details), ..rest] if current == phase -> [
+        CyclePhase(current, list.append(details, [detail])),
         ..rest
       ]
       _ -> [CyclePhase(phase, [detail]), ..acc]
@@ -819,19 +771,16 @@ fn group_consecutive_by_phase(
 /// Execute has something to act on. Spelling that out here is the direct
 /// follow-up to the fetch/decode/execute discussion: "decode" can
 /// otherwise read as just another arithmetic step alongside Fetch.
-fn describe_decoded(instr: instruction.Instruction) -> String {
-  let raw = int.to_string(instruction.encode(instr))
+fn describe_decoded(instr: instruction.Instruction) -> Text {
+  let word = instruction.encode(instr)
   case instr {
-    instruction.Inp ->
-      raw <> " → INP (" <> circuit_note("lecture d'une entrée") <> ")"
-    instruction.Out ->
-      raw <> " → OUT (" <> circuit_note("écriture de la sortie") <> ")"
-    instruction.Hlt ->
-      raw <> " → HLT (" <> circuit_note("arrêt du processeur") <> ")"
+    instruction.Inp -> text.DecodedPlain(word, "INP", text.ReadingInput)
+    instruction.Out -> text.DecodedPlain(word, "OUT", text.WritingOutput)
+    instruction.Hlt -> text.DecodedPlain(word, "HLT", text.StoppingProcessor)
     instruction.Add(a, m) ->
-      decoded_with_address(raw, "ADD", a, m, circuit_note("une addition"))
+      text.DecodedWithOperand(word, "ADD", memory_text(a, m), text.Addition)
     instruction.Sub(a, m) ->
-      decoded_with_address(raw, "SUB", a, m, circuit_note("une soustraction"))
+      text.DecodedWithOperand(word, "SUB", memory_text(a, m), text.Subtraction)
 
     // Un mot comme 5042 peut se lire « LDA 42 » ou « MOV ACC, 42 » : c'est
     // le même mot, il n'y a pas de bonne réponse déductible. On montre la
@@ -839,28 +788,28 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
     // l'équivalence est ainsi visible à chaque cycle plutôt qu'à expliquer
     // une fois pour toutes.
     instruction.Load(register, a, m) ->
-      decoded_move(
-        raw,
+      text.DecodedMove(
+        word,
         register_name(register),
         memory_text(a, m),
         alias("LDA", register, a, m),
-        circuit_note("chargement depuis la mémoire"),
+        text.LoadFromMemory,
       )
     instruction.Store(register, a, m) ->
-      decoded_move(
-        raw,
+      text.DecodedMove(
+        word,
         memory_text(a, m),
         register_name(register),
         alias("STA", register, a, m),
-        circuit_note("stockage en mémoire"),
+        text.StoreToMemory,
       )
     instruction.Move(destination, source) ->
-      decoded_move(
-        raw,
+      text.DecodedMove(
+        word,
         register_name(destination),
         register_name(source),
         "",
-        circuit_note("un transfert entre registres"),
+        text.RegisterTransfer,
       )
 
     // `PSH` et `POP` portent maintenant un registre. Le mot machine, lui,
@@ -869,65 +818,52 @@ fn describe_decoded(instr: instruction.Instruction) -> String {
     // `MOV ACC, n` — et le raccourci disparaît au décodage, comme tous les
     // autres.
     instruction.Push(register) ->
-      raw
-      <> " → PSH "
-      <> register_name(register)
-      <> " ("
-      <> circuit_note("empilement d'un registre")
-      <> ")"
+      text.DecodedWithOperand(
+        word,
+        "PSH",
+        register_name(register),
+        text.PushRegister,
+      )
     instruction.Pop(register) ->
-      raw
-      <> " → POP "
-      <> register_name(register)
-      <> " ("
-      <> circuit_note("dépilement vers un registre")
-      <> ")"
+      text.DecodedWithOperand(
+        word,
+        "POP",
+        register_name(register),
+        text.PopRegister,
+      )
 
     // PLT ne calcule rien : il lit trois cases consécutives — x, y, couleur —
     // et les envoie à l'écran. Les trois adresses sont écrites en clair parce
     // que l'opérande unique du mot machine n'en désigne que la première.
-    instruction.Plot(a) ->
-      raw
-      <> " → PLT, mem["
-      <> int.to_string(a)
-      <> "] mem["
-      <> int.to_string(a + 1)
-      <> "] mem["
-      <> int.to_string(a + 2)
-      <> "] → x, y, couleur ("
-      <> circuit_note("l'envoi d'un point à l'écran")
-      <> ")"
+    instruction.Plot(a) -> text.DecodedPlot(word, a, text.SendPixel)
+
     instruction.Jsr(a) ->
-      decoded_with_address(
-        raw,
+      text.DecodedWithOperand(
+        word,
         "JSR",
-        a,
-        instruction.Direct,
-        circuit_note("un saut avec mémorisation de l'adresse de retour"),
+        memory_text(a, instruction.Direct),
+        text.JumpAndLink,
       )
     instruction.Bra(a) ->
-      decoded_with_address(
-        raw,
+      text.DecodedWithOperand(
+        word,
         "BRA",
-        a,
-        instruction.Direct,
-        circuit_note("un saut"),
+        memory_text(a, instruction.Direct),
+        text.Jump,
       )
     instruction.Brz(a) ->
-      decoded_with_address(
-        raw,
+      text.DecodedWithOperand(
+        word,
         "BRZ",
-        a,
-        instruction.Direct,
-        circuit_note("un saut conditionnel (si ACC = 0)"),
+        memory_text(a, instruction.Direct),
+        text.JumpIfZero,
       )
     instruction.Brp(a) ->
-      decoded_with_address(
-        raw,
+      text.DecodedWithOperand(
+        word,
         "BRP",
-        a,
-        instruction.Direct,
-        circuit_note("un saut conditionnel (si ACC ≥ 0)"),
+        memory_text(a, instruction.Direct),
+        text.JumpIfPositive,
       )
   }
 }
@@ -963,70 +899,5 @@ fn alias(
     instruction.Acc, instruction.Direct ->
       mnemonic <> " " <> int.to_string(address)
     _, _ -> ""
-  }
-}
-
-fn decoded_move(
-  raw: String,
-  destination: String,
-  source: String,
-  alias_text: String,
-  note: String,
-) -> String {
-  let shortcut = case alias_text {
-    "" -> ""
-    _ -> " (alias " <> alias_text <> ")"
-  }
-  raw
-  <> " → MOV "
-  <> destination
-  <> ", "
-  <> source
-  <> shortcut
-  <> " ("
-  <> note
-  <> ")"
-}
-
-fn circuit_note(purpose: String) -> String {
-  "configuration des circuits du processeur pour " <> purpose
-}
-
-fn decoded_with_address(
-  raw: String,
-  mnemonic: String,
-  address: Int,
-  mode: instruction.Addressing,
-  note: String,
-) -> String {
-  raw
-  <> " → "
-  <> mnemonic
-  <> ", "
-  <> memory_text(address, mode)
-  <> " ("
-  <> note
-  <> ")"
-}
-
-fn load_error_message(err: load.LoadError) -> String {
-  case err {
-    // « cases » et non « lignes » : ce que le chargeur compte, ce sont les
-    // mots posés en mémoire. Un seul `lst: DAT` de cent-et-une valeurs tient
-    // sur une ligne et déborde quand même. Le champ s'appelait `line_count`
-    // et disait déjà des cases ; renommé `cell_count` en v0.5.0, il compile
-    // pareil puisque le filtrage est positionnel.
-    //
-    // Cette branche est défensive : `check_length` (semantic/lints.gleam)
-    // applique la même règle, `ast.cell_count`, et signale le débordement
-    // avant que l'assemblage n'appelle le chargeur, si bien que c'est le
-    // message générique « voir les diagnostics » qui s'affiche. Elle existe
-    // parce que `load.load` rend un `Result` qu'il faut traiter, pas parce
-    // qu'on l'a vue.
-    load.ProgramTooLong(cell_count) ->
-      "programme trop long : "
-      <> int.to_string(cell_count)
-      <> " cases (maximum 100)"
-    load.UndefinedLabel(name) -> "label non défini : " <> name
   }
 }

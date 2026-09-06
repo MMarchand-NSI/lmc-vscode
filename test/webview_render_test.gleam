@@ -2,6 +2,7 @@ import gleam/option.{Some}
 import gleam/string
 import webview/model
 import webview/render
+import webview/text
 
 /// Assemble puis charge, comme les boutons Assembler puis Charger.
 fn loaded(source: String) -> model.Model {
@@ -124,4 +125,44 @@ pub fn a_lit_point_renders_with_its_colour_test() {
     |> model.step
     |> render.to_json
   assert string.contains(json, "\"screen\":[{\"x\":20,\"y\":25,\"c\":7}]")
+}
+
+// ── La langue ───────────────────────────────────────────────────────
+
+pub fn the_panel_speaks_french_by_default_test() {
+  // Le défaut n'est pas la langue de l'éditeur : un panneau muet est plus
+  // probablement une classe qu'un anglophone. C'est le même défaut que
+  // celui du serveur, et le réglage `lmc.locale` de l'extension le règle
+  // pour les deux à la fois.
+  let json = loaded("INP\nOUT\nHLT\n") |> model.step |> render.to_json
+  assert string.contains(json, "lire mem[0]")
+}
+
+pub fn asking_for_english_renders_english_test() {
+  let m =
+    loaded("INP\nOUT\nHLT\n")
+    |> model.set_locale(text.from_tag("en-GB"))
+    |> model.step
+  let json = render.to_json(m)
+  assert string.contains(json, "read mem[0]")
+  assert !string.contains(json, "lire mem[0]")
+}
+
+pub fn an_unknown_language_falls_back_rather_than_breaking_test() {
+  // « de-DE » n'est pas traduit : le panneau retombe sur le français plutôt
+  // que de rendre des trous. C'est la règle de `lmc_lsp`, réutilisée telle
+  // quelle plutôt que redécidée ici.
+  let m =
+    loaded("INP\nOUT\nHLT\n")
+    |> model.set_locale(text.from_tag("de-DE"))
+    |> model.step
+  assert string.contains(render.to_json(m), "lire mem[0]")
+}
+
+pub fn the_error_phase_is_the_only_translated_phase_name_test() {
+  // Fetch, Decode et Execute sont les termes du cours dans les deux
+  // langues ; seul « Erreur » est un mot.
+  assert text.phase_label(text.Fetch, text.from_tag("en")) == "Fetch"
+  assert text.phase_label(text.Failure, text.from_tag("fr")) == "Erreur"
+  assert text.phase_label(text.Failure, text.from_tag("en")) == "Error"
 }

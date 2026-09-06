@@ -5,7 +5,7 @@
     <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src {{cspSource}}; script-src 'nonce-{{nonce}}';" />
     <link rel="stylesheet" href="{{styleUri}}" />
-    <title>LMC — Émulateur</title>
+    <title data-ui="pageTitle"></title>
   </head>
   <body>
     <div id="error" class="error-banner"></div>
@@ -21,31 +21,24 @@
          la même chose à deux endroits n'ajoutait rien. -->
     <div class="toolbar">
       <div class="controls">
-        <button id="step" type="button">Step</button>
-        <button id="run" type="button">Run</button>
-        <button id="reset" type="button">Reset</button>
+        <button id="step" type="button" data-ui="btnStep"></button>
+        <button id="run" type="button" data-ui="btnRun"></button>
+        <button id="reset" type="button" data-ui="btnReset"></button>
       </div>
 
       <span class="tip-anchor">
-        <button id="assemble" type="button" class="secondary">Assembler .lmc</button>
-        <span class="tip" role="tooltip"><strong>Produire le fichier objet</strong> — écrit
-          <code>.lmcobj</code> à côté du source : un mot de quatre chiffres par ligne, sans
-          mnémonique ni label, parce que c'est tout ce que le processeur reçoit. Assembler
-          <code>LDA 42</code> et <code>MOV ACC, 42</code> donne deux fois la même ligne. N'exécute
-          rien et ne charge rien.</span>
+        <button id="assemble" type="button" class="secondary" data-ui="btnAssemble"></button>
+        <span class="tip" role="tooltip"><strong data-ui="tipAssembleTitle"></strong> — <span data-ui="tipAssembleBody"></span></span>
       </span>
 
       <span class="tip-anchor">
-        <button id="load" type="button" class="secondary">Charger .lmcobj en RAM</button>
-        <span class="tip" role="tooltip"><strong>Charger en RAM</strong> — relit
-          <code>.lmcobj</code> sur le disque et le dépose en mémoire. C'est bien le fichier qui est
-          chargé : sans lui rien ne s'exécute, et si tu modifies le source sans réassembler, tu
-          charges l'ancien programme. Une vraie chaîne d'outils fait exactement ça.</span>
+        <button id="load" type="button" class="secondary" data-ui="btnLoad"></button>
+        <span class="tip" role="tooltip"><strong data-ui="tipLoadTitle"></strong> — <span data-ui="tipLoadBody"></span></span>
       </span>
 
       <div class="register">
-        <span class="label" tabindex="0">État</span>
-        <span class="tip" role="tooltip"><strong>État du processeur</strong> — vide (rien n'est chargé en RAM : assemblez, puis chargez), running (prêt à exécuter), waiting_input (arrêté sur un INP, en attente d'une valeur), halted (arrêté par HLT), error.</span>
+        <span class="label" tabindex="0" data-ui="statusLabel"></span>
+        <span class="tip" role="tooltip"><strong data-ui="tipStatusTitle"></strong> — <span data-ui="tipStatusBody"></span></span>
         <span id="status" class="status">—</span>
       </div>
     </div>
@@ -58,15 +51,15 @@
            la grille mémoire est ce qui a besoin de largeur, pas eux. -->
       <div class="column">
         <section class="unit cpu">
-          <h2>Processeur</h2>
+          <h2 data-ui="headingProcessor"></h2>
           <div class="register">
             <span class="label" tabindex="0">ACC</span>
-            <span class="tip" role="tooltip"><strong>Accumulator</strong> — l'accumulateur. Toute l'arithmétique et toutes les entrées-sorties passent par lui : ADD, SUB, INP et OUT ne travaillent que sur ACC.</span>
+            <span class="tip" role="tooltip"><strong data-ui="tipAccTitle"></strong> — <span data-ui="tipAccBody"></span></span>
             <span id="acc" class="value">—</span>
           </div>
           <div class="register">
             <span class="label" tabindex="0">PC</span>
-            <span class="tip" role="tooltip"><strong>Program Counter</strong> — le compteur ordinal : l'adresse de la prochaine instruction à lire. Écrire dedans, c'est sauter, et c'est tout ce que font BRA, BRZ, BRP et RET. Il est incrémenté dès la phase Fetch, comme sur un vrai processeur — à l'arrêt, il pointe donc déjà après la dernière instruction exécutée.</span>
+            <span class="tip" role="tooltip"><strong data-ui="tipPcTitle"></strong> — <span data-ui="tipPcBody"></span></span>
             <span id="pc" class="value">—</span>
           </div>
           <!-- SI, LR et SP n'apparaissent qu'avec les tableaux, les
@@ -75,34 +68,34 @@
                encombrées par des registres dont on ne parle pas encore. -->
           <div class="register secondary">
             <span class="label" tabindex="0">SI</span>
-            <span class="tip" role="tooltip"><strong>Source Index</strong> — le registre d'index, nommé comme le SI du x86, où il joue le même rôle. Le suffixe [SI] ajoute son contenu à l'adresse écrite — lst[SI] désigne la case lst + SI, ce qui permet de parcourir un tableau ou une chaîne avec une seule instruction, quel que soit le rang lu.</span>
+            <span class="tip" role="tooltip"><strong data-ui="tipSiTitle"></strong> — <span data-ui="tipSiBody"></span></span>
             <span id="x" class="value">—</span>
           </div>
           <div class="register secondary">
             <span class="label" tabindex="0">LR</span>
-            <span class="tip" role="tooltip"><strong>Link Register</strong> — l'adresse de retour, sous son nom ARM. JSR y écrit l'adresse de l'instruction qui suit l'appel, RET y revient. LR n'en contient qu'une seule : un appel imbriqué l'écrase, et c'est ce qui rend la pile nécessaire.</span>
+            <span class="tip" role="tooltip"><strong data-ui="tipLrTitle"></strong> — <span data-ui="tipLrBody"></span></span>
             <span id="lr" class="value">—</span>
           </div>
           <div class="register secondary">
             <span class="label" tabindex="0">SP</span>
-            <span class="tip" role="tooltip"><strong>Stack Pointer</strong> — le pointeur de pile : il désigne la prochaine case libre. La pile descend depuis la case 99 ; PSH y range un registre, POP l'en retire. Écrits sans registre, ils travaillent sur ACC.</span>
+            <span class="tip" role="tooltip"><strong data-ui="tipSpTitle"></strong> — <span data-ui="tipSpBody"></span></span>
             <span id="sp" class="value">—</span>
           </div>
 
         </section>
 
         <section class="unit io">
-          <h2>Entrées / Sorties</h2>
+          <h2 data-ui="headingIo"></h2>
           <div class="io-part">
-            <h3>Entrée (INP)</h3>
+            <h3 data-ui="headingInput"></h3>
             <form id="input-form">
-              <label for="input-value">Valeur</label>
+              <label for="input-value" data-ui="inputValueLabel"></label>
               <input id="input-value" type="number" inputmode="numeric" autofocus />
-              <button type="submit">OK</button>
+              <button type="submit" data-ui="btnOk"></button>
             </form>
           </div>
           <div class="io-part output-tray">
-            <h3>Sortie (OUT)</h3>
+            <h3 data-ui="headingOutput"></h3>
             <ul id="output"></ul>
           </div>
           <!-- L'écran est une sortie, au même titre qu'OUT, et il est dans le
@@ -111,9 +104,9 @@
                agrandis par le CSS — un point du programme est donc un pixel
                du canvas, sans arithmétique nulle part. -->
           <div class="io-part screen-part">
-            <h3 tabindex="0">Écran (PLT)</h3>
-            <span class="tip" role="tooltip"><strong>PLT adr</strong> — allumer un point. L'instruction lit trois cases consécutives à partir de adr : x, y, puis la couleur, un index de palette. Le processeur ne connaît ni la taille de l'écran ni les couleurs : il dit « allume ce point », l'affichage décide du reste. Ici, 32 × 32 points et huit couleurs.</span>
-            <canvas id="screen" width="32" height="32" role="img" aria-label="Écran, 32 sur 32 points"></canvas>
+            <h3 tabindex="0" data-ui="headingScreen"></h3>
+            <span class="tip" role="tooltip"><strong data-ui="tipScreenTitle"></strong> — <span data-ui="tipScreenBody"></span></span>
+            <canvas id="screen" width="32" height="32" role="img" data-ui-aria="screenAria"></canvas>
             <!-- Les pastilles sont construites par app_ffi.mjs à partir de sa
                  propre palette : une seule liste de couleurs, sinon la
                  légende finit par mentir sur ce qui est peint. -->
@@ -123,31 +116,24 @@
       </div>
 
       <section class="unit memory-wrap">
-        <h2>Mémoire</h2>
-        <p class="unit-note">
-          Une seule mémoire pour le programme et pour les données : c'est le
-          principe de von Neumann, et c'est ce que montrent les marquages
-          ci-dessous.
-        </p>
+        <h2 data-ui="headingMemory"></h2>
+        <p class="unit-note" data-ui="memoryNote"></p>
         <div id="memory" class="memory-grid"></div>
         <!-- Les pastilles portent les mêmes classes que les cases de la
              grille, et style.css applique les mêmes règles aux deux : la
              légende ne peut pas dériver de ce qu'elle décrit. -->
         <ul class="legend">
-          <li><span class="swatch"></span>Programme</li>
-          <li><span class="swatch data"></span>Données (DAT)</li>
-          <li><span class="swatch stack"></span>Pile</li>
-          <li><span class="swatch unused"></span>Libre</li>
+          <li><span class="swatch"></span><span data-ui="legendProgram"></span></li>
+          <li><span class="swatch data"></span><span data-ui="legendData"></span></li>
+          <li><span class="swatch stack"></span><span data-ui="legendStack"></span></li>
+          <li><span class="swatch unused"></span><span data-ui="legendFree"></span></li>
         </ul>
       </section>
     </div>
 
     <details class="cycle-details">
-      <summary>Fetch → Decode → Execute</summary>
-      <p class="cycle-hint">
-        Chaque instruction, quel que soit son mnémonique, passe par les mêmes trois phases.
-        Voici ce qui s'est passé au dernier step :
-      </p>
+      <summary data-ui="cycleSummary"></summary>
+      <p class="cycle-hint" data-ui="cycleHint"></p>
       <ol id="cycle-events"></ol>
     </details>
 

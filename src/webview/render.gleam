@@ -1,9 +1,12 @@
 import gleam/json.{type Json}
+import gleam/list
 import gleam/option.{None, Some}
 import lmc/runner/inspect
 import lmc/runner/memory
 import lmc/runner/state
+import lmc/text/message
 import webview/model.{type Model}
+import webview/text
 
 // Builds the single JSON payload app_ffi.mjs's render() consumes to update
 // the DOM. Kept as its own pure module (like model.gleam) so the view-model
@@ -39,11 +42,21 @@ pub fn to_json(mdl: Model) -> String {
     // provenance du texte, pas une frontière que la machine connaîtrait.
     #("dataAddresses", json.array(model.data_addresses(mdl), json.int)),
     #("cycle", json_cycle(mdl)),
+    // Le texte fixe du panneau, dans la langue demandée. `index.html` ne
+    // porte plus que des `data-ui` vides : une seule source pour les deux
+    // langues, et le compilateur exige la traduction de chacune.
+    #("ui", json_ui(mdl)),
+    #("locale", json.string(locale_tag(mdl.locale))),
     // Un seul bandeau pour deux échecs possibles. L'erreur de chargement
     // passe devant : c'est celle qui répond à « pourquoi Run ne fait rien ».
     #(
       "loadError",
-      json_option_string(option.or(mdl.ram_error, mdl.assembly_error)),
+      json_option_string(
+        option.map(option.or(mdl.ram_error, mdl.assembly_error), text.render(
+          _,
+          mdl.locale,
+        )),
+      ),
     ),
     // Y a-t-il de quoi produire un fichier objet ? Le bouton Assembler s'en
     // sert pour se désactiver quand le source ne s'assemble pas.
@@ -63,11 +76,32 @@ fn json_screen(mdl: Model) -> Json {
   })
 }
 
+/// L'étiquette BCP 47 de la langue rendue, pour l'attribut `lang` du
+/// document : la césure et les lecteurs d'écran s'en servent.
+fn locale_tag(locale: text.Locale) -> String {
+  case locale {
+    message.French -> "fr"
+    message.English -> "en"
+  }
+}
+
+fn json_ui(mdl: Model) -> Json {
+  json.object(
+    text.labels(mdl.locale)
+    |> list.map(fn(pair) { #(pair.0, json.string(pair.1)) }),
+  )
+}
+
 fn json_cycle(mdl: Model) -> Json {
   json.array(model.last_cycle(mdl), fn(phase) {
     json.object([
-      #("phase", json.string(phase.name)),
-      #("details", json.array(phase.details, json.string)),
+      #("phase", json.string(text.phase_label(phase.phase, mdl.locale))),
+      #(
+        "details",
+        json.array(phase.details, fn(detail) {
+          json.string(text.render(detail, mdl.locale))
+        }),
+      ),
     ])
   })
 }
