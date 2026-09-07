@@ -678,11 +678,31 @@ fn build_address_to_line(result: pipeline.ParseResult) -> Dict(Int, Int) {
   |> dict.from_list
 }
 
+/// L'inversion de `address_to_line`, et elle ne peut pas être un simple
+/// `dict.from_list` : **une ligne occupe parfois plusieurs cases**.
+/// `load.address_offsets` rend une entrée *par case*, toutes vers le même
+/// offset de ligne — son propre commentaire le dit : « les trois cases de
+/// `lst: DAT 12, 4, 86` renvoient toutes vers la même ligne source ». Les
+/// quatre paires de `lst: DAT 12, 5, 89, 4` ont donc la même clé une fois
+/// retournées, et `dict.from_list` n'en garde qu'une, celle qu'il insère en
+/// dernier. Le curseur posé sur cette ligne encadrait alors la case du
+/// dernier `4` au lieu de celle du `12`.
+///
+/// On garde **la plus petite** adresse : cliquer une ligne montre la case où
+/// la donnée commence, qui est aussi celle que l'étiquette désigne — `lst`
+/// vaut l'adresse du `12`, et un panneau qui montrerait autre chose
+/// contredirait le programme. Un pli plutôt qu'un tri, parce que l'ordre de
+/// `dict.to_list` n'est pas spécifié : rien ne doit dépendre de lui.
 fn invert(d: Dict(Int, Int)) -> Dict(Int, Int) {
   d
   |> dict.to_list
-  |> list.map(fn(pair) { #(pair.1, pair.0) })
-  |> dict.from_list
+  |> list.fold(dict.new(), fn(acc, pair) {
+    let #(address, line) = pair
+    case dict.get(acc, line) {
+      Ok(first) if first <= address -> acc
+      _ -> dict.insert(acc, line, address)
+    }
+  })
 }
 
 /// Same addressing as build_address_to_line (same load.address_offsets

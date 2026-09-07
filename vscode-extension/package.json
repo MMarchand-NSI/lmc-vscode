@@ -2,7 +2,7 @@
   "name": "lmc-vscode",
   "displayName": "LMC — teaching assembly language",
   "description": "The LMC assembly language: diagnostics, completion, formatting and a step-through emulator. A teaching tool, in French, English, Spanish, Japanese or Korean.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "mmarchand",
   "repository": {
     "type": "git",

@@ -239,6 +239,29 @@ pub fn line_for_address_and_cursor_address_are_inverse_test() {
   assert model.cursor_address(m2) == Some(1)
 }
 
+pub fn a_multi_cell_dat_line_points_at_its_first_cell_test() {
+  // `lst: DAT 12, 5, 89, 4` occupe quatre cases et une seule ligne source.
+  // Le curseur posé dessus doit encadrer la case du **12**, celle où la
+  // donnée commence et celle que l'étiquette `lst` désigne — montrer la
+  // dernière contredirait le programme.
+  //
+  // Ce n'était pas le cas : `address_offsets` rend une entrée par case,
+  // toutes vers la même ligne, et l'inversion par `dict.from_list` n'en
+  // gardait qu'une, la dernière insérée. Signalé depuis l'extension
+  // installée, le 2026-09-07.
+  let m =
+    loaded("LDA lst\nHLT\nlst: DAT 12, 5, 89, 4\n")
+    |> model.set_cursor_line(Some(2))
+  assert model.cursor_address(m) == Some(2)
+
+  // Et le chemin inverse, inchangé : les quatre cases renvoient toutes vers
+  // la ligne du DAT, c'est bien une ligne qui en occupe quatre.
+  assert model.line_for_address(m, 2) == Some(2)
+  assert model.line_for_address(m, 3) == Some(2)
+  assert model.line_for_address(m, 4) == Some(2)
+  assert model.line_for_address(m, 5) == Some(2)
+}
+
 pub fn cursor_line_on_blank_line_has_no_address_test() {
   let m =
     model.init("INP\n\nOUT\nHLT\n")

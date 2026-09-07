@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- **Fix: putting the cursor on a `DAT` line holding several values outlined the wrong cell.**
+  `lst: DAT 12, 5, 89, 4` is one line and four cells; the panel now outlines the first of them,
+  the one `lst` names, instead of an arbitrary later one.
+
 ## 0.1.2
 
 - **Requires VS Code 1.105.0 or later** (it declared 1.80.0). Older versions will no longer offer
