@@ -2,14 +2,14 @@
   "name": "lmc-vscode",
   "displayName": "LMC — teaching assembly language",
   "description": "The LMC assembly language: diagnostics, completion, formatting and a step-through emulator. A teaching tool, in French, English, Spanish, Japanese or Korean.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "mmarchand",
   "repository": {
     "type": "git",
     "url": "https://github.com/MMarchand-NSI/lmc-vscode.git"
   },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Programming Languages",
@@ -91,7 +91,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "@types/vscode": "1.80.0",
+    "@types/vscode": "1.105.0",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.25.0",
     "jsdom": "^24.1.3",

@@ -847,9 +847,12 @@ checking (the author checks by hand constantly), item 9 is deferred by choice, a
    **self-contained** archive. Two things had to change first, and neither was cosmetic.
    `lsp-server.mjs` and `vendor/` moved from the repo root **into `vscode-extension/`**, because
    `vsce` archives that directory and nothing above it: the old layout worked under `F5` and would
-   have shipped a `.vsix` with no language server in it at all. And `@types/vscode` is now pinned
-   *exactly* to `1.80.0` — `vsce` refuses to package when the types are newer than
-   `engines.vscode`, and `^1.80.0` resolves to the latest minor, so the caret was the bug.
+   have shipped a `.vsix` with no language server in it at all. And `@types/vscode` is pinned
+   **exactly**, with no caret — `vsce` refuses to package when the types are newer than
+   `engines.vscode`, and a caret resolves to the latest minor, which is what the bug was. The two
+   move together: `engines.vscode` is `^1.105.0` and `@types/vscode` is `1.105.0` since
+   2026-09-07 (it was `1.80.0` on both). Raising the engine is not free — the Marketplace stops
+   offering the extension to anyone on an older VS Code — so it is a decision, not housekeeping.
    Verified by running, not by reading the file list: the archive was unzipped and its
    `extension/lsp-server.mjs` driven over stdio, `initialize` answered, diagnostics and hover came
    back. `.vscodeignore` keeps the TypeScript sources out; `node_modules` is deliberately *not*
