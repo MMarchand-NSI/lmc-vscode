@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - **`.lmc` and `.lmcobj` files have their own icons** in the explorer and in tabs: three lines of
   code for the source, a grid of memory cells for the object file. They show with the default icon
