@@ -80,6 +80,8 @@ pub fn render(text: Text) -> String {
       <> "] ← ACC ("
       <> int.to_string(value)
       <> ")"
+    message.RegisterRead(register, value) ->
+      "lire " <> register <> " → " <> int.to_string(value)
     message.RegisterChanged(register, from, to) ->
       register <> " " <> int.to_string(from) <> " → " <> int.to_string(to)
     message.LinkChanged(from, to) ->

@@ -63,8 +63,8 @@ check("son défaut est une langue offerte", setting.enum.includes(setting.defaul
 const client = readFileSync(clientPath, "utf8");
 check("client.ts traite « auto » à part", client.includes('choice === "auto"'), true);
 
-// Les trois phrases que l'hôte prononce lui-même (titre de l'onglet,
-// notification, avertissement) ne passent pas par le catalogue Gleam : elles
+// Les deux phrases que l'hôte prononce lui-même (notification,
+// avertissement) ne passent pas par le catalogue Gleam : elles
 // sont dans une table de `webviewPanel.ts`. Elle a déjà été oubliée une fois
 // — l'espagnol est arrivé, la table est restée à deux langues, et un réglage
 // `es` donnait un panneau espagnol avec un titre d'onglet français.

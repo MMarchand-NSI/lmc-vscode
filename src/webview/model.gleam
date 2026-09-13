@@ -579,8 +579,30 @@ fn data_addresses_of_source(model: Model) -> List(Int) {
 pub fn last_cycle(model: Model) -> List(CyclePhase) {
   model.last_events
   |> dedupe_input_accumulator_change
-  |> list.flat_map(event_phase_details)
+  |> events_phase_details
   |> group_consecutive_by_phase
+}
+
+/// La lecture de `PC` qui ouvre chaque Fetch (`lmc_lsp` v0.8.5) arrive comme
+/// n'importe quel `RegisterRead`, que `event_phase_and_detail` range en
+/// Execute. Seule, elle s'afficherait donc comme un Execute *avant* le Fetch,
+/// et casserait les trois phases. Elle est reconnue ici à sa place, juste
+/// avant `Fetched`, et rattachée au Fetch : c'est la première ligne de la
+/// phase, celle qui dit d'où vient l'adresse de la case lue.
+fn events_phase_details(events: List(Event)) -> List(#(message.Phase, Text)) {
+  case events {
+    [
+      event.RegisterRead(instruction.Pc, pc),
+      event.Fetched(..) as fetched,
+      ..rest
+    ] -> [
+      #(message.Fetch, message.RegisterRead(register_name(instruction.Pc), pc)),
+      ..list.append(event_phase_details(fetched), events_phase_details(rest))
+    ]
+    [evt, ..rest] ->
+      list.append(event_phase_details(evt), events_phase_details(rest))
+    [] -> []
+  }
 }
 
 /// Un événement donne une ligne, sauf `Fetched` qui en donne deux : lire le
@@ -638,18 +660,16 @@ pub type Access {
 /// **rapportées** — et rien de plus.
 ///
 /// `Fetched` est une lecture : toute instruction commence par lire sa propre
-/// case, et c'est la lecture la plus instructive à voir clignoter, puisqu'elle
-/// a lieu à chaque pas sans exception.
+/// case, et c'est la lecture la plus instructive à voir, puisqu'elle a lieu
+/// à chaque pas sans exception. `MemoryRead` est la lecture de l'opérande —
+/// la case que `LDA n` va chercher — et elle est *rapportée* depuis
+/// `lmc_lsp` v0.8.3, pas reconstruite ici : l'adresse effective d'un accès
+/// indexé n'est connue que du runner, et la recalculer serait la duplication
+/// qui a déjà produit le bug v0.1.5. L'événement a été demandé en amont
+/// plutôt que contourné ici ; c'est le motif de tout ce dépôt.
 ///
-/// **Les lectures d'opérande manquent, et c'est délibéré.** `LDA n` lit
-/// `mem[n]`, mais le runner n'émet aucun événement pour cette lecture (voir
-/// `runner/event.gleam` dans `lmc_lsp` : il y a `MemoryWritten`, pas de
-/// `MemoryRead`). Les reconstruire ici demanderait de recopier sa logique
-/// d'adressage, indexation comprise, et de deviner la valeur de `SI` au bon
-/// instant — exactement le genre de duplication qui a déjà menti dans ce
-/// dépôt (l'adresse déduite du numéro de ligne, bug v0.1.5 de `lmc_lsp`). La
-/// bonne correction est un événement de plus côté runner ; voir la liste
-/// ouverte de CLAUDE.md.
+/// Voir `register_writes` pour l'autre moitié de ce que fait un pas, celle
+/// qui touche le processeur et non la mémoire.
 pub fn memory_accesses(model: Model) -> List(#(Int, Access)) {
   model.last_events
   |> list.filter_map(fn(evt) {
@@ -660,6 +680,79 @@ pub fn memory_accesses(model: Model) -> List(#(Int, Access)) {
       _ -> Error(Nil)
     }
   })
+}
+
+/// Ce que le dernier pas a fait à chaque registre : les mêmes deux couleurs
+/// que la mémoire, et pour la même raison — lire ne change rien, écrire
+/// change la machine.
+///
+/// **Un registre au plus une fois, l'écriture l'emportant sur la lecture.**
+/// C'est la différence de forme avec `memory_accesses`, qui rend une entrée
+/// par accès : `ADD n` lit l'accumulateur puis l'écrit, et la case de
+/// registre n'a qu'une couleur à porter. Elle va au geste qui modifie, comme
+/// la couleur chaude elle-même. Une règle plutôt que « le dernier événement
+/// gagne », pour que la couleur ne dépende pas de l'ordre d'émission du
+/// runner.
+///
+/// Les lectures sont **rapportées** depuis `lmc_lsp` v0.8.4
+/// (`event.RegisterRead`), pas déduites de l'instruction décodée : savoir
+/// que `ADD` lit l'accumulateur, que `PSH` lit le pointeur de pile, ou que
+/// `lst[SI]` lit le registre d'index, c'est la sémantique de la machine, et
+/// la recopier ici serait la duplication qui a produit le bug v0.1.5. Même
+/// chemin que `MemoryRead` en v0.8.3 : demandé en amont, pas contourné ici.
+///
+/// `PC` est donc toujours rose : la phase Fetch l'incrémente à chaque pas
+/// (voir `event_phase_details`, qui en tire déjà sa deuxième ligne), et une
+/// écriture l'emporte. Sa lecture par `JSR` se lit dans le panneau du cycle,
+/// pas dans la couleur.
+pub fn register_accesses(
+  model: Model,
+) -> List(#(instruction.Register, Access)) {
+  [
+    instruction.Acc,
+    instruction.Pc,
+    instruction.Si,
+    instruction.Lr,
+    instruction.Sp,
+  ]
+  |> list.filter_map(fn(register) {
+    case
+      list.any(model.last_events, event_writes_register(_, register)),
+      list.any(model.last_events, event_reads_register(_, register))
+    {
+      True, _ -> Ok(#(register, Written))
+      False, True -> Ok(#(register, Read))
+      False, False -> Error(Nil)
+    }
+  })
+}
+
+fn event_reads_register(evt: Event, register: instruction.Register) -> Bool {
+  case evt {
+    event.RegisterRead(read, _) -> read == register
+    _ -> False
+  }
+}
+
+fn event_writes_register(evt: Event, register: instruction.Register) -> Bool {
+  case evt, register {
+    event.AccumulatorChanged(..), instruction.Acc -> True
+    // `INP` écrit l'accumulateur comme le reste, et il le dit deux fois :
+    // `InputConsumed(v)` puis `AccumulatorChanged(_, v)`. Le second est
+    // retiré pour le panneau du cycle (voir
+    // `dedupe_input_accumulator_change`) et pas d'ici, mais s'appuyer sur
+    // cet ordre serait fragile — le premier suffit à dire qu'ACC a changé.
+    event.InputConsumed(..), instruction.Acc -> True
+    // La lecture incrémente le compteur ordinal. Le runner n'émet pas
+    // d'événement pour cet incrément, mais `Fetched` l'implique, et c'est
+    // déjà de lui qu'`event_phase_details` tire la ligne « PC 0 → 1 ».
+    event.Fetched(..), instruction.Pc -> True
+    event.Jumped(..), instruction.Pc -> True
+    event.IndexChanged(..), instruction.Si -> True
+    event.LinkChanged(..), instruction.Lr -> True
+    event.StackPointerChanged(..), instruction.Sp -> True
+    _, _ -> False
+  }
 }
 
 pub type CyclePhase {
@@ -748,7 +841,7 @@ fn event_phase_and_detail(evt: Event) -> #(message.Phase, Text) {
     )
     // Depuis lmc_lsp v0.8.3, la lecture d'un opérande est rapportée elle
     // aussi. Elle se dit exactement comme celle du Fetch — même fait, autre
-    // phase — et c'est ce qui fait pulser la case de la donnée.
+    // phase — et c'est ce qui allume la case de la donnée.
     event.MemoryRead(address, v) -> #(
       message.Execute,
       message.CellRead(address, v),
@@ -756,6 +849,14 @@ fn event_phase_and_detail(evt: Event) -> #(message.Phase, Text) {
     event.MemoryWritten(address, v) -> #(
       message.Execute,
       message.MemoryWritten(address, v),
+    )
+    // Depuis lmc_lsp v0.8.4, la lecture d'un registre est rapportée comme
+    // celle d'une case. C'est elle qui nomme l'opérande implicite : sur
+    // `ADD b`, la ligne « lire ACC → 5 » précède « ACC 5 → 12 », et le 5
+    // cesse de sortir de nulle part.
+    event.RegisterRead(register, v) -> #(
+      message.Execute,
+      message.RegisterRead(register_name(register), v),
     )
     event.AccumulatorChanged(old, new) -> #(
       message.Execute,

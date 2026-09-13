@@ -27,7 +27,24 @@
         "extensions": [
           ".lmc"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/lmc-light.png",
+          "dark": "./icons/lmc-dark.png"
+        }
+      },
+      {
+        "id": "lmcobj",
+        "aliases": [
+          "LMC object file"
+        ],
+        "extensions": [
+          ".lmcobj"
+        ],
+        "icon": {
+          "light": "./icons/lmcobj-light.png",
+          "dark": "./icons/lmcobj-dark.png"
+        }
       }
     ],
     "grammars": [

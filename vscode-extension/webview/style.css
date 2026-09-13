@@ -3,12 +3,42 @@
 
 :root {
   color-scheme: light dark;
+
+  /* Les deux couleurs du dernier pas : **teal pour une lecture, rose pour
+     une écriture**. Écrites ici une seule fois parce qu'elles servent à deux
+     endroits — les cases de la grille et les registres du processeur — et
+     que deux copies finiraient par diverger, laissant la mémoire et les
+     registres enseigner deux codes de couleur différents.
+
+     Aucune des deux n'appartient à un thème VS Code : elles sont en clair,
+     avec une transparence qui les laisse fonctionner sur fond clair comme
+     sur fond sombre. Le fond est discret, le liseré franc : c'est lui qui
+     porte la distinction, et il laisse le nombre lisible dans les deux
+     thèmes au lieu de le noyer sous un aplat saturé.
+
+     scripts/build-icon.py reprend ces deux teintes en RVB pleines (l'icone
+     du Marketplace est la grille mémoire avec une case lue et une case
+     écrite) : si elles changent ici, elles changent là-bas. */
+  --lmc-read: rgba(0, 176, 176, 0.28);
+  --lmc-read-edge: rgba(0, 176, 176, 0.95);
+  --lmc-write: rgba(255, 92, 168, 0.28);
+  --lmc-write-edge: rgba(255, 92, 168, 0.95);
 }
 
-/* La page occupe au moins la hauteur de la fenêtre, pour que le panneau du
-   cycle puisse s'étirer jusqu'en bas ; `min-height` et non `height`, afin
-   qu'une fenêtre trop courte fasse défiler la page entière plutôt que de
-   comprimer quoi que ce soit. */
+/* La page fait **exactement** la hauteur de la fenêtre, et c'est ce qui
+   permet au panneau du cycle de défiler en lui-même.
+
+   C'était `min-height: 100vh`, au motif qu'une fenêtre trop courte devait
+   faire défiler la page plutôt que de comprimer quoi que ce soit. Mais un
+   minimum ne borne rien : le `body` grandissait avec son contenu, le panneau
+   du cycle n'avait donc jamais de hauteur maximale, et son `overflow-y: auto`
+   ne se déclenchait jamais. Après un Run, qui affiche la trace entière, le
+   panneau débordait de la fenêtre au lieu de défiler.
+
+   L'intention d'origine tient toujours, par `overflow-y: auto` ici : le
+   panneau descend jusqu'à son `min-height`, et si la fenêtre est trop courte
+   même pour ça, c'est la page qui défile — une seule barre, jamais deux
+   imbriquées. */
 body {
   font-family: var(--vscode-font-family, sans-serif);
   color: var(--vscode-foreground);
@@ -16,7 +46,8 @@ body {
   margin: 0;
   padding: 12px;
   box-sizing: border-box;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -265,6 +296,37 @@ button.secondary:hover:not(:disabled) {
 .register .value {
   font-size: 1.4em;
   font-weight: 600;
+  /* Le rectangle allumé quand le registre vient de changer (voir plus bas)
+     a besoin d'air autour du nombre, et il ne doit pas faire sauter la
+     ligne quand il apparaît : le calage est permanent, la couleur non. */
+  padding: 0 5px;
+  margin-right: -5px;
+  border-radius: 3px;
+}
+
+/* Le registre que le dernier pas a écrit garde la couleur de l'écriture,
+   la même que les cases de la grille et pour la même durée — jusqu'au pas
+   suivant. Un pas, c'est deux choses à voir : ce qu'il a fait à la mémoire
+   et ce qu'il a fait au processeur. La grille le montrait déjà ; ici,
+   « ACC 0 → 7 » ne se lisait que dans le panneau du cycle, et il fallait
+   savoir où regarder.
+
+   Le teal a manqué un moment, et la correction est passée par où il fallait :
+   le runner ne rapportait aucune lecture de registre, donc `ADD n` ne pouvait
+   pas allumer l'accumulateur qu'il lit pourtant. Plutôt que de redécoder
+   l'instruction ici — recopier la sémantique de la machine dans l'affichage —
+   l'événement a été demandé en amont, `lmc_lsp` v0.8.4, comme `MemoryRead`
+   l'avait été en v0.8.3.
+
+   Un registre lu *et* écrit dans le même pas est rose : c'est le modèle qui
+   tranche, voir model.register_accesses. */
+.register .value.read {
+  background-color: var(--lmc-read);
+  box-shadow: inset 0 0 0 2px var(--lmc-read-edge);
+}
+.register .value.written {
+  background-color: var(--lmc-write);
+  box-shadow: inset 0 0 0 2px var(--lmc-write-edge);
 }
 
 .status {
@@ -384,53 +446,33 @@ button:disabled {
   background: var(--vscode-editor-findMatchHighlightBackground, #515c6a);
   border-color: var(--vscode-focusBorder);
 }
-/* La case que le dernier pas a touchée pulse : **teal pour une lecture, rose
-   pour une écriture**. Deux couleurs et non une, parce que c'est la
-   distinction que la grille doit enseigner — lire ne change rien, écrire
-   change la machine — et la couleur chaude va au geste qui modifie.
-   Aucune des deux n'appartient à un thème VS Code : elles sont écrites en
-   clair, avec une transparence qui les laisse fonctionner sur fond clair
-   comme sur fond sombre. Elles ne remplacent aucun marquage : elles passent
-   par-dessus le temps d'une animation, puis la case redevient ce qu'elle
-   était. */
-@keyframes mailbox-read {
-  from {
-    background-color: rgba(0, 176, 176, 0.85);
-    box-shadow: 0 0 0 2px rgba(0, 176, 176, 0.55);
-  }
-  to {
-    background-color: transparent;
-    box-shadow: 0 0 0 2px rgba(0, 176, 176, 0);
-  }
-}
-@keyframes mailbox-written {
-  from {
-    background-color: rgba(255, 92, 168, 0.85);
-    box-shadow: 0 0 0 2px rgba(255, 92, 168, 0.55);
-  }
-  to {
-    background-color: transparent;
-    box-shadow: 0 0 0 2px rgba(255, 92, 168, 0);
-  }
-}
+/* La case que le dernier pas a touchée reste allumée : **teal pour une
+   lecture, rose pour une écriture**. Deux couleurs et non une, parce que
+   c'est la distinction que la grille doit enseigner — lire ne change rien,
+   écrire change la machine — et la couleur chaude va au geste qui modifie.
+
+   **Elle ne clignote pas, et c'est le point.** C'était une animation de
+   600 ms : le temps de lever les yeux du code vers la grille, elle était
+   finie, et il fallait refaire un pas pour revoir ce qu'on venait de
+   manquer. La couleur tient donc jusqu'au pas suivant — le rendu repose ces
+   classes à chaque image d'après `state.accesses`, qui ne change qu'avec
+   `last_events`, donc l'expiration est exactement l'exécution de
+   l'instruction d'après. Rien n'a plus besoin de relancer une animation par
+   un reflow, et `prefers-reduced-motion` n'a plus rien à désactiver : il n'y
+   a plus de mouvement du tout.
+
+   Fond discret et liseré *intérieur* : le liseré ne peut pas déborder sur
+   les cases voisines (3 px de gouttière), et surtout il ne touche pas à
+   `border-color`, qui porte déjà le marquage de la pile et des DAT. Ces
+   deux marquages disent d'où vient la case, celui-ci dit ce que le dernier
+   pas en a fait : ils doivent pouvoir se lire ensemble. */
 .mailbox.read {
-  animation: mailbox-read 600ms ease-out;
+  background-color: var(--lmc-read);
+  box-shadow: inset 0 0 0 2px var(--lmc-read-edge);
 }
 .mailbox.written {
-  animation: mailbox-written 600ms ease-out;
-}
-/* Une animation ne doit pas s'imposer à qui a demandé qu'on lui en épargne :
-   la case s'allume alors sans clignoter, dans sa couleur, et l'information
-   reste — y compris la distinction entre lire et écrire. */
-@media (prefers-reduced-motion: reduce) {
-  .mailbox.read {
-    animation: none;
-    background-color: rgba(0, 176, 176, 0.35);
-  }
-  .mailbox.written {
-    animation: none;
-    background-color: rgba(255, 92, 168, 0.35);
-  }
+  background-color: var(--lmc-write);
+  box-shadow: inset 0 0 0 2px var(--lmc-write-edge);
 }
 
 .mailbox.cursor:not(.current) {
@@ -476,12 +518,17 @@ button:disabled {
 /* Cells past the end of the assembled program — always 0, never touched.
    Dimmed rather than hidden (still legible if someone wants to check),
    so attention naturally goes to the handful of cells that actually
-   matter instead of all 100 carrying equal visual weight. */
-.mailbox.unused,
+   matter instead of all 100 carrying equal visual weight.
+
+   Sauf si le dernier pas l'a touchée : `STA 90` écrit là où rien n'a été
+   déclaré, et c'est précisément ce qu'il faut voir. Tant que la couleur ne
+   durait qu'une animation, un rose à 35 % passait sans conséquence ;
+   maintenant qu'elle reste, elle doit se lire. */
+.mailbox.unused:not(.read):not(.written),
 .legend .swatch.unused {
   opacity: 0.35;
 }
-.mailbox.unused:hover {
+.mailbox.unused:not(.read):not(.written):hover {
   opacity: 0.7;
 }
 
@@ -537,8 +584,9 @@ button:disabled {
 .cycle-panel {
   /* Prend toute la place restante jusqu'en bas de la fenêtre, et défile en
      lui-même : c'est le seul bloc dont le contenu grandit d'un pas à
-     l'autre. */
-  flex: 1 1 auto;
+     l'autre. Base 0 et non `auto` : la place qu'il reçoit est ce qui reste,
+     pas la hauteur de sa trace — c'est ce qui borne un Run de cent pas. */
+  flex: 1 1 0;
   min-height: 6em;
   overflow-y: auto;
   margin-top: 16px;

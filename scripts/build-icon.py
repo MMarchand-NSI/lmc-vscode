@@ -3,8 +3,8 @@
 
 L'icone n'est pas un dessin arbitraire : c'est la grille memoire du panneau,
 avec les deux couleurs que le panneau utilise reellement, teal pour une case
-lue et rose pour une case ecrite (voir webview/style.css, @keyframes
-mailbox-read et mailbox-written). Elle est produite par ce script et non
+lue et rose pour une case ecrite (voir webview/style.css, les variables
+--lmc-read et --lmc-write, qui servent aussi aux registres). Elle est produite par ce script et non
 dessinee a la main pour que ces couleurs restent celles du produit : si la
 palette change la, elle change ici.
 

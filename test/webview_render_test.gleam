@@ -113,6 +113,28 @@ pub fn data_addresses_is_an_empty_array_not_null_without_dat_test() {
   assert string.contains(json, "\"dataAddresses\":[]")
 }
 
+pub fn register_accesses_reach_the_payload_under_their_dom_names_test() {
+  // `SI` s'appelle `x` dans la page — identifiant interne, jamais affiché,
+  // inchangé aux deux renommages du registre. Une clé qui ne correspondrait
+  // à aucun élément n'allumerait rien, sans rien casser ailleurs : c'est
+  // exactement le genre d'erreur muette que ce test attrape.
+  let json =
+    loaded("        LDA n\n        MOV SI, ACC\n        HLT\nn:      DAT 7\n")
+    |> model.step
+    |> model.step
+    |> render.to_json
+  assert string.contains(
+    json,
+    "\"registerAccesses\":[{\"register\":\"acc\",\"kind\":\"read\"},{\"register\":\"pc\",\"kind\":\"write\"},{\"register\":\"x\",\"kind\":\"write\"}]",
+  )
+}
+
+pub fn nothing_is_marked_before_any_step_test() {
+  let json = loaded("INP\nOUT\nHLT\n") |> render.to_json
+  assert string.contains(json, "\"accesses\":[]")
+  assert string.contains(json, "\"registerAccesses\":[]")
+}
+
 pub fn an_unlit_screen_renders_as_an_empty_array_test() {
   // Un tableau vide, et non mille zéros : le payload ne porte que les points
   // allumés, l'affichage repeint le fond lui-même.

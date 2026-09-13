@@ -27,12 +27,12 @@ This README is developer documentation; the extension's own page is
 
 ## The LMC language
 
-The language reference — instructions, registers, addressing, encoding, diagnostics — lives with
-the language itself, in
-[lmc_lsp/LANGAGE.md](https://github.com/MMarchand-NSI/lmc_lsp/blob/master/LANGAGE.md) (in French).
-It is deliberately not duplicated here: this README used to carry its own instruction table, and
-that table drifted into claiming things that were false — that labels were case-insensitive, and
-that `;` opened a comment. One source of truth is worth the extra click.
+The full language reference (instructions, registers, addressing, encoding, diagnostics) lives
+with the language server, in a repository that is not public. It is deliberately not duplicated
+here: this README used to carry its own instruction table, and that table drifted into claiming
+things that were false, that labels were case-insensitive and that `;` opened a comment. The
+seventeen instructions, with the same descriptions the editor shows on hover, are on the
+extension's page, [`vscode-extension/README.md`](vscode-extension/README.md).
 
 In short: this variant extends the classic LMC. The machine word is four digits rather than three,
 there are five registers (`ACC`, `SI`, `LR`, `SP`, `PC`) and seventeen mnemonics, including `MOV`,
@@ -46,8 +46,13 @@ not a matter of syntax at all — `MOV`, `JSR`, `PSH` and `PLT` have nowhere els
 
 ## Examples
 
-`examples/` is what the F5 launch config opens, so there is always something to run. The comments
-are in French, like the language reference.
+**These programs are not installed with the extension.** They live in this repository only:
+installing `mmarchand.lmc-vscode` gives you the language support and the emulator, not a single
+`.lmc` file. To try them, download the [`examples/`](examples/) folder (or clone the repository) and
+open it in VS Code with the extension installed. The comments are in French.
+
+For development, `examples/` is also what the F5 launch config opens, so there is always something
+to run.
 
 | | |
 |---|---|

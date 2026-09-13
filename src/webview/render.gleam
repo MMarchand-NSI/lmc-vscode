@@ -2,6 +2,7 @@ import gleam/json.{type Json}
 import gleam/list
 import gleam/option.{None, Some}
 import lmc/runner/inspect
+import lmc/runner/instruction
 import lmc/runner/memory
 import lmc/runner/state
 import webview/model.{type Model}
@@ -41,9 +42,12 @@ pub fn to_json(mdl: Model) -> String {
     // provenance du texte, pas une frontière que la machine connaîtrait.
     #("dataAddresses", json.array(model.data_addresses(mdl), json.int)),
     #("cycle", json_cycle(mdl)),
-    // Les cases que le dernier pas a lues ou écrites. L'affichage les fait
-    // pulser ; le modèle dit seulement lesquelles et dans quel sens.
+    // Les cases que le dernier pas a lues ou écrites, et les registres qu'il
+    // a écrits. Le modèle dit lesquels et dans quel sens ; l'affichage les
+    // allume, et jusqu'au pas suivant — voir style.css, la couleur ne
+    // clignote pas.
     #("accesses", json_accesses(mdl)),
+    #("registerAccesses", json_register_accesses(mdl)),
     // Le texte fixe du panneau, dans la langue demandée. `index.html` ne
     // porte plus que des `data-ui` vides : une seule source pour les deux
     // langues, et le compilateur exige la traduction de chacune.
@@ -92,15 +96,43 @@ fn json_accesses(mdl: Model) -> Json {
     let #(address, kind) = access
     json.object([
       #("address", json.int(address)),
-      #(
-        "kind",
-        json.string(case kind {
-          model.Read -> "read"
-          model.Written -> "write"
-        }),
-      ),
+      #("kind", json.string(access_kind(kind))),
     ])
   })
+}
+
+/// Même forme que `json_accesses`, pour que l'affichage n'ait qu'une seule
+/// façon de lire les deux — mêmes mots `read` et `write`, même paire.
+///
+/// Les clés sont les identifiants du DOM, pas les noms des registres : `SI`
+/// s'appelle `x` dans la page depuis qu'il s'appelait `X`, et ce nom-là n'est
+/// jamais affiché (même choix qu'aux deux renommages, v0.4.0 et v0.7.0 — un
+/// identifiant interne ne suit pas le vocabulaire). Le nom visible, lui, vient
+/// de `model.register_name`.
+fn json_register_accesses(mdl: Model) -> Json {
+  json.array(model.register_accesses(mdl), fn(access) {
+    let #(register, kind) = access
+    json.object([
+      #(
+        "register",
+        json.string(case register {
+          instruction.Acc -> "acc"
+          instruction.Pc -> "pc"
+          instruction.Si -> "x"
+          instruction.Lr -> "lr"
+          instruction.Sp -> "sp"
+        }),
+      ),
+      #("kind", json.string(access_kind(kind))),
+    ])
+  })
+}
+
+fn access_kind(kind: model.Access) -> String {
+  case kind {
+    model.Read -> "read"
+    model.Written -> "write"
+  }
 }
 
 fn json_cycle(mdl: Model) -> Json {

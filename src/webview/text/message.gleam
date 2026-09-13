@@ -104,6 +104,13 @@ pub type Text {
   OutputSent(value: Int)
   PixelSent(x: Int, y: Int, colour: Int, outcome: Plotted)
   MemoryWritten(address: Int, value: Int)
+  /// « lire ACC → 5 ». La symétrie de `CellRead` du côté du processeur, et
+  /// elle dit ce qu'aucune autre ligne ne disait : d'où vient l'opérande
+  /// *implicite*. `ADD b` montrait la case lue puis « ACC 5 → 12 », sans
+  /// jamais nommer le 5 — or l'opérande implicite est tout le sujet d'une
+  /// machine à accumulateur. Rapportée par le runner depuis `lmc_lsp`
+  /// v0.8.4, jamais reconstruite ici.
+  RegisterRead(register: String, value: Int)
   /// `ACC 0 → 12`, `SI`, `SP` : le nom du registre ne se traduit pas, la
   /// ligne n'a donc rien à traduire non plus, mais elle passe par ici pour
   /// que tout le panneau ait la même forme.

@@ -57,6 +57,7 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
 
   if (currentPanel) {
     sourceUri = editor.document.uri;
+    currentPanel.title = panelTitle(sourceUri);
     currentPanel.reveal(vscode.ViewColumn.Beside);
     sendSource(currentPanel, editor.document);
     return;
@@ -67,7 +68,7 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
 
   currentPanel = vscode.window.createWebviewPanel(
     "lmcEmulator",
-    t().panelTitle,
+    panelTitle(sourceUri),
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
@@ -82,6 +83,16 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
 
   currentPanel.webview.html = renderHtml(currentPanel.webview, webviewDir);
 
+  // L'icône de l'onglet : la grille mémoire, une case lue et une écrite, en
+  // variantes claire et sombre (scripts/build-file-icons.py). Sans elle,
+  // l'onglet n'a que son titre, à côté d'onglets de fichiers qui ont tous
+  // leur icône.
+  const iconsDir = path.join(context.extensionPath, "icons");
+  currentPanel.iconPath = {
+    light: vscode.Uri.file(path.join(iconsDir, "emulator-light.png")),
+    dark: vscode.Uri.file(path.join(iconsDir, "emulator-dark.png")),
+  };
+
   // Le serveur, lui, redémarre pour changer de langue ; le panneau n'a qu'à
   // recevoir la nouvelle et se repeindre.
   disposables.push(
@@ -91,9 +102,6 @@ export function openEmulatorPanel(context: vscode.ExtensionContext): void {
           type: "setLocale",
           locale: configuredLocale(),
         });
-        // Le titre de l'onglet est posé par l'hôte, pas peint par le
-        // webview : il ne suivrait pas tout seul.
-        if (currentPanel) currentPanel.title = t().panelTitle;
       }
     }),
   );
@@ -193,10 +201,22 @@ function configuredLocale(): string {
   return choice === "auto" ? vscode.env.language : choice;
 }
 
-/// Les trois phrases que l'hôte prononce lui-même. Elles ne peuvent pas
+/// Le titre de l'onglet : le fichier auquel le panneau est relié, sans son
+/// extension (`fibo.lmc` → « LMC - fibo »). Un élève qui a plusieurs
+/// programmes ouverts doit savoir, sans cliquer, quel source ce panneau
+/// exécute et quel `.lmcobj` il chargera ; « Émulateur » ne le disait pas.
+///
+/// Ce n'est plus une phrase, donc plus une affaire de langue : il n'est pas
+/// dans `hostText`, et changer `lmc.locale` n'a plus à le reposer. Il suit en
+/// revanche le fichier, c'est-à-dire chaque endroit où `sourceUri` change.
+function panelTitle(uri: vscode.Uri): string {
+  return `LMC - ${path.basename(uri.fsPath, path.extname(uri.fsPath))}`;
+}
+
+/// Les deux phrases que l'hôte prononce lui-même. Elles ne peuvent pas
 /// venir du catalogue Gleam (`src/webview/text.gleam`) comme tout le reste :
-/// une notification VS Code et le titre d'un onglet ne passent pas par le
-/// rendu du webview, et le nom du fichier objet n'existe que de ce côté-ci.
+/// une notification VS Code ne passe pas par le rendu du webview, et le nom
+/// du fichier objet n'existe que de ce côté-ci.
 /// C'est donc le seul autre endroit du dépôt où une langue se choisit, et
 /// c'est assumé plutôt que contourné.
 ///
@@ -206,30 +226,27 @@ function configuredLocale(): string {
 /// pas tant que le défaut du réglage était `fr` ; il est passé à `auto` pour
 /// la publication, donc un VS Code allemand ou italien passe maintenant par
 /// ce repli couramment, et aurait eu un panneau anglais sous un titre
-/// d'onglet français.
+/// d'onglet français. (Le titre d'onglet a quitté cette table depuis : il ne
+/// porte plus que le nom du fichier, voir `panelTitle`.)
 const hostText = {
   fr: {
     openFileFirst:
       "Ouvrez d'abord un fichier .lmc, puis lancez « LMC: Open Emulator ».",
-    panelTitle: "LMC — Émulateur",
     assembledInto: (name: string) => `Code assemblé dans ${name}`,
   },
   es: {
     openFileFirst:
       "Abre primero un archivo .lmc y luego ejecuta « LMC: Open Emulator ».",
-    panelTitle: "LMC — Emulador",
     assembledInto: (name: string) => `Código ensamblado en ${name}`,
   },
   ja: {
     openFileFirst:
       "先に .lmc ファイルを開いてから « LMC: Open Emulator » を実行してください。",
-    panelTitle: "LMC — エミュレータ",
     assembledInto: (name: string) => `${name} にアセンブルしました`,
   },
   ko: {
     openFileFirst:
       "먼저 .lmc 파일을 연 다음 « LMC: Open Emulator »를 실행하세요.",
-    panelTitle: "LMC — 에뮬레이터",
     assembledInto: (name: string) => `${name}에 어셈블했습니다`,
   },
   en: {
@@ -241,7 +258,6 @@ const hostText = {
     // chercher une entrée qui n'existe pas.
     openFileFirst:
       "Open an .lmc file first, then run « LMC: Open Emulator ».",
-    panelTitle: "LMC — Emulator",
     assembledInto: (name: string) => `Code assembled into ${name}`,
   },
 };

@@ -34,7 +34,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the build script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.3" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.5" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -226,8 +226,8 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   line in the editor. `Halted` was missed when `WaitingForInput`
   was fixed; the reverse case — execution falling *into* a `DAT`, which halts because opcode 0 is
   `HLT` — is what makes `pc - 1` the right correction rather than blanking the highlight, and has
-  its own test. **The Fetch phase of the cycle panel says that increment out loud**, as a second
-  line under Fetch (`"PC 0 → 1 (incrémenté pendant la lecture, avant le décodage)"`, rendered as a
+  its own test. **The Fetch phase of the cycle panel says that increment out loud**, as the third
+  line under Fetch, after `lire PC → 0` and `lire mem[0] → 5003` (`"PC 0 → 1 (incrémenté pendant la lecture, avant le décodage)"`, rendered as a
   sub-list exactly as Execute already is when it carries several actions): reading the word and
   advancing the counter are two acts of one phase, and naming the second is what makes the register
   panel's off-by-one legible instead of mysterious. That line is *derived*, not reported: the runner
@@ -294,13 +294,18 @@ Gleam's `main()` is just an export — nothing calls it on its own; `index.html`
   The host sends **facts, not prose**: `objectLoadFailed` carries the file's `name`, and the panel
   writes the sentence. A shell that phrased it would be choosing the language where it is not
   known.
-  **Three sentences escape that rule and it is assumed, not worked around**: the "open an .lmc
-  file first" warning, the emulator tab's title, and the "code assembled into X" notification.
+  **Two sentences escape that rule and it is assumed, not worked around**: the "open an .lmc
+  file first" warning and the "code assembled into X" notification. There were three: the tab
+  title was one until 2026-09-13, when it became `LMC - <file name without extension>`
+  (`panelTitle` in `webviewPanel.ts`), so that a student with several programs open knows which
+  source the panel runs and which `.lmcobj` it will load. A file name is not prose, so the title
+  left `hostText`, no longer changes with `lmc.locale`, and instead follows `sourceUri` — set on
+  creation and again when the command re-points an open panel at another file.
   That table was left at two languages when Spanish arrived, so a reader set to `es` got a Spanish
   panel with a French tab title; `scripts/check-manifest.mjs` now requires it to cover every
   language the server speaks, and the primary-subtag lookup matches the server's own. A
-  VS Code notification and a tab title do not go through the webview's rendering, and the object
-  file's name only exists host-side, so they live in `webviewPanel.ts`'s `hostText` — the one other
+  VS Code notification does not go through the webview's rendering, and the object file's name
+  only exists host-side, so they live in `webviewPanel.ts`'s `hostText` — the one other
   place in this repo where a language is chosen. Its fallback copies the server's rule: a language
   it does not speak gets **English** (`locale.fallback_locale`, since the server's v0.8.2). It said
   French until 2026-09-06, which cost nothing while `lmc.locale` defaulted to `fr`; the default is
@@ -468,15 +473,31 @@ never just code review):
   produced a scrollbar with nothing to scroll: the block came out taller than the three frames it
   holds. It keeps its content height, and a window too short for everything scrolls the page — one
   scrollbar rather than two nested.
+  **"Scrolling inside itself" was false for a Run until 2026-09-13**, and the reason is worth
+  keeping. `body` had `min-height: 100vh`, and a minimum bounds nothing: the page grew with its
+  content, so the cycle panel (`flex: 1 1 auto`) never had a maximum height and its
+  `overflow-y: auto` never fired. A step's trace is short enough to hide that; a Run prints every
+  step, and the panel ran off the bottom of the window. Now `body` is `height: 100vh` with
+  `overflow-y: auto`, and the panel is `flex: 1 1 0` — its height is what is left, not the length
+  of its trace. The old intent survives: below its `min-height` the panel stops shrinking and the
+  page scrolls instead.
   **No test covers the layout**: jsdom does no layout, so the smoke test can only assert that
   nothing is collapsible any more. Heights and scrollbars are checked by the author in a real
   panel, on `F5`, which is what open item 1 is about: hand-checked, not automated.
-- **La case touchée pulse : teal si elle a été lue, rose si elle a été écrite.** Deux couleurs et
+- **La case touchée s'allume : teal si elle a été lue, rose si elle a été écrite.** Deux couleurs et
   non une, parce que c'est la distinction que la grille doit enseigner — lire ne change rien,
   écrire change la machine — et la couleur chaude va au geste qui modifie.
-  `model.memory_accesses` rend ce que le dernier pas a lu ou écrit, `render.gleam` l'envoie sous `accesses`, et `app_ffi.mjs` pose une classe que le CSS
-  anime — retirée puis reposée après un reflow, sans quoi une case lue deux fois de suite ne
-  clignoterait qu'une fois, ce qui est précisément le cas du pas à pas.
+  `model.memory_accesses` rend ce que le dernier pas a lu ou écrit, `render.gleam` l'envoie sous
+  `accesses`, et `app_ffi.mjs` pose une classe que le CSS colore.
+  **Elle ne clignote pas, et c'est une décision prise deux fois.** C'était une animation de 600 ms,
+  relancée par un reflow pour qu'une case lue deux fois de suite clignote deux fois ; à l'usage le
+  clignotement était fini avant qu'on ait levé les yeux du code vers la grille. La couleur tient
+  donc jusqu'au pas suivant, sans aucune machinerie : les classes sont reposées à chaque rendu
+  d'après `accesses`, qui ne change qu'avec `last_events` — l'expiration est exactement
+  l'exécution de l'instruction d'après. Deux conséquences, toutes deux voulues : `prefers-reduced-motion`
+  n'a plus rien à désactiver (il n'y a plus de mouvement), et le marquage est devenu un fond
+  discret plus un liseré **intérieur**, pour ne toucher ni à `border-color`, qui porte la pile et
+  les `DAT`, ni à la lisibilité du nombre, maintenant qu'il est permanent.
   **Trois événements, tous rapportés par le runner** : `Fetched` (toute instruction lit sa propre
   case), `MemoryRead` — arrivé en v0.8.3, c'est lui qui allume la case de la donnée que `LDA n` va
   chercher — et `MemoryWritten`. Rien n'est reconstruit ici : l'adresse effective d'un accès
@@ -484,8 +505,38 @@ never just code review):
   v0.1.5. La demande faite en amont plutôt que contournée ici, c'est le motif de tout ce dépôt.
   Une même phrase sert la lecture du Fetch et celle de l'opérande (`message.CellRead`) : c'est le
   même fait, une case lue et ce qu'elle contenait, et seule la phase diffère.
-  `prefers-reduced-motion` désactive le clignotement et laisse la case allumée : l'information ne
-  dépend pas de l'animation.
+- **Les registres touchés portent les mêmes deux couleurs que les cases** (`model.register_accesses`,
+  clé `registerAccesses`, classe posée sur la valeur et non sur la ligne). Un pas fait deux choses, à
+  la mémoire et au processeur, et seule la première se voyait : « ACC 0 → 7 » ne se lisait que dans le
+  panneau du cycle, à condition de savoir où regarder.
+  **Le teal a manqué, et la correction est passée par où il fallait.** Le runner rapportait les
+  écritures de registre et aucune lecture, donc `ADD n` ne pouvait pas allumer l'accumulateur qu'il
+  lit pourtant — c'est exactement ce qui a été signalé à l'usage. Plutôt que de redécoder
+  l'instruction ici, l'événement a été demandé en amont : `event.RegisterRead`, **`lmc_lsp` v0.8.4**,
+  douze lectures qui étaient muettes (`ADD`/`SUB`, `OUT`, `BRZ`/`BRP` même quand le saut n'a pas lieu,
+  `STA`, `MOV`, `PSH` deux fois, `POP`, `JSR`, et le registre d'index en adressage indexé). Même
+  chemin que `MemoryRead` en v0.8.3, et pour la même raison : savoir que `PSH` lit `SP` ou que
+  `lst[SI]` lit `SI`, c'est la sémantique de la machine, et la recopier dans l'affichage serait la
+  duplication qui a produit le bug v0.1.5.
+  **Un registre lu *et* écrit dans le même pas est rose**, la couleur chaude allant au geste qui
+  modifie. C'est une règle du modèle et non « le dernier événement gagne » : la couleur ne doit pas
+  dépendre de l'ordre d'émission du runner. `ADD` est donc rose, et sa lecture reste visible dans le
+  panneau du cycle, qui dit maintenant `lire ACC → 5` avant `ACC 5 → 12` — la ligne qui manquait pour
+  que l'opérande implicite d'une machine à accumulateur cesse de sortir de nulle part.
+  **`PC` est toujours rose** : la phase Fetch l'incrémente à chaque pas, et une écriture l'emporte.
+  Ses lectures se lisent dans le cycle, pas dans la couleur.
+  **La phase Fetch lit `PC`, et le dit depuis `lmc_lsp` v0.8.5.** v0.8.4 ne l'émettait pas, au motif
+  que `Fetched` le disait déjà ; c'était confondre deux faits : `Fetched` dit que la case a été lue,
+  pas que `PC` l'a été pour la désigner, et `lire mem[0] → 5003` tirait son 0 de nulle part. Stallings
+  (*Computer Organization and Architecture*, 8e éd., ch. 15) écrit `t1: MAR <- (PC)` avant
+  `t2: MBR <- (memory)`. Le runner émet `RegisterRead(Pc)` juste avant `Fetched`, et
+  `events_phase_details` (`model.gleam`) le rattache au Fetch : rangé comme tout `RegisterRead`, il
+  serait tombé en Execute, *avant* le Fetch, et aurait cassé les trois phases. Le Fetch se lit
+  donc `lire PC → 0`, `lire mem[0] → 5003`, `PC 0 → 1`. Le modèle n'a ni `MAR` ni `MBR` : ces deux
+  micro-opérations restent fusionnées en une lecture de case, et c'est décidé (point ouvert 11).
+  Les deux teintes ne sont plus écrites qu'une fois, en variables CSS (`--lmc-read`, `--lmc-write`) :
+  elles servent à deux endroits, et deux copies laisseraient la mémoire et les registres enseigner
+  deux codes de couleur différents. `scripts/build-icon.py` les reprend en RVB pleines, comme avant.
 - All five registers are shown (`ACC`, `PC`, then `SI`, `LR`, `SP` more discreetly, since they only
   come into play with arrays, subroutines and the stack), and the memory grid marks four things —
   the stack above `SP` (dashed orange), the cells a `DAT` reserved (dotted blue), the unused middle
@@ -628,8 +679,8 @@ never just code review):
   French or English sentence gets corrected in the loop where the work happens, and nothing in that
   loop can see a wrong politeness register in Japanese or Korean. Each of those files says so in
   its own header, and the Marketplace page asks for corrections.
-- **`lmc_lsp` v0.8.3: `MemoryRead`, asked for and granted.** The pink pulse landed one release
-  earlier with a hole in it: `LDA n` lit the instruction's cell and not the data's, because the
+- **`lmc_lsp` v0.8.3: `MemoryRead`, asked for and granted.** The two colours of a step landed one
+  release earlier with a hole in it: `LDA n` lit the instruction's cell and not the data's, because the
   runner reported writes and not reads. Rather than recompute the effective address here — indexed
   mode, `SI` at the right instant, all of it already implemented over there — the gap was written
   down as an open item and the event asked for. It exists now, deliberately not emitted for the
@@ -639,6 +690,17 @@ never just code review):
   as the Fetch line (`message.CellRead`, renamed from `FetchRead`): one fact, one sentence, five
   languages unchanged. Four model tests failed on the bump without being touched, including the one
   that pinned the absence — it now pins the presence.
+- **`lmc_lsp` v0.8.4 : `RegisterRead`, demandé et obtenu — deuxième fois.** Le même manque que
+  v0.8.3, un cran plus bas : les quatre `…Changed` disaient ce qu'une instruction écrit dans un
+  registre, rien ne disait ce qu'elle y lit, donc la couleur de lecture ne pouvait pas exister côté
+  processeur. Douze lectures étaient muettes ; deux exceptions restent, chacune fixée par un test
+  amont — la phase Fetch, dont `Fetched` dit déjà qu'elle a lu la case que `PC` désignait, et une
+  instruction qui échoue, qui ne rapporte rien de ce qu'elle avait commencé (la règle de
+  `read_effective`). De ce côté-ci : une arme dans `model.register_accesses`, une dans le panneau du
+  cycle, un `message.RegisterRead` et ses cinq traductions. Deux tests du cycle ont échoué au bump
+  sans être touchés — ce sont eux qui ont montré la nouvelle ligne à sa place. Corrigé en passant
+  chez `lmc_lsp` : un test y exécutait `POP IX`, resté du renommage `IX` → `SI` de la v0.7.0, sur un
+  programme qui portait un diagnostic sans que rien ne s'en plaigne.
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the
@@ -679,6 +741,20 @@ never just code review):
     write, the values read off `style.css`), so the icon cannot drift away from the product: if the
     palette moves there, it moves here. No lettering, because three letters at 42 px, the size of a
     row in the extensions list, is a smudge. Checked at both sizes, by looking at it.
+  - **File icons for `.lmc` and `.lmcobj`** (2026-09-13), `vscode-extension/icons/`, produced by
+    `scripts/build-file-icons.py`: three lines of code for the source, a 2 × 2 grid of cells for the
+    object file, teal and pink as in `icon.png`, each with a darker variant for light themes. They
+    are `contributes.languages[].icon`, which VS Code shows **only when the icon theme has nothing
+    for the file**: checked against Seti, the default, whose theme file has no `lmc` entry and does
+    not set `showLanguageModeIcons: false`. Giving `.lmcobj` an icon meant declaring it a language
+    (`lmcobj`, no grammar); the language server is scoped to `lmc`, so nothing else answers it.
+    32 px PNG, because VS Code draws file icons at `background-size: 16px` (`iconlabel.css`), and the
+    bar heights are even so they land on whole pixels at 16. PNG rather than SVG because the
+    contribution-point docs only show PNG. Looked at in a 16 px preview on dark and light
+    grounds, not yet in a real explorer.
+    The same script draws **the emulator tab's icon**: a 3 × 3 grid, one teal cell and one pink,
+    the rest grey, set by `webviewPanel.ts` as `panel.iconPath` (light and dark). Unlike the file
+    icons it does not depend on the icon theme: a webview panel's icon is always shown.
   - **`CHANGELOG.md`**, the store's second tab, and `categories`/`keywords`/`galleryBanner`.
     `Education` was added; **`Debuggers` was considered and dropped** — the extension registers no
     debug adapter, and a category is a claim.
@@ -886,3 +962,9 @@ checking (the author checks by hand constantly), item 9 is deferred by choice, a
    decision covers both sides. The analysis stays in `lmc_lsp`'s CLAUDE.md if it ever comes back;
    the reservation worth remembering is that such a colour would be **provenance, not machine
    state**, the same status as the dotted `DAT` marking in the memory grid.
+11. ~~**Show `MAR`, `MBR` and `IR`.**~~ **Settled, 2026-09-13: it will not be done.** The author's
+    decision: "ça deviendrait trop compliqué pour rien". A real fetch is `MAR <- (PC)`,
+    `MBR <- (memory)`, `IR <- (MBR)`; the model folds the first two into one cell read and does not
+    display the instruction register. The one thing that folding used to hide, where the fetched
+    address comes from, is now said by `lire PC → 0` (`lmc_lsp` v0.8.5). Three more registers would
+    add machinery without adding that kind of answer. Do not re-propose them.

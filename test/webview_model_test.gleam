@@ -2,8 +2,10 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
 import lmc/runner/inspect
+import lmc/runner/instruction
 import lmc/runner/state
 import webview/model
+import webview/text/locale
 import webview/text/message as text
 
 /// Assemble puis charge en RAM, comme le feraient les boutons Assembler
@@ -64,7 +66,8 @@ pub fn a_program_too_long_does_not_assemble_test() {
 }
 
 pub fn a_step_reports_the_cells_it_touched_test() {
-  // Le pas à pas fait pulser en rose la case touchée. Le modèle ne dit que
+  // Le pas à pas allume la case touchée, teal si elle a été lue et rose si
+  // elle a été écrite. Le modèle ne dit que
   // ce que le runner a rapporté : la lecture de l'instruction elle-même, et
   // l'écriture d'un STA.
   let m =
@@ -90,6 +93,119 @@ pub fn an_operand_read_is_reported_test() {
     loaded("        LDA n\n        HLT\nn:      DAT 7\n")
     |> model.step
   assert model.memory_accesses(m) == [#(0, model.Read), #(2, model.Read)]
+}
+
+pub fn a_step_reports_the_registers_it_touched_test() {
+  // L'autre moitié de ce que fait un pas : la grille montrait la mémoire
+  // touchée, les registres ne se lisaient que dans le panneau du cycle. Le
+  // modèle ne rapporte toujours que ce que le runner a dit.
+  let m =
+    loaded("        LDA n\n        MOV SI, ACC\n        HLT\nn:      DAT 7\n")
+
+  let first = model.step(m)
+  assert model.register_accesses(first)
+    == [#(instruction.Acc, model.Written), #(instruction.Pc, model.Written)]
+
+  // `MOV SI, ACC` lit l'accumulateur et écrit l'index : les deux couleurs
+  // dans le même pas, ce qui est exactement ce que la distinction doit
+  // enseigner.
+  let second = model.step(first)
+  assert model.register_accesses(second)
+    == [
+      #(instruction.Acc, model.Read),
+      #(instruction.Pc, model.Written),
+      #(instruction.Si, model.Written),
+    ]
+}
+
+pub fn a_register_read_and_written_in_one_step_is_written_test() {
+  // `ADD` lit l'accumulateur puis l'écrit. Une case de registre n'a qu'une
+  // couleur à porter : elle va au geste qui modifie. La lecture, elle, reste
+  // visible dans le panneau du cycle.
+  let m =
+    loaded(
+      "        LDA a\n        ADD b\n        HLT\na:      DAT 5\nb:      DAT 7\n",
+    )
+    |> model.step
+    |> model.step
+  assert model.register_accesses(m)
+    == [#(instruction.Acc, model.Written), #(instruction.Pc, model.Written)]
+
+  // Et la ligne du cycle dit bien d'où venait le 5.
+  let lines =
+    model.last_cycle(m)
+    |> list.flat_map(fn(phase) { phase.details })
+    |> list.map(locale.render(_, locale.from_tag("fr")))
+  assert list.contains(lines, "lire ACC → 5")
+}
+
+pub fn a_branch_that_does_not_jump_still_reads_the_accumulator_test() {
+  // Le seul effet observable d'un `BRZ` non pris : il a quand même lu
+  // l'accumulateur pour décider. Sans la lecture, ce pas n'allumait rien du
+  // tout et semblait ne rien faire.
+  let m =
+    loaded(
+      "        LDA a\n        BRZ fin\n        HLT\nfin:    HLT\na:      DAT 7\n",
+    )
+    |> model.step
+    |> model.step
+  assert model.register_accesses(m)
+    == [#(instruction.Acc, model.Read), #(instruction.Pc, model.Written)]
+}
+
+pub fn every_step_writes_the_program_counter_test() {
+  // `HLT` ne touche aucun registre… sauf celui que la lecture incrémente
+  // toujours. PC allumé à chaque pas n'est donc pas du bruit : c'est ce que
+  // dit déjà la deuxième ligne du Fetch (« PC 0 → 1 »).
+  let m = loaded("        HLT\n") |> model.step
+  assert model.register_accesses(m) == [#(instruction.Pc, model.Written)]
+}
+
+pub fn a_call_writes_the_link_register_and_a_push_the_stack_pointer_test() {
+  // Les trois registres discrets sont ceux qu'on voit le moins bouger, et
+  // ceux qu'une séance sur les sous-programmes doit justement montrer.
+  let m =
+    loaded(
+      "        JSR proc\n        HLT\nproc:   MOV ACC, LR\n        PSH\n        POP\n        MOV PC, LR\n",
+    )
+
+  // JSR lit le compteur ordinal pour en faire l'adresse de retour, puis
+  // l'écrit en sautant : rose, l'écriture l'emportant.
+  let call = model.step(m)
+  assert model.register_accesses(call)
+    == [#(instruction.Pc, model.Written), #(instruction.Lr, model.Written)]
+
+  let move = model.step(call)
+  assert model.register_accesses(move)
+    == [
+      #(instruction.Acc, model.Written),
+      #(instruction.Pc, model.Written),
+      #(instruction.Lr, model.Read),
+    ]
+
+  // PSH lit le registre empilé et le pointeur, puis descend le pointeur.
+  let push = model.step(move)
+  assert model.register_accesses(push)
+    == [
+      #(instruction.Acc, model.Read),
+      #(instruction.Pc, model.Written),
+      #(instruction.Sp, model.Written),
+    ]
+}
+
+pub fn reading_an_input_lights_the_accumulator_test() {
+  // `INP` écrit ACC comme n'importe quelle autre instruction, mais le dit
+  // avec `InputConsumed` — l'`AccumulatorChanged` qui suit est celui que le
+  // panneau du cycle retire comme redondant. Le marquage ne doit pas
+  // dépendre de lequel des deux survit.
+  let m =
+    loaded("        INP\n        HLT\n")
+    |> model.step
+    |> model.resume_after_input(7)
+  assert list.contains(model.register_accesses(m), #(
+    instruction.Acc,
+    model.Written,
+  ))
 }
 
 pub fn set_source_if_changed_is_a_noop_when_unchanged_test() {
@@ -317,7 +433,9 @@ pub fn step_produces_one_entry_per_phase_test() {
   assert fetch.phase == text.Fetch
   assert decode.phase == text.Decode
   assert execute.phase == text.Execute
-  assert execute.details == [text.OutputSent(9)]
+  // `OUT` lit l'accumulateur avant de l'envoyer, et le dit depuis lmc_lsp
+  // v0.8.4 : l'opérande d'`OUT` est implicite, comme celui d'`ADD`.
+  assert execute.details == [text.RegisterRead("ACC", 9), text.OutputSent(9)]
 }
 
 pub fn fetch_shows_the_program_counter_moving_test() {
@@ -327,7 +445,14 @@ pub fn fetch_shows_the_program_counter_moving_test() {
   // arrêtée montre un PC déjà passé à l'instruction suivante.
   let m = loaded("LDA n\nADD n\nHLT\nn: DAT 5\n") |> model.step
   let assert [fetch, _decode, _execute] = model.last_cycle(m)
-  assert fetch.details == [text.CellRead(0, 5003), text.FetchIncrement(0, 1)]
+  // Trois actes, dans l'ordre de la machine : lire PC pour savoir quelle
+  // case aller chercher, lire la case, avancer PC.
+  assert fetch.details
+    == [
+      text.RegisterRead("PC", 0),
+      text.CellRead(0, 5003),
+      text.FetchIncrement(0, 1),
+    ]
 }
 
 pub fn the_program_counter_line_follows_the_instruction_test() {
@@ -428,8 +553,14 @@ pub fn add_accumulator_change_is_not_deduped_test() {
     |> model.step
     |> model.step
   let assert [_fetch, _decode, execute] = model.last_cycle(m)
+  // Les trois lignes de l'Execute d'un `ADD` : la case lue, l'accumulateur
+  // lu — le second opérande, celui qui était implicite — et le résultat.
   assert execute.details
-    == [text.CellRead(3, 5), text.RegisterChanged("ACC", 5, 10)]
+    == [
+      text.CellRead(3, 5),
+      text.RegisterRead("ACC", 5),
+      text.RegisterChanged("ACC", 5, 10),
+    ]
 }
 
 pub fn events_clear_on_reset_test() {

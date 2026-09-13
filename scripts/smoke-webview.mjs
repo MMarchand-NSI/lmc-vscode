@@ -321,9 +321,10 @@ async function cycle() {
     "Fetch,Decode,Execute");
 
   const fetchLines = [...phases[0].querySelectorAll("li")].map((li) => li.textContent);
-  check("Fetch montre deux actions, pas une", fetchLines.length, 2);
-  check("la lecture du mot", fetchLines[0], "read mem[0] → 5003");
-  check("et l'avancée du compteur ordinal", fetchLines[1],
+  check("Fetch montre trois actions", fetchLines.length, 3);
+  check("d'abord la lecture de PC, qui désigne la case", fetchLines[0], "read PC → 0");
+  check("la lecture du mot", fetchLines[1], "read mem[0] → 5003");
+  check("et l'avancée du compteur ordinal", fetchLines[2],
     "PC 0 → 1 (incremented during the read, before decoding)");
 
   // Le registre affiche 1 alors que l'instruction exécutée est celle de la
@@ -333,11 +334,16 @@ async function cycle() {
 
 // ── Les cases touchées ─────────────────────────────────────────────
 
-// Le modèle dit quelles cases le dernier pas a lues ou écrites ; le DOM
-// doit porter la classe qui les fait pulser. Ce que ce test regarde, c'est
-// justement la moitié impure : `pulseAccesses` retire les classes avant de
-// les reposer, et un oubli de nettoyage laisserait toute la grille rose au
-// bout de quelques pas.
+// Le modèle dit quelles cases le dernier pas a lues ou écrites et quels
+// registres il a écrits ; le DOM doit porter la classe qui les allume. Ce
+// que ce test regarde, c'est justement la moitié impure : `markAccesses` et
+// `renderRegisters` retirent les classes avant de les reposer, et un oubli
+// de nettoyage laisserait toute la grille rose au bout de quelques pas.
+//
+// La couleur ne clignote plus : elle tient jusqu'au pas suivant. jsdom ne
+// fait aucune mise en page et n'anime rien, donc ce que ce test peut dire
+// est exactement ce qui compte ici — quelles classes sont posées, et
+// lesquelles ont disparu au pas d'après.
 async function accesses() {
   console.log("\nLes cases lues et écrites");
   const p = openPanel();
@@ -361,8 +367,35 @@ async function accesses() {
   check("et écrit là où STA range", marked("written"), "4");
 
   await p.click("reset");
-  check("après Reset, plus rien ne pulse",
+  check("après Reset, plus rien n'est allumé",
     (marked("read") + marked("written")) || "aucune", "aucune");
+
+  // Les registres, l'autre moitié d'un pas, avec les deux mêmes couleurs.
+  // PC est écrit à chaque fois — la lecture l'incrémente toujours.
+  const marks = () =>
+    ["acc", "pc", "x", "lr", "sp"]
+      .map((id) => {
+        const cls = p.document.getElementById(id).classList;
+        return cls.contains("written")
+          ? id + ":write"
+          : cls.contains("read")
+          ? id + ":read"
+          : null;
+      })
+      .filter(Boolean)
+      .join(",") || "aucun";
+
+  check("après Reset, aucun registre n'est allumé", marks(), "aucun");
+  await p.click("step");
+  check("LDA écrit l'accumulateur, et la lecture avance le compteur",
+    marks(), "acc:write,pc:write");
+  await p.click("step");
+  // `STA m` ne change pas l'accumulateur, il le lit : sans l'événement
+  // demandé à lmc_lsp v0.8.4, ce pas n'allumait rien côté processeur.
+  check("STA lit l'accumulateur qu'il range", marks(), "acc:read,pc:write");
+  check("et la ligne du cycle le dit aussi",
+    [...p.document.querySelectorAll("#cycle-events li li")]
+      .map((li) => li.textContent).includes("read ACC → 7"), true);
 }
 
 // ── La langue ──────────────────────────────────────────────────────
@@ -427,7 +460,7 @@ async function language() {
   await p.click("load");
   await p.click("step");
   check("le cycle parle anglais lui aussi",
-    p.document.querySelector("#cycle-events li li")?.textContent ?? "", "read mem[0] → 9001");
+    p.document.querySelectorAll("#cycle-events li li")[1]?.textContent ?? "", "read mem[0] → 9001");
 }
 
 // ── ─────────────────────────────────────────────────────────────────

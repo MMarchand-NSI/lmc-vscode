@@ -156,36 +156,55 @@ function renderMemory(state) {
     cell.classList.toggle("unused", addr >= programLength && !stacked);
   }
 
-  pulseAccesses(state, cells);
+  markAccesses(state, cells);
 }
 
-/// Fait pulser les cases que le dernier pas a lues ou écrites, teal pour une
+/// Allume les cases que le dernier pas a lues ou écrites, teal pour une
 /// lecture et rose pour une écriture (voir style.css : c'est la distinction
 /// que la grille doit enseigner, et la couleur chaude va au geste qui
 /// modifie la machine).
 ///
-/// Le retrait de la classe, la lecture d'`offsetWidth` puis sa remise sont
-/// la façon standard de **relancer** une animation CSS : sans ce passage par
-/// le reflow, une case lue deux fois de suite ne clignoterait qu'une fois,
-/// et le pas à pas — où l'on relit souvent la même case — perdrait
-/// justement ce qu'il doit montrer.
-function pulseAccesses(state, cells) {
+/// **La couleur reste jusqu'au pas suivant.** C'était une animation de
+/// 600 ms, relancée à la main par un reflow pour qu'une case lue deux fois
+/// de suite clignote deux fois ; le clignotement était fini avant qu'on ait
+/// eu le temps de regarder. Comme les classes sont reposées à chaque rendu
+/// d'après `state.accesses`, et que celui-ci ne change qu'avec les
+/// événements du dernier pas, la couleur tombe exactement quand la machine
+/// exécute l'instruction d'après — le nettoyage ci-dessous est donc tout ce
+/// qu'il faut, et l'oublier laisserait la grille entière allumée au bout de
+/// quelques pas.
+function markAccesses(state, cells) {
   for (const cell of cells) {
     cell.classList.remove("read", "written");
   }
   for (const access of state.accesses ?? []) {
     const cell = cells[access.address];
     if (!cell) continue;
-    void cell.offsetWidth;
     cell.classList.add(access.kind === "write" ? "written" : "read");
   }
 }
 
+/// Les cinq registres, et les mêmes deux couleurs que la grille sur ceux
+/// que le dernier pas a touchés — un pas fait deux choses, à la mémoire et
+/// au processeur, et seule la première se voyait. Teal pour un registre lu,
+/// rose pour un registre écrit ; un registre écrit *et* lu est rose, la
+/// règle étant tranchée par le modèle (voir `model.register_accesses`) et
+/// non par l'ordre d'arrivée.
+///
+/// La classe se pose sur le nombre et non sur la ligne : c'est la valeur qui
+/// a changé, pas le nom du registre, et une ligne entière colorée irait
+/// jusqu'au bord du cadre pour dire moins.
 function renderRegisters(state) {
+  const touched = new Map(
+    (state.registerAccesses ?? []).map((a) => [a.register, a.kind]),
+  );
   for (const name of ["acc", "pc", "x", "lr", "sp"]) {
     const value = state[name];
-    document.getElementById(name).textContent =
-      value === null || value === undefined ? "—" : String(value);
+    const el = document.getElementById(name);
+    el.textContent = value === null || value === undefined ? "—" : String(value);
+    const kind = touched.get(name);
+    el.classList.toggle("read", kind === "read");
+    el.classList.toggle("written", kind === "write");
   }
 }
 

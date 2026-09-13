@@ -66,11 +66,13 @@ quatre, c'est tout l'intérêt du découpage.
 
 ## 3. Les phrases que l'hôte prononce lui-même
 
-`vscode-extension/webviewPanel.ts`, table `hostText` : trois entrées, le
-titre de l'onglet, la notification d'assemblage, l'avertissement « ouvre
-d'abord un fichier .lmc ». Elles ne peuvent pas venir du catalogue Gleam (une
-notification VS Code et un titre d'onglet ne passent pas par le rendu du
-webview).
+`vscode-extension/webviewPanel.ts`, table `hostText` : deux entrées, la
+notification d'assemblage et l'avertissement « ouvre d'abord un fichier
+.lmc ». Elles ne peuvent pas venir du catalogue Gleam (une notification VS Code
+ne passe pas par le rendu du webview).
+
+Le titre de l'onglet n'est plus à traduire : c'est `LMC - <nom du fichier>`,
+construit par `panelTitle`, sans aucun mot d'une langue.
 
 Citer la commande sous son nom réel, `LMC: Open Emulator`, dans toutes les
 langues : les chaînes du manifeste ne suivent pas `lmc.locale` et sont en

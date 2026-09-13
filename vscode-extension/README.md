@@ -69,9 +69,12 @@ A grid of a hundred cells, the five registers, the input and output trays, and t
 incremented during the read, which is what explains why a stopped machine shows a `PC` one past the
 instruction that stopped it.
 
-At every step, the cells the instruction touched pulse: **teal for a cell that was read, pink for
+At every step, the cells the instruction touched light up: **teal for a cell that was read, pink for
 one that was written**. Reading changes nothing, writing changes the machine, and the grid says
-which just happened.
+which just happened. The colour stays until the next instruction runs, so there is time to look.
+The registers carry the same two colours — a step does two things, one to memory and one to the
+processor — and one both read and written in the same step is pink, the warm colour going to the
+act that changes the machine.
 
 The panel and the editor are synced both ways: moving the cursor outlines the matching cell,
 clicking a cell reveals its source line. That is the reason for a panel here rather than one of the
@@ -87,6 +90,22 @@ the lesson, not a defect.
 because that is all the processor ever receives. "Load" reads that file back off the disk. Loading
 before assembling fails, and editing the source without reassembling loads the old program: that is
 how a real toolchain behaves.
+
+### What the model simplifies, on purpose
+
+- **There is no `MAR`, `MBR` or `IR`.** On a real processor, the fetch goes through three internal
+  registers: `MAR <- (PC)`, then `MBR <- (memory)`, then `IR <- (MBR)` (W. Stallings, *Computer
+  Organization and Architecture*, ch. "Control Unit Operation"). Here the first two are folded into
+  a single cell read, and the fetched word is decoded without being shown in an instruction
+  register. The panel still says where the address comes from: `read PC → 0`, then
+  `read mem[0] → 5003`, then `PC 0 → 1`. Adding those three registers would make the machine harder
+  to follow without teaching more about it.
+- **"Read" means something different for a register than for a cell.** Memory is read on command:
+  an address goes out, a READ signal is sent, the word comes back. A register does not work that
+  way: its value is always present on its outputs, and "reading" it means that value is passed on
+  to the part that needs it, at the moment it is needed (onto a bus, into an adder, into another
+  register). When the panel says `read ACC → 5` or turns a register teal, it means the step **used**
+  that register's value, not that a separate read operation took place.
 
 ## A screen
 
