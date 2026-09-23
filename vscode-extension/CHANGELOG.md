@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - **Negative numbers, in ten's complement on four digits** (language server `lmc_lsp` 0.9.0). A
   word from 5000 to 9999 now reads as -5000 to -1, and the sign survives a trip through memory:
