@@ -41,7 +41,7 @@ with the details this table leaves out.
 | `MOV dst, src` | the general form of both: `LDA n` is `MOV ACC, n`, `STA n` is `MOV n, ACC` |
 | `BRA addr` | unconditional jump |
 | `BRZ addr` | jump if accumulator = 0 |
-| `BRP addr` | jump if accumulator >= 0 |
+| `BRP addr` | jump if the accumulator is positive or zero |
 | `JSR sub` | call a subroutine, recording the return address in `LR` |
 | `RET` | return to the last caller: jumps to `LR`, also written `MOV PC, LR` |
 | `PSH reg` | push a register onto the stack; with none written, `ACC` |
@@ -51,6 +51,13 @@ with the details this table leaves out.
 
 A label ends with a colon (`total: DAT 0`), and `lst[SI]` addresses the cell `lst + SI`, which is
 what lets one instruction walk an array. Branches and `PLT` cannot be indexed.
+
+A cell holds a four-digit word, 0000 to 9999, and so does every register. The sign is a convention
+of the instruction set, not something the cell carries: **ten's complement on four digits**, the
+decimal twin of two's complement, where 0000 to 4999 are themselves and 5000 to 9999 read as -5000
+to -1. `BRP` and `OUT` follow it, so `OUT` prints the word 9995 as `-5`; the memory grid and the
+registers always show the four raw digits. `DAT -5` and `DAT 9995` store the same cell, and typing
+either one into `INP` stores the same word.
 
 ## What the extension gives you
 

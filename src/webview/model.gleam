@@ -636,6 +636,11 @@ fn event_phase_details(evt: Event) -> List(#(message.Phase, Text)) {
 /// AccumulatorChanged, so this is INP-specific, not a general pattern to
 /// generalize away — drop the redundant AccumulatorChanged, keep
 /// InputConsumed (it says *why* ACC changed, not just that it did).
+///
+/// The `new == v` guard is what keeps the fold visible: since `lmc_lsp`
+/// v0.9.0 (ten's complement on four digits) typing -5 stores the word 9995,
+/// so the two events carry different values and both lines stay — "entrée
+/// (-5)" then "ACC 0 → 9995" is the lesson, not a duplicate.
 fn dedupe_input_accumulator_change(events: List(Event)) -> List(Event) {
   case events {
     [

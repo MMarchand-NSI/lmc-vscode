@@ -34,7 +34,7 @@ just deprecated, in favor of depending on `lmc_lsp` directly. Sequence of events
   complexity with no upside: silently degrading to unmaintained code on a missing vendor file is
   worse than failing loudly and telling you to run the build script.
 - **The Emulator API now also depends on `lmc_lsp` directly, as a Gleam git dependency** (`gleam.toml`:
-  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.8.5" }`), instead of
+  `lmc_lsp = { git = "https://github.com/MMarchand-NSI/lmc_lsp.git", ref = "v0.9.0" }`), instead of
   keeping a second, parallel copy of the lexer/parser/runner in this repo. Verified working: `gleam
   deps download` clones the private repo over the `gh` git-credential helper locally, and CI does the
   same over SSH with a read-only deploy key (see Commands below).
@@ -75,7 +75,8 @@ node scripts/check-manifest.mjs          # checks the extension manifest against
                                           # languages lmc_lsp speaks
 node scripts/check-grammar.mjs           # tokenizes with the real Oniguruma engine and checks the
                                           # TextMate grammar against lmc_lsp's lexer — the mnemonic
-                                          # and register tables, and what counts as a name
+                                          # and register tables, what counts as a name, and
+                                          # where a number (negative included) starts and ends
                                           # (needs `gleam build` *and* `gleam deps download`)
 ```
 
@@ -701,6 +702,24 @@ never just code review):
   sans être touchés — ce sont eux qui ont montré la nouvelle ligne à sa place. Corrigé en passant
   chez `lmc_lsp` : un test y exécutait `POP IX`, resté du renommage `IX` → `SI` de la v0.7.0, sur un
   programme qui portait un diagnostic sans que rien ne s'en plaigne.
+- **`lmc_lsp` v0.9.0 : les négatifs en complément à 10^4.** Un mot fait quatre chiffres, registres
+  compris ; 5000 à 9999 se lisent -5000 à -1. `BRP` teste le chiffre de tête, `OUT` sort la valeur
+  signée (la seule instruction qui interprète un mot), `INP` replie ce qu'on tape, `DAT -5`
+  assemble 9995, et `NoNegativeLiteral` est devenu `MinusNeedsDigits`. Aucune API utilisée ici n'a
+  bougé : bump, puis tout ce qui écrivait « pas de négatif » en dur.
+  **Trois endroits l'écrivaient, et la suite passait au vert sur tous les trois.** La grammaire
+  (`\b[0-9]+\b`, le `-` hors du nombre) : `check-grammar.mjs` ne testait aucun littéral négatif ; il
+  demande maintenant au vrai lexer où sont les entiers, cas limites compris (`DAT 1-2` donne deux
+  entiers, `DAT - 5` aucun signe), et exige que la grammaire colore les mêmes morceaux. Vérifié en
+  remettant l'ancienne règle : six échecs. `check-examples.mjs`, dont la regex d'en-tête n'admettait
+  que `[\d ]` : un cas `Sortie : -6` n'aurait pas échoué, il aurait été **sauté sans rien dire**.
+  Et `unit-05`, qui enseignait qu'`OUT` écrirait 9997 au lieu de -3 ; il porte maintenant le cas
+  `4 10 → -6`, et `unit-10` ne justifie plus son second piège par là.
+  Ce qui ne change pas, et c'est voulu : `parse_word` (`model.gleam`) n'accepte que 0-9999, parce
+  qu'un fichier objet contient des motifs, pas des valeurs signées. Et une entrée négative ne passe
+  plus par `dedupe_input_accumulator_change` : `InputConsumed(-5)` puis `AccumulatorChanged(0, 9995)`
+  portent deux valeurs, les deux lignes restent, et c'est la seconde qui montre le repliement
+  (`negative_input_keeps_both_lines_test`).
 - **A progressive `examples/unit-*.lmc` series**, thirteen files, one new thing each: `INP`/`OUT`,
   the input queue, `STA`/`LDA` on numbered cells, `ADD`, `SUB`, then `DAT` as *naming* (files 1 to 5
   use no `DAT` at all and address cells as `50`, which is the point: `DAT` is a convenience for the

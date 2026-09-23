@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Negative numbers, in ten's complement on four digits** (language server `lmc_lsp` 0.9.0). A
+  word from 5000 to 9999 now reads as -5000 to -1, and the sign survives a trip through memory:
+  `LDA a / SUB b / STA x / LDA x / BRP` used to lose it at the `STA`, it no longer does. `OUT`
+  prints the signed value (`-5`, not `9995`), `BRP` tests the leading digit, `DAT -5` assembles,
+  and typing `-5` into the input tray stores 9995. The memory grid and the registers still show the
+  raw four digits, and the Execute phase of an `INP` shows both: `ACC ← input (-5)` then
+  `ACC 0 → 9995`.
+- **`DAT -5` is coloured as one number**, minus sign included.
+
 ## 0.2.0
 
 - **`.lmc` and `.lmcobj` files have their own icons** in the explorer and in tabs: three lines of

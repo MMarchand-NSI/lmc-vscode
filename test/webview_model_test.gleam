@@ -563,6 +563,37 @@ pub fn add_accumulator_change_is_not_deduped_test() {
     ]
 }
 
+pub fn negative_input_keeps_both_lines_test() {
+  // Depuis lmc_lsp v0.9.0 (complément à 10^4), `INP` replie ce qu'on tape :
+  // -5 range le mot 9995. Les deux événements portent alors deux valeurs
+  // différentes, et le dédoublonnage ne s'applique plus — voulu : la
+  // seconde ligne est celle qui montre le repliement.
+  let m =
+    loaded("INP\nHLT\n")
+    |> model.run_to_halt
+    |> model.provide_input(-5)
+    |> model.step
+  let assert [_fetch, _decode, execute] = model.last_cycle(m)
+  assert execute.details
+    == [
+      text.WaitingForInput,
+      text.InputTaken(-5),
+      text.RegisterChanged("ACC", 0, 9995),
+    ]
+}
+
+pub fn negative_dat_survives_the_object_file_test() {
+  // `DAT -5` s'assemble en 9995 : le fichier objet ne contient que des
+  // motifs de quatre chiffres, et c'est `OUT` seul qui relit le signe.
+  let m =
+    loaded("LDA n\nOUT\nHLT\nn: DAT -5\n")
+    |> model.run_to_halt
+  let assert Some(code) = model.object_code(m)
+  assert string.contains(code, "9995")
+  let assert Some(machine) = m.machine
+  assert inspect.output_buffer(machine) == [-5]
+}
+
 pub fn events_clear_on_reset_test() {
   let m =
     loaded("INP\nOUT\nHLT\n")

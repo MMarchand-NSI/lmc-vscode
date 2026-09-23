@@ -4,12 +4,14 @@
 // toujours ACC moins la case, jamais l'inverse. Il faut donc charger le
 // premier nombre dans ACC avant de retirer le second.
 //
-// Ne fais pas descendre le résultat sous zéro : la machine sait calculer
-// avec des nombres négatifs, mais elle ne sait pas les afficher, et OUT
-// écrirait 9997 au lieu de -3. Le fichier 10 s'en sert justement pour
-// comparer deux nombres sans jamais afficher la différence.
+// Le résultat peut descendre sous zéro, et OUT affiche alors -6. Dans ACC
+// pourtant, c'est 9994 qui est rangé : la machine ne connaît que des mots
+// de quatre chiffres, et ce sont les mots de 5000 à 9999 qui comptent pour
+// des négatifs (9994 = 10000 - 6). Regarde le registre ACC pendant le pas
+// à pas. Le fichier 10 se sert de ce signe pour comparer deux nombres.
 //
 // Entrée : 10 4         Sortie : 6
+// Entrée : 4 10         Sortie : -6
 
         INP
         STA 50

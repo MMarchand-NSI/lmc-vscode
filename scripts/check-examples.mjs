@@ -76,9 +76,11 @@ for (const name of files) {
 
   // « Entrée : … » puis au moins deux espaces puis « Sortie : … ». Les deux
   // espaces séparent les colonnes de l'en-tête ; ce qui suit la sortie (une
-  // remarque entre parenthèses) n'est pas repris.
+  // remarque entre parenthèses) n'est pas repris. Le signe moins en fait
+  // partie depuis lmc_lsp v0.9.0, où OUT affiche -3 : sans lui, un cas à
+  // sortie négative ne serait pas refusé, il serait sauté sans rien dire.
   const cases = [
-    ...source.matchAll(/Entrée\s*:\s*([\d ]*?)\s{2,}Sortie\s*:\s*([\d ]*)/g),
+    ...source.matchAll(/Entrée\s*:\s*([-\d ]*?)\s{2,}Sortie\s*:\s*([-\d ]*)/g),
   ];
   // Seule la série unit-* promet ses cas dans son en-tête. Les autres
   // exemples ne sont pas tenus d'en porter ; s'ils en portent, ils sont

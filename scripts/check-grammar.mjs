@@ -146,6 +146,25 @@ for (const name of candidates) {
   check(`${JSON.stringify(name)} : serveur ${accepte ? "oui" : "non"}`, colore, accepte);
 }
 
+// ── Les nombres ─────────────────────────────────────────────────────
+// Même principe que les noms : pas de règle retapée ici, on demande au vrai
+// lexer où sont les entiers, et on exige que la grammaire colore exactement
+// ces morceaux-là. Le littéral négatif est arrivé en v0.9.0 ; la grammaire
+// d'avant laissait le « - » hors du nombre, et rien ici ne l'aurait vu.
+
+console.log("\nCe que le lexer lit comme entier, la grammaire le colore comme nombre");
+const lexer = await import(join(js, "lmc_lsp/lmc/parse/lexer.mjs"));
+for (const line of [
+  "        DAT 42", "        DAT -5", "        DAT - 5", "        DAT 1, -2",
+  "        DAT 1-2", "        DAT --5", "        DAT -0", "        LDA -5",
+]) {
+  const integers = lexer.tokenize(line).toArray()
+    .filter((t) => t.kind.constructor.name === "Integer").map((t) => t.text);
+  const numeric = scopes(line)
+    .filter(([, s]) => s === "constant.numeric.lmc").map(([t]) => t);
+  check(`${JSON.stringify(line.trim())} : lexer ${integers.join(" ")}`, numeric.join(" "), integers.join(" "));
+}
+
 // ── Le reste de la ligne ────────────────────────────────────────────
 
 console.log("\nLe reste");
